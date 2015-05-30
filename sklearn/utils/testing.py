@@ -709,7 +709,7 @@ def _delete_folder(folder_path, warn=False):
     Copy from joblib.pool (for independance)"""
     try:
         if os.path.exists(folder_path):
-            shutil.rmtree(folder_path)
+            shutil.rmtree(folder_path)  # This can fail under windows, but will succeed when called by atexit
     except shutil.WindowsError:
         if warn:
             warnings.warn("Could not delete temporary folder %s" % folder_path)
