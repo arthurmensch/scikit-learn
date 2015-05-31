@@ -46,7 +46,6 @@ from sklearn.feature_extraction.image import reconstruct_from_patches_2d
 
 ###############################################################################
 # Load Lena image and extract patches
-
 lena = lena() / 256.0
 
 # downsample for higher speed
@@ -74,7 +73,7 @@ print('done in %.2fs.' % (time() - t0))
 
 print('Learning the dictionary...')
 t0 = time()
-dico = MiniBatchDictionaryLearning(n_components=100, alpha=1, n_iter=500)
+dico = MiniBatchDictionaryLearning(n_components=100, alpha=1, n_iter=500, batch_size=100, n_jobs=4)
 V = dico.fit(data).components_
 dt = time() - t0
 print('done in %.2fs.' % dt)
