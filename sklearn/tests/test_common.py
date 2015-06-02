@@ -66,7 +66,7 @@ def test_non_meta_estimators():
             continue
         for check in _yield_all_checks(name, Estimator):
             yield check, name, Estimator
-    _
+    _clear_temp_memory(warn=False)
 
 
 def test_configure():
