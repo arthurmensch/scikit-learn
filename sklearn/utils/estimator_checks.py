@@ -6,6 +6,9 @@ import sys
 import traceback
 import inspect
 import pickle
+import tempfile
+import shutil
+import atexit
 from copy import deepcopy
 
 import numpy as np
@@ -47,6 +50,7 @@ from sklearn.datasets import load_iris, load_boston, make_blobs
 
 
 BOSTON = None
+_TEMP_MEMORY = None
 CROSS_DECOMPOSITION = ['PLSCanonical', 'PLSRegression', 'CCA', 'PLSSVD']
 
 
@@ -55,6 +59,7 @@ def _yield_non_meta_checks(name, Estimator):
     yield check_fit_score_takes_y
     yield check_dtype_object
     yield check_estimators_fit_returns_self
+    yield check_estimators_fit_readonly
 
     # Check that all estimator yield informative messages when
     # trained on empty datasets
@@ -90,6 +95,7 @@ def _yield_classifier_checks(name, Classifier):
     yield check_estimators_partial_fit_n_features
     # basic consistency testing
     yield check_classifiers_train
+    # TODO add check_classifiers_train_readonly
     if (name not in ["MultinomialNB", "LabelPropagation", "LabelSpreading"]
         # TODO some complication with -1 label
             and name not in ["DecisionTreeClassifier",
@@ -110,6 +116,7 @@ def _yield_regressor_checks(name, Regressor):
     # TODO: test with multiple responses
     # basic testing
     yield check_regressors_train
+    yield check_regressors_train_readonly
     yield check_regressor_data_not_an_array
     yield check_estimators_partial_fit_n_features
     yield check_regressors_no_decision_function
@@ -134,11 +141,13 @@ def _yield_transformer_checks(name, Transformer):
     if name not in ['AdditiveChi2Sampler', 'Binarizer', 'Normalizer']:
         # basic tests
         yield check_transformer_general
+        # TODO check_transformer_general_readonly
         yield check_transformers_unfitted
 
 
 def _yield_clustering_checks(name, Clusterer):
     yield check_clusterer_compute_labels_predict
+    # TODO check_clusterer_compute_labels_predict_readonly
     if name not in ('WardAgglomeration', "FeatureAgglomeration"):
         # this is clustering on the features
         # let's not test that here.
@@ -194,6 +203,42 @@ def _boston_subset(n_samples=200):
         X = StandardScaler().fit_transform(X)
         BOSTON = X, y
     return BOSTON
+
+
+def _read_only_boston_subset(n_samples=200):
+    global _TEMP_MEMORY
+    if _TEMP_MEMORY is None:
+        temp_folder = tempfile.mkdtemp(prefix='sklearn_checks_temp_')
+        _TEMP_MEMORY = Memory(cachedir=temp_folder, mmap_mode='r')
+        atexit.register(_clear_temp_memory(warn=True))
+    f = _TEMP_MEMORY.cache(_boston_subset)
+    return f(n_samples=n_samples)
+
+
+
+
+def _read_only_make_blobs(*args, **kwargs):
+    global _TEMP_MEMORY
+    if _TEMP_MEMORY is None:
+        temp_folder = tempfile.mkdtemp(prefix='sklearn_checks_temp_')
+
+def _boston_subset_with_mode(readonly=False):
+    if readonly:
+        return _read_only_boston_subset()
+    else:
+        return _boston_subset()
+
+
+def _clear_temp_memory(warn=False):
+    global _TEMP_MEMORY
+    if _TEMP_MEMORY is not None:
+        try:
+            cachedir = _TEMP_MEMORY.cachedir
+            _TEMP_MEMORY = None
+            shutil.rmtree(_TEMP_MEMORY.cachedir)
+        except shutil.WindowsError:
+            if warn:
+                warnings.warn("Could not delete temporary folder %s" % cachedir)
 
 
 def set_fast_parameters(estimator):
@@ -342,7 +387,7 @@ def check_transformer_data_not_an_array(name, Transformer):
 
 def check_transformers_unfitted(name, Transformer):
     X, y = _boston_subset()
-
+    
     with warnings.catch_warnings(record=True):
         transformer = Transformer()
 
@@ -793,6 +838,21 @@ def check_estimators_fit_returns_self(name, Estimator):
 
     assert_true(estimator.fit(X, y) is estimator)
 
+def check_estimators_fit_readonly(name, Estimator):
+    """Check if fit does not fail on memory mapped data with mmap_mode = 'r'"""
+    X, y = _read_only_boston_subset()
+    y = multioutput_estimator_convert_y_2d(name, y)
+    # some want non-negative input
+    X -= X.min()
+
+    estimator = Estimator()
+
+    set_fast_parameters(estimator)
+    set_random_state(estimator)
+
+    assert_true(estimator.fit(X, y) is estimator)
+
+
 
 @ignore_warnings
 def check_estimators_unfitted(name, Estimator):
@@ -913,7 +973,7 @@ def check_classifiers_pickle(name, Classifier):
 
 
 def check_regressors_int(name, Regressor):
-    X, _ = _boston_subset()
+    X, y = _boston_subset()
     X = X[:50]
     rnd = np.random.RandomState(0)
     y = rnd.randint(3, size=X.shape[0])
@@ -930,8 +990,10 @@ def check_regressors_int(name, Regressor):
     set_random_state(regressor_2)
 
     if name in CROSS_DECOMPOSITION:
+        # TODO: this creates a copy, y ceases to be readonly withr readonly=True
         y_ = np.vstack([y, 2 * y + rnd.randint(2, size=len(y))])
         y_ = y_.T
+
     else:
         y_ = y
 
@@ -943,8 +1005,12 @@ def check_regressors_int(name, Regressor):
     assert_array_almost_equal(pred1, pred2, 2, name)
 
 
-def check_regressors_train(name, Regressor):
-    X, y = _boston_subset()
+def check_regressors_train_readonly(name, Regressors):
+    check_regressors_int(name, Regressors, readonly=False)
+
+
+def check_regressors_train(name, Regressor, readonly=False):
+    X, y = _boston_subset_with_mode(readonly)
     y = StandardScaler().fit_transform(y)   # X is already scaled
     y = multioutput_estimator_convert_y_2d(name, y)
     rnd = np.random.RandomState(0)
@@ -1180,7 +1246,7 @@ def check_classifier_data_not_an_array(name, Estimator):
 
 
 def check_regressor_data_not_an_array(name, Estimator):
-    X, y = _boston_subset(n_samples=50)
+    X, y = _boston_subset()
     y = multioutput_estimator_convert_y_2d(name, y)
     check_estimators_data_not_an_array(name, Estimator, X, y)
 
