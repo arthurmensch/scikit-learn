@@ -363,7 +363,7 @@ def check_array(array, accept_sparse=None, dtype="numeric", order=None,
     else:
         if ensure_2d:
             array = np.atleast_2d(array)
-
+        # XXX: this transform memmap into array, preventing us from directly testing estimators with read-only input
         array = np.array(array, dtype=dtype, order=order, copy=copy)
         # make sure we actually converted to numeric:
         if dtype_numeric and array.dtype.kind == "O":
