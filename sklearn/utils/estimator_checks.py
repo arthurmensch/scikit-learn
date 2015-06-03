@@ -256,7 +256,7 @@ def _init_temp_memory():
     global _TEMP_MEMORY
     if _TEMP_MEMORY is None:
         temp_folder = tempfile.mkdtemp(prefix='sklearn_checks_temp_')
-        _TEMP_MEMORY = Memory(cachedir=temp_folder, mmap_mode='r')
+        _TEMP_MEMORY = Memory(cachedir=temp_folder, mmap_mode='r', verbose=0)
         # Cannot use atexit as it is called everytime a test end, thus forcing us to regenerate cache at every check
         # atexit.register(_clear_temp_memory(warn=True))
 
