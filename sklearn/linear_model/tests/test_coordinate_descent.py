@@ -390,11 +390,12 @@ def test_multi_task_lasso_and_enet():
 
 
 def test_lasso_readonly_data():
-    X = np.array([[-1], [0], [1]])
-    Y = np.array([-1, 0, 1])   # just a straight line
-    T = np.array([[2], [3], [4]])  # test sample
+    X = np.asfortranarray(np.array([[-1.], [0.], [1.]]))
+    Y = np.asfortranarray(np.array([-1., 0., 1.]))  # just a straight line
+
+    T = np.array([[2.], [3.], [4.]])  # test sample
     with TempMemmap((X, Y)) as (X, Y):
-        clf = Lasso(alpha=0.5)
+        clf = Lasso(alpha=0.5, copy_X=False)
         clf.fit(X, Y)
         pred = clf.predict(T)
         assert_array_almost_equal(clf.coef_, [.25])
