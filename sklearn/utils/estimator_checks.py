@@ -194,7 +194,6 @@ def check_estimator(Estimator):
         check(name, Estimator)
 
 
-# Utility dataset functions, used by check functions
 def _boston_subset(n_samples=200):
     """Utility function used to cache boston subset into a global variable"""
     global BOSTON
