@@ -23,11 +23,14 @@ import matplotlib.pyplot as plt
 from sklearn.datasets import fetch_olivetti_faces
 from sklearn.cluster import MiniBatchKMeans
 from sklearn import decomposition
+from sklearn.decomposition.dict_learning import sparse_encode
+
+import numpy as np
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
-n_row, n_col = 2, 3
+n_row, n_col = 5, 3
 n_components = n_row * n_col
 image_shape = (64, 64)
 rng = RandomState(0)
@@ -38,6 +41,9 @@ dataset = fetch_olivetti_faces(shuffle=True, random_state=rng)
 faces = dataset.data
 
 n_samples, n_features = faces.shape
+
+l1_ratio = 0.3
+alpha = 1
 
 # global centering
 faces_centered = faces - faces.mean(axis=0)
@@ -66,38 +72,50 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 # List of the different estimators, whether to center and transpose the
 # problem, and whether the transformer uses the clustering API.
 estimators = [
-    ('Eigenfaces - RandomizedPCA',
-     decomposition.RandomizedPCA(n_components=n_components, whiten=True),
-     True),
+    # ('Eigenfaces - RandomizedPCA',
+    #  decomposition.RandomizedPCA(n_components=n_components, whiten=True),
+    #  True),
+    #
+    # ('Non-negative components - NMF',
+    #  decomposition.NMF(n_components=n_components, init='nndsvda', beta=5.0,
+    #                    tol=5e-3, sparseness='components'),
+    #  False),
+    #
+    # ('Independent components - FastICA',
+    #  decomposition.FastICA(n_components=n_components, whiten=True),
+    #  True),
+    #
+    # ('Sparse comp. - MiniBatchSparsePCA',
+    #  decomposition.MiniBatchSparsePCA(n_components=n_components, alpha=0.6,
+    #                                   n_iter=50, batch_size=3,
+    #                                   random_state=rng),
+    #  True),
+    #
+    # ('MiniBatchDictionaryLearning',
+    #     decomposition.MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1,
+    #                                               n_iter=50, batch_size=10,
+    #                                               random_state=rng),
+    #  True),
+    #
+    # ('Cluster centers - MiniBatchKMeans',
+    #     MiniBatchKMeans(n_clusters=n_components, tol=1e-3, batch_size=20,
+    #                     max_iter=50, random_state=rng),
+    #  True),
+    #
+    # ('Factor Analysis components - FA',
+    #  decomposition.FactorAnalysis(n_components=n_components, max_iter=2),
+    #  True),
 
-    ('Non-negative components - NMF',
-     decomposition.NMF(n_components=n_components, init='nndsvda', beta=5.0,
-                       tol=5e-3, sparseness='components'),
-     False),
-
-    ('Independent components - FastICA',
-     decomposition.FastICA(n_components=n_components, whiten=True),
-     True),
-
-    ('Sparse comp. - MiniBatchSparsePCA',
-     decomposition.MiniBatchSparsePCA(n_components=n_components, alpha=0.8,
-                                      n_iter=100, batch_size=3,
-                                      random_state=rng),
-     True),
-
-    ('MiniBatchDictionaryLearning',
-        decomposition.MiniBatchDictionaryLearning(n_components=15, alpha=0.1,
-                                                  n_iter=50, batch_size=3,
-                                                  random_state=rng),
-     True),
-
-    ('Cluster centers - MiniBatchKMeans',
-        MiniBatchKMeans(n_clusters=n_components, tol=1e-3, batch_size=20,
-                        max_iter=50, random_state=rng),
-     True),
-
-    ('Factor Analysis components - FA',
-     decomposition.FactorAnalysis(n_components=n_components, max_iter=2),
+    ('Sparse comp. - MiniBatchDictionaryLearning',
+     decomposition.MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1,
+                                               n_iter=400, batch_size=10,
+                                               fit_algorithm='ols',
+                                               fit_constraint='enet',
+                                               tol=1e-4,
+                                               verbose=10,
+                                               l1_ratio=l1_ratio,
+                                               random_state=rng,
+                                               n_jobs=1),
      True),
 ]
 
@@ -109,7 +127,6 @@ plot_gallery("First centered Olivetti faces", faces_centered[:n_components])
 
 ###############################################################################
 # Do the estimation and plot it
-
 for name, estimator, center in estimators:
     print("Extracting the top %d %s..." % (n_components, name))
     t0 = time()
@@ -129,5 +146,14 @@ for name, estimator, center in estimators:
                      n_row=1)
     plot_gallery('%s - Train time %.1fs' % (name, train_time),
                  components_[:n_components])
+
+    if name == 'Sparse comp. - MiniBatchDictionaryLearning':
+        print("%s - Component density" % name)
+        print 1 - np.sum(components_ == 0) / float(np.size(components_))
+        print("%s - Component density" % name)
+        code = sparse_encode(data, components_, algorithm='ols')
+        print 1 - np.sum(code == 0) / float(np.size(code))
+        plot_gallery('%s - Reconstruction' % name,
+                     code[:n_components].dot(components_))
 
 plt.show()

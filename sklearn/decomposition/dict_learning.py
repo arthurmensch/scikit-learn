@@ -21,7 +21,10 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
                      gen_batches, _get_n_jobs)
 from ..utils.extmath import randomized_svd, row_norms
 from ..utils.validation import check_is_fitted
-from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars
+from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge
+from .dict_learning_fast import _update_dict_fast
+
+from multiprocessing.pool import ThreadPool
 
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
@@ -47,7 +50,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     cov: array, shape=(n_components, n_samples)
         Precomputed covariance, dictionary * X'
 
-    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold'}
+    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold', 'ols'}
         lars: uses the least angle regression method (linear_model.lars_path)
         lasso_lars: uses Lars to compute the Lasso solution
         lasso_cd: uses the coordinate descent method to compute the
@@ -56,6 +59,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         omp: uses orthogonal matching pursuit to estimate the sparse solution
         threshold: squashes to zero all coefficients less than regularization
         from the projection dictionary * data'
+        ols: uses a non-penalized least square fit (regularization parameter is ignored)
 
     regularization : int | float
         The regularization parameter. It corresponds to alpha when
@@ -132,9 +136,16 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         new_code = orthogonal_mp_gram(gram, cov, regularization, None,
                                       row_norms(X, squared=True),
                                       copy_Xy=copy_cov).T
+
+    elif algorithm == 'ols':
+        # Should be put into sparse_encode
+        lr = Ridge(alpha=1e-6, fit_intercept=False, normalize=False)
+        lr.fit(dictionary.T, X.T)
+        new_code = lr.coef_
+
     else:
         raise ValueError('Sparse coding method must be "lasso_lars" '
-                         '"lasso_cd",  "lasso", "threshold" or "omp", got %s.'
+                         '"lasso_cd",  "lasso", "threshold", "ols" or "omp", got %s.'
                          % algorithm)
     return new_code
 
@@ -168,7 +179,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     cov: array, shape=(n_components, n_samples)
         Precomputed covariance, dictionary' * X
 
-    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold'}
+    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold', 'ols'}
         lars: uses the least angle regression method (linear_model.lars_path)
         lasso_lars: uses Lars to compute the Lasso solution
         lasso_cd: uses the coordinate descent method to compute the
@@ -177,6 +188,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         omp: uses orthogonal matching pursuit to estimate the sparse solution
         threshold: squashes to zero all coefficients less than alpha from
         the projection dictionary * X'
+        ols: uses a non-penalized least square fit (regularization parameter is ignored)
 
     n_nonzero_coefs: int, 0.1 * n_features by default
         Number of nonzero coefficients to target in each column of the
@@ -257,12 +269,14 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
         code[this_slice] = this_view
+
     return code
 
 
-def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
-                 random_state=None):
-    """Update the dense dictionary factor in place.
+def _update_dict_unitary_component(dictionary, Y, code, verbose=False, return_r2=False,
+                                   online=False,
+                                   random_state=None):
+    """Update the dense dictionary factor in place, constraining dictionary component to have a unit l2 norm.
 
     Parameters
     ----------
@@ -282,6 +296,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         Whether to compute and return the residual sum of squares corresponding
         to the computed solution.
 
+    online: bool,
+        Wether the update we perform is part of an online algorithm or not (this changes derivation of residuals
+        and of step size)
+
     random_state: int or RandomState
         Pseudo number generator state used for random sampling.
 
@@ -291,8 +309,9 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         Updated dictionary.
 
     """
+
     n_components = len(code)
-    n_samples = Y.shape[0]
+    n_features = Y.shape[0]
     random_state = check_random_state(random_state)
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(dictionary, code)
@@ -302,7 +321,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     for k in range(n_components):
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-        dictionary[:, k] = np.dot(R, code[k, :].T)
+        if online:
+            dictionary[:, k] = R[:, k]
+        else:
+            dictionary[:, k] = np.dot(R, code[k, :].T)
         # Scale k'th atom
         atom_norm_square = np.dot(dictionary[:, k], dictionary[:, k])
         if atom_norm_square < 1e-20:
@@ -311,24 +333,91 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                 sys.stdout.flush()
             elif verbose:
                 print("Adding new random atom")
-            dictionary[:, k] = random_state.randn(n_samples)
+            dictionary[:, k] = random_state.randn(n_features)
             # Setting corresponding coefs to 0
             code[k, :] = 0.0
             dictionary[:, k] /= sqrt(np.dot(dictionary[:, k],
                                             dictionary[:, k]))
+
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
             # R <- -1.0 * U_k * V_k^T + R
             R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+
     if return_r2:
-        R **= 2
-        # R is fortran-ordered. For numpy version < 1.6, sum does not
-        # follow the quick striding first, and is thus inefficient on
-        # fortran ordered data. We take a flat view of the data with no
-        # striding
-        R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
-        R = np.sum(R)
-        return dictionary, R
+        if online:
+            R += Y
+            residual = -np.sum(dictionary * R) / 2
+        else:
+            R **= 2
+            # R is fortran-ordered. For numpy version < 1.6, sum does not
+            # follow the quick striding first, and is thus inefficient on
+            # fortran ordered data. We take a flat view of the data with no
+            # striding
+            R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
+            residual = np.sum(R)
+        return dictionary, residual
+    return dictionary
+
+
+def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+                 l1_ratio=0.1, radius=1.,
+                 random_state=None,
+                 pool=None):
+    """Update the dense dictionary factor in place, constraining feature vectors (holding each component value for this
+    feature) to stay on an elastic net ball, which allows sparsity enforcement.
+
+    Parameters
+    ----------
+    dictionary: array of shape (n_features, n_components)
+        Value of the dictionary at the previous iteration.
+
+    Y: array of shape (n_features, n_samples)
+        Data matrix.
+
+    code: array of shape (n_components, n_samples)
+        Sparse coding of the data against which to optimize the dictionary.
+
+    l1_ratio: float,
+        Sparsity controlling parameter for dictionary components in elastic net setting
+
+    verbose:
+        Degree of output the procedure will print.
+
+    return_r2: bool
+        Whether to compute and return the residual sum of squares corresponding
+        to the computed solution.
+
+    random_state: int or RandomState
+        Pseudo number generator state used for random sampling.
+
+    pool : ThreadPool,
+        thread pool to use
+
+    Returns
+    -------
+    dictionary: array of shape (n_features, n_components)
+        Updated dictionary.
+
+    """
+    # Residuals, computed 'in-place' for efficiency
+    n_features = dictionary.shape[0]
+
+    R = -np.dot(dictionary, code)
+    R += Y
+    permutation = random_state.permutation(n_features)
+    if pool is None:
+        _update_dict_fast(dictionary, R, code, permutation, l1_ratio, radius)
+    # Cythonized because of large loop with n_features iterations
+    else:
+        slices = list(gen_even_slices(n_features, pool._processes))
+        pool.map(lambda this_slice: _update_dict_fast(dictionary[this_slice], R[this_slice],
+                                                           code, l1_ratio, radius),
+                 slices)
+    if return_r2:
+        R += Y
+        residual = -np.sum(dictionary * R) / 2
+        return dictionary, residual
     return dictionary
 
 
@@ -475,9 +564,9 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         code = sparse_encode(X, dictionary, algorithm=method, alpha=alpha,
                              init=code, n_jobs=n_jobs)
         # Update dictionary
-        dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
-                                             verbose=verbose, return_r2=True,
-                                             random_state=random_state)
+        dictionary, residuals = _update_dict_unitary_component(dictionary.T, X.T, code.T,
+                                                               verbose=verbose, return_r2=True,
+                                                               random_state=random_state)
         dictionary = dictionary.T
 
         # Cost function
@@ -503,10 +592,12 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         return code, dictionary, errors
 
 
-def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
+def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
-                         method='lars', iter_offset=0, random_state=None,
+                         method='lars', constraint='unitary_component',
+                         iter_offset=0, tol=1e-4,
+                         random_state=None,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False):
     """Solves a dictionary learning matrix factorization problem online.
@@ -559,12 +650,24 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     n_jobs : int,
         Number of parallel jobs to run, or -1 to autodetect.
 
-    method : {'lars', 'cd'}
+    method : {'lars', 'cd', 'ols'}
         lars: uses the least angle regression method to solve the lasso problem
         (linear_model.lars_path)
         cd: uses the coordinate descent method to compute the
         Lasso solution (linear_model.Lasso). Lars will be faster if
         the estimated components are sparse.
+        ols: compute code using an ordinary least square method. alpha will be ignored
+
+    constraint : {'unitary_component', 'enet'}
+        Constraint on the dictionary used when updating it
+        unitary_component: constraining the dictionary to stay on the l2 unit ball. l1_ratio will be ignored
+        enet: constraining the dictionary to stay on the enet ball
+
+    l1_ratio: float,
+        Sparsity controlling parameter for enet projection
+
+    tol: float,
+        Stop controlling parameter
 
     iter_offset : int, default 0
         Number of previous iterations completed on the dictionary used for
@@ -613,9 +716,12 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     if n_components is None:
         n_components = X.shape[1]
 
-    if method not in ('lars', 'cd'):
+    if constraint not in ('unitary_component', 'enet'):
+        raise ValueError('Dictionary constraint not supported as a fit algorithm.')
+    if method not in ('lars', 'cd', 'ols'):
         raise ValueError('Coding method not supported as a fit algorithm.')
-    method = 'lasso_' + method
+    if method in ('lars', 'cd'):
+        method = 'lasso_' + method
 
     t0 = time.time()
     n_samples, n_features = X.shape
@@ -625,6 +731,13 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
 
     if n_jobs == -1:
         n_jobs = cpu_count()
+
+    # Using a thread pool in the enet constraint setting
+    # if constraint is 'enet':
+    if n_jobs > 1:
+        pool = ThreadPool(n_jobs)
+    else:
+        pool = None
 
     # Init V with SVD of X
     if dict_init is not None:
@@ -662,8 +775,21 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         A = inner_stats[0].copy()
         B = inner_stats[1].copy()
 
+    # Residual variable for tolerance computation
+    last_residual = float("inf")
+    this_residual = 0
+    penalty = 0
+    patience = max(1, n_samples / (10*batch_size))
+    this_patience = 0
+
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
+
+    # XXX: To be removed, for testing purpose only
+    # residuals = np.zeros(n_iter)
+    # density = np.zeros(n_iter)
+    # values = np.zeros((n_iter, 10))
+    # voxels = random_state.permutation(n_features)[:10]
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         this_X = X_train[batch]
@@ -675,9 +801,9 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
             if verbose > 10 or ii % ceil(100. / verbose) == 0:
                 print ("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                        % (ii, dt, dt / 60))
-
+        # Setting n_jobs > 1 does not improve performance
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                  alpha=alpha, n_jobs=n_jobs).T
+                                  alpha=0.1, n_jobs=1).T
 
         # Update the auxiliary variables
         if ii < batch_size - 1:
@@ -692,14 +818,58 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         B += np.dot(this_X.T, this_code.T)
 
         # Update dictionary
-        dictionary = _update_dict(dictionary, B, A, verbose=verbose,
-                                  random_state=random_state)
-        # XXX: Can the residuals be of any use?
+        if constraint == 'unitary_component':
+            dictionary, this_residual = _update_dict_unitary_component(dictionary, B, A, verbose=verbose,
+                                                                       random_state=random_state, return_r2=True,
+                                                                       )
+        else:
+            dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose,
+                                                     l1_ratio=l1_ratio,
+                                                     radius=1,
+                                                     random_state=random_state, return_r2=True,
+                                                     pool=pool)
+
+        # Residual handling
+        # XXX: How should we scale the penalty so it stays coherent for all algorithm ?
+        if method != 'ols':
+            penalty += alpha * np.sum(this_code)
+            this_residual += penalty
+        this_residual /= iter_offset + (ii * batch_size) + 1
+        change_ratio = abs(this_residual / last_residual - 1)
+        if last_residual == 0:
+            this_patience = patience
+        else:
+            if change_ratio < tol:
+                this_patience += 1
+            else:
+                this_patience = 0
+        if this_patience >= patience:
+            print(u'{0:d} itertation'.format(ii))
+            break
+        last_residual = this_residual
+
+        # XXX: To be removed, for testing purpose only
+        # residuals[ii] = this_residual
+        # values[ii] = dictionary[voxels, 0] / sqrt(np.sum(dictionary[:, 0] ** 2))
+        # density[ii] = 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary)
 
         # Maybe we need a stopping criteria based on the amount of
         # modification in the dictionary
         if callback is not None:
             callback(locals())
+
+    if pool is not None:
+        pool.close()
+    #
+    # if constraint == 'enet':
+    #     # Spatial maps need to be L2 normalized for consistency
+    #     S = np.sum(dictionary ** 2, axis=1)
+    #     dictionary /= S[:, np.newaxis]
+
+    # XXX: To be removed, for testing purpose only
+    # np.save('tests/residuals', residuals)
+    # np.save('tests/density', density)
+    # np.save('tests/values', values)
 
     if return_inner_stats:
         if return_n_iter:
@@ -1049,18 +1219,31 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     alpha : float,
         sparsity controlling parameter
 
+    l1_ratio: float,
+        sparsity controlling parameter, for 'elastic_net' method only
+
+    tol: float,
+        Tolerance for the stopping condition.
+
     n_iter : int,
         total number of iterations to perform
 
-    fit_algorithm : {'lars', 'cd'}
+    fit_algorithm : {'lars', 'cd', 'ols'}
         lars: uses the least angle regression method to solve the lasso problem
         (linear_model.lars_path)
         cd: uses the coordinate descent method to compute the
         Lasso solution (linear_model.Lasso). Lars will be faster if
         the estimated components are sparse.
+        elastic_net: Perform gradient-descent with elastic net projection
+        to enforce dictionary sparsity, outputting non sparse code
+
+    fit_constraint : {'unitary_component', 'enet'}
+        Constraint on the dictionary used when updating it
+        unitary_component: constraining the dictionary to stay on the l2 unit ball. l1_ratio will be ignored
+        enet: constraining the dictionary to stay on the enet ball
 
     transform_algorithm : {'lasso_lars', 'lasso_cd', 'lars', 'omp', \
-    'threshold'}
+    'threshold', 'ols'}
         Algorithm used to transform the data.
         lars: uses the least angle regression method (linear_model.lars_path)
         lasso_lars: uses Lars to compute the Lasso solution
@@ -1070,6 +1253,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         omp: uses orthogonal matching pursuit to estimate the sparse solution
         threshold: squashes to zero all coefficients less than alpha from
         the projection dictionary * X'
+        ols: uses a non-penalized least square fit (regularization parameter is ignored)
 
     transform_n_nonzero_coefs : int, ``0.1 * n_features`` by default
         Number of nonzero coefficients to target in each column of the
@@ -1095,6 +1279,12 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
     dict_init : array of shape (n_components, n_features),
         initial value of the dictionary for warm restart scenarios
+
+    dict_constraint : {'elastic_net', None}
+        elastic_net : constraint dictionary on the elastic net ball, yielding sparse components
+
+    l1_ratio: float,
+        Sparsity controlling parameter for dictionary components
 
     verbose :
         degree of verbosity of the printed output
@@ -1139,12 +1329,12 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     MiniBatchSparsePCA
 
     """
-    def __init__(self, n_components=None, alpha=1, n_iter=1000,
-                 fit_algorithm='lars', n_jobs=1, batch_size=3,
-                 shuffle=True, dict_init=None, transform_algorithm='omp',
+    def __init__(self, n_components=None, alpha=1, l1_ratio=0.5, n_iter=1000,
+                 fit_algorithm='lars', fit_constraint='unitary_component', n_jobs=1, batch_size=3,
+                 shuffle=True, dict_init=None, transform_algorithm='omp', tol=1e-4,
                  transform_n_nonzero_coefs=None, transform_alpha=None,
-                 verbose=False, split_sign=False, random_state=None):
-
+                 verbose=False, split_sign=False,
+                 random_state=None):
         self._set_sparse_coding_params(n_components, transform_algorithm,
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
@@ -1157,6 +1347,9 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.batch_size = batch_size
         self.split_sign = split_sign
         self.random_state = random_state
+        self.l1_ratio = l1_ratio
+        self.fit_constraint = fit_constraint
+        self.tol = tol
 
     def fit(self, X, y=None):
         """Fit the model from data in X.
@@ -1179,9 +1372,12 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             X, self.n_components, self.alpha,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
+            constraint=self.fit_constraint,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=random_state,
+            l1_ratio=self.l1_ratio,
+            tol=self.tol,
             return_inner_stats=True,
             return_n_iter=True)
         self.components_ = U
@@ -1224,6 +1420,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         U, (A, B) = dict_learning_online(
             X, self.n_components, self.alpha,
             n_iter=self.n_iter, method=self.fit_algorithm,
+            constraint=self.fit_constraint,
+            l1_ratio=self.l1_ratio,
             n_jobs=self.n_jobs, dict_init=dict_init,
             batch_size=len(X), shuffle=False,
             verbose=self.verbose, return_code=False,
