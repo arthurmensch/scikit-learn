@@ -363,8 +363,10 @@ def check_array(array, accept_sparse=None, dtype="numeric", order=None,
     else:
         if ensure_2d:
             array = np.atleast_2d(array)
-
-        array = np.array(array, dtype=dtype, order=order, copy=copy)
+        if copy:
+            array = np.array(array, dtype=dtype, order=order, copy=copy)
+        else:
+            array = np.asarray(array, dtype=dtype, order=order)
         # make sure we actually converted to numeric:
         if dtype_numeric and array.dtype.kind == "O":
             array = array.astype(np.float64)

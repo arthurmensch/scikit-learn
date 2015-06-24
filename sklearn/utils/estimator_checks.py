@@ -193,7 +193,7 @@ def check_estimator(Estimator):
         check(name, Estimator)
 
 
-def _boston_subset(n_samples=200):
+def _boston_subset(n_samples=200, positive=False):
     global BOSTON
     if BOSTON is None:
         boston = load_boston()
@@ -201,32 +201,42 @@ def _boston_subset(n_samples=200):
         X, y = shuffle(X, y, random_state=0)
         X, y = X[:n_samples], y[:n_samples]
         X = StandardScaler().fit_transform(X)
+        if positive:
+            X -= X.min()
         BOSTON = X, y
     return BOSTON
 
 
-def _read_only_boston_subset(n_samples=200):
+def _read_only_boston_subset(n_samples=200, positive=False):
     global _TEMP_MEMORY
     if _TEMP_MEMORY is None:
         temp_folder = tempfile.mkdtemp(prefix='sklearn_checks_temp_')
         _TEMP_MEMORY = Memory(cachedir=temp_folder, mmap_mode='r')
-        atexit.register(_clear_temp_memory(warn=True))
+        # atexit.register(_clear_temp_memory(warn=True))
     f = _TEMP_MEMORY.cache(_boston_subset)
-    return f(n_samples=n_samples)
+    return f(n_samples=n_samples, positive=positive)
 
 
+def _make_blobs(*args, **kwargs):
+    positive = kwargs.pop('positive', False)
+    X, y = make_blobs(*args, **kwargs)
+    if positive:
+        X -= X.min()
+    return X, y
 
 
 def _read_only_make_blobs(*args, **kwargs):
     global _TEMP_MEMORY
     if _TEMP_MEMORY is None:
         temp_folder = tempfile.mkdtemp(prefix='sklearn_checks_temp_')
+        f = _TEMP_MEMORY.cache(_make_blobs)
+    return f(*args, **kwargs)
 
-def _boston_subset_with_mode(readonly=False):
+def _boston_subset_with_mode(readonly=False, positive=False):
     if readonly:
-        return _read_only_boston_subset()
+        return _read_only_boston_subset(positive)
     else:
-        return _boston_subset()
+        return _boston_subset(positive)
 
 
 def _clear_temp_memory(warn=False):
@@ -840,10 +850,8 @@ def check_estimators_fit_returns_self(name, Estimator):
 
 def check_estimators_fit_readonly(name, Estimator):
     """Check if fit does not fail on memory mapped data with mmap_mode = 'r'"""
-    X, y = _read_only_boston_subset()
+    X, y = _read_only_boston_subset(positive=True)
     y = multioutput_estimator_convert_y_2d(name, y)
-    # some want non-negative input
-    X -= X.min()
 
     estimator = Estimator()
 
@@ -1006,7 +1014,7 @@ def check_regressors_int(name, Regressor):
 
 
 def check_regressors_train_readonly(name, Regressors):
-    check_regressors_int(name, Regressors, readonly=False)
+    check_regressors_train(name, Regressors, readonly=False)
 
 
 def check_regressors_train(name, Regressor, readonly=False):
