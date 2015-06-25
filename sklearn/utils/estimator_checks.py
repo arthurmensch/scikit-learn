@@ -712,6 +712,7 @@ def check_estimators_partial_fit_n_features(name, Alg):
 
 def check_clustering(name, Alg, readonly=False):
     X, y = _make_blobs_with_mode(n_samples=50, random_state=1, readonly=readonly)
+    # TODO: this breaks read only mode
     X, y = shuffle(X, y, random_state=7)
     X = StandardScaler().fit_transform(X)
     n_samples, n_features = X.shape
@@ -1045,7 +1046,7 @@ def check_regressors_int(name, Regressor):
 
 
 def check_regressors_train_readonly(name, Regressors):
-    check_regressors_train(name, Regressors, readonly=False)
+    check_regressors_train(name, Regressors, readonly=True)
 
 
 def check_regressors_train(name, Regressor, readonly=False):
