@@ -875,6 +875,7 @@ def check_classifiers_train_readonly(name, Classifier):
 def check_estimators_fit_returns_self(name, Estimator, readonly=False):
     """Check if self is returned when calling fit"""
     X, y = _make_blobs_with_mode(random_state=0, n_samples=9, n_features=4, readonly=readonly, positive=True)
+    # In _make_blobs :
     # some want non-negative input
     # X -= X.min()
     y = multioutput_estimator_convert_y_2d(name, y)
