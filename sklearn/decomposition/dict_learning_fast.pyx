@@ -10,6 +10,7 @@ from ..utils.enet_proj_fast cimport _enet_projection_with_mask, DOUBLE, UINT8_t,
 from ..utils._random cimport sample_without_replacement
 
 from libc.stdlib cimport malloc, free
+from libc.stdio cimport printf
 
 
 cdef extern from "cblas.h":
@@ -33,7 +34,7 @@ cdef extern from "cblas.h":
 @cython.wraparound(False)
 @cython.initializedcheck(False)
 cpdef void _update_dict_fast(DOUBLE[:, :] dictionary, DOUBLE[:, :] R,
-                             DOUBLE[:, :] code, long[:] permutation,
+                             DOUBLE[:, :] code,
                              double l1_ratio,
                              double radius) nogil:
     cdef int n_features = dictionary.shape[0]
@@ -48,15 +49,15 @@ cpdef void _update_dict_fast(DOUBLE[:, :] dictionary, DOUBLE[:, :] R,
     cdef UINT8_t * mask
     cdef double norm
     cdef int random_state = 0
-    # Initializing mask here to avoid too much malloc
-    mask = <UINT8_t *>malloc(n_features * sizeof(UINT8_t))
+    with nogil:
+        # Initializing mask here to avoid too much malloc
+        mask = <UINT8_t *>malloc(n_features * sizeof(UINT8_t))
 
-    for idx in range(n_features):
-        j = permutation[idx]
-        # R[j, :] += np.dot(dictionary[j, :], code)
-        dgemv(CblasRowMajor, CblasTrans, n_components, n_samples, 1., code_ptr, n_components,
-             dictionary_ptr + j * n_components, 1, 1., R_ptr + j * n_samples, 1)
-        norm = _enet_projection_with_mask(dictionary[j, :], R[j, :], mask, radius, l1_ratio, random_state)
-        dgemv(CblasRowMajor, CblasTrans, n_components, n_samples, -1., code_ptr, n_components,
-              dictionary_ptr + j * n_components, 1, 1., R_ptr + j * n_samples, 1)
-    free(mask)
+        for j in range(n_features):
+            # R[j, :] += np.dot(dictionary[j, :], code)
+            dgemv(CblasRowMajor, CblasTrans, n_components, n_samples, 1., code_ptr, n_components,
+                 dictionary_ptr + j * n_components, 1, 1., R_ptr + j * n_samples, 1)
+            norm = _enet_projection_with_mask(dictionary[j, :], R[j, :], mask, radius, l1_ratio, random_state)
+            dgemv(CblasRowMajor, CblasTrans, n_components, n_samples, -1., code_ptr, n_components,
+                  dictionary_ptr + j * n_components, 1, 1., R_ptr + j * n_samples, 1)
+        free(mask)

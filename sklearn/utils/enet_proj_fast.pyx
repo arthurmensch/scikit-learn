@@ -14,6 +14,7 @@ from libc.math cimport sqrt
 
 from libc.stdlib cimport malloc, free
 
+from enet_proj_fast cimport DOUBLE, UINT32_t, UINT8_t
 
 # The following two functions are shamelessly copied from the tree code.
 @cython.cdivision(True)
