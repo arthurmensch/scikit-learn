@@ -261,9 +261,9 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
     if pool is not None and algorithm is 'lasso_cd':
         slices = list(gen_even_slices(n_samples, pool._processes))
-        code_views = pool.map(lambda this_slice_: _sparse_encode(X[this_slice_].copy(), dictionary, gram, cov[:, this_slice_].copy(), algorithm,
+        code_views = pool.map(lambda this_slice_: _sparse_encode(X[this_slice_], dictionary, gram, cov[:, this_slice_], algorithm,
                                                     regularization=regularization, copy_cov=copy_cov,
-                                                    init=init[this_slice_].copy() if init is not None else None,
+                                                    init=init[this_slice_] if init is not None else None,
                                                     max_iter=max_iter),
                               slices)
     else:
