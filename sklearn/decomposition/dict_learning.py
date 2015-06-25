@@ -153,7 +153,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 # XXX : could be moved to the linear_model module
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
-                  max_iter=1000, n_jobs=1):
+                  max_iter=1000, n_jobs=1, pool=None):
     """Sparse coding
 
     Each row of the result is the solution to a sparse coding problem.
@@ -250,7 +250,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         if regularization is None:
             regularization = 1.
 
-    if n_jobs == 1 or algorithm == 'threshold':
+    if (pool is None and n_jobs == 1) or algorithm == 'threshold':
         return _sparse_encode(X, dictionary, gram, cov=cov,
                               algorithm=algorithm,
                               regularization=regularization, copy_cov=copy_cov,
@@ -258,17 +258,25 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
     # Enter parallel code block
     code = np.empty((n_samples, n_components))
-    slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
 
-    code_views = Parallel(n_jobs=n_jobs)(
-        delayed(_sparse_encode)(
-            X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
-            regularization=regularization, copy_cov=copy_cov,
-            init=init[this_slice] if init is not None else None,
-            max_iter=max_iter)
-        for this_slice in slices)
+    if pool is not None and algorithm is 'lasso_cd':
+        slices = list(gen_even_slices(n_samples, pool._processes))
+        code_views = pool.map(lambda this_slice_: _sparse_encode(X[this_slice_], dictionary, gram, cov[:, this_slice_], algorithm,
+                                                    regularization=regularization, copy_cov=copy_cov,
+                                                    init=init[this_slice_] if init is not None else None,
+                                                    max_iter=max_iter),
+                              slices)
+    else:
+        slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
+        code_views = Parallel(n_jobs=n_jobs, backend='threading')(
+            delayed(_sparse_encode)(
+                X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
+                regularization=regularization, copy_cov=copy_cov,
+                init=init[this_slice] if init is not None else None,
+                max_iter=max_iter)
+            for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
-        code[this_slice] = this_view
+            code[this_slice] = this_view
 
     return code
 
@@ -405,15 +413,15 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
 
     R = -np.dot(dictionary, code)
     R += Y
-    permutation = random_state.permutation(n_features)
+    # permutation = random_state.permutation(n_features)
     if pool is None:
-        _update_dict_fast(dictionary, R, code, permutation, l1_ratio, radius)
+        _update_dict_fast(dictionary, R, code, l1_ratio, radius)
     # Cythonized because of large loop with n_features iterations
     else:
         slices = list(gen_even_slices(n_features, pool._processes))
-        pool.map(lambda this_slice: _update_dict_fast(dictionary[this_slice], R[this_slice],
-                                                           code, l1_ratio, radius),
-                 slices)
+        pool.map_async(lambda this_slice_: _update_dict_fast(dictionary[this_slice_], R[this_slice_],
+                                                             code, l1_ratio, radius),
+                 slices).get()
     if return_r2:
         R += Y
         residual = -np.sum(dictionary * R) / 2
@@ -803,7 +811,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
                        % (ii, dt, dt / 60))
         # Setting n_jobs > 1 does not improve performance
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                  alpha=0.1, n_jobs=1).T
+                                  alpha=0.1, pool=pool).T
 
         # Update the auxiliary variables
         if ii < batch_size - 1:
@@ -882,7 +890,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
         elif verbose == 1:
             print('|', end=' ')
         code = sparse_encode(X, dictionary.T, algorithm=method, alpha=alpha,
-                             n_jobs=n_jobs)
+                             n_jobs=1)
         if verbose > 1:
             dt = (time.time() - t0)
             print('done (total time: % 3is, % 4.1fmn)' % (dt, dt / 60))
