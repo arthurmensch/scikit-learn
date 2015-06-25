@@ -18,6 +18,8 @@ import logging
 from time import time
 
 from numpy.random import RandomState
+import matplotlib
+matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
 
 from sklearn.datasets import fetch_olivetti_faces
@@ -42,8 +44,8 @@ faces = dataset.data
 
 n_samples, n_features = faces.shape
 
-l1_ratio = 0.3
-alpha = 1
+l1_ratio = 0.001
+alpha = 0.2
 
 # global centering
 faces_centered = faces - faces.mean(axis=0)
@@ -108,14 +110,15 @@ estimators = [
 
     ('Sparse comp. - MiniBatchDictionaryLearning',
      decomposition.MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1,
-                                               n_iter=400, batch_size=10,
-                                               fit_algorithm='ols',
-                                               fit_constraint='enet',
+                                               n_iter=40, batch_size=10,
+                                               fit_algorithm='cd',
+                                               fit_update_dict_dir='feature',
                                                tol=1e-4,
                                                verbose=10,
-                                               l1_ratio=l1_ratio,
+                                               l1_ratio=0.03,
                                                random_state=rng,
-                                               n_jobs=1),
+                                               n_jobs=5,
+                                               debug_info=True),
      True),
 ]
 
@@ -127,7 +130,7 @@ plot_gallery("First centered Olivetti faces", faces_centered[:n_components])
 
 ###############################################################################
 # Do the estimation and plot it
-for name, estimator, center in estimators:
+for i, (name, estimator, center) in enumerate(estimators):
     print("Extracting the top %d %s..." % (n_components, name))
     t0 = time()
     data = faces
@@ -147,13 +150,20 @@ for name, estimator, center in estimators:
     plot_gallery('%s - Train time %.1fs' % (name, train_time),
                  components_[:n_components])
 
+    # XXX: To be removed
+    if estimator.debug_info:
+        np.save('/media/data/work/debug_drop/values_%i' % i, estimator.values_)
+        np.save('/media/data/work/debug_drop/residuals_%i' % i, estimator.residuals_)
+        np.save('/media/data/work/debug_drop/density_%i' % i, estimator.density_)
+
     if name == 'Sparse comp. - MiniBatchDictionaryLearning':
         print("%s - Component density" % name)
         print 1 - np.sum(components_ == 0) / float(np.size(components_))
         print("%s - Component density" % name)
-        code = sparse_encode(data, components_, algorithm='ols')
+        code = sparse_encode(data, components_, algorithm='lasso_cd', alpha=alpha)
         print 1 - np.sum(code == 0) / float(np.size(code))
         plot_gallery('%s - Reconstruction' % name,
                      code[:n_components].dot(components_))
 
 plt.show()
+plt.close()

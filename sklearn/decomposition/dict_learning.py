@@ -22,14 +22,16 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
 from ..utils.extmath import randomized_svd, row_norms
 from ..utils.validation import check_is_fitted
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge
-from .dict_learning_fast import _update_dict_fast
+from .dict_learning_fast import _update_dict_feature_wise_fast
+from ..utils.enet_proj_fast import enet_projection, enet_norm
 
 from multiprocessing.pool import ThreadPool
 
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
-                   init=None, max_iter=1000):
+                   init=None, max_iter=1000,
+                   random_state=None):
     """Generic sparse coding
 
     Each column of the result is the solution to a Lasso problem.
@@ -50,7 +52,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     cov: array, shape=(n_components, n_samples)
         Precomputed covariance, dictionary * X'
 
-    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold', 'ols'}
+    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold', 'ridge'}
         lars: uses the least angle regression method (linear_model.lars_path)
         lasso_lars: uses Lars to compute the Lasso solution
         lasso_cd: uses the coordinate descent method to compute the
@@ -112,7 +114,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     elif algorithm == 'lasso_cd':
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
-                    max_iter=max_iter, warm_start=True)
+                    max_iter=max_iter, selection='random', random_state=random_state, warm_start=True)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T)
         new_code = clf.coef_
@@ -137,9 +139,9 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                                       row_norms(X, squared=True),
                                       copy_Xy=copy_cov).T
 
-    elif algorithm == 'ols':
-        # Should be put into sparse_encode
-        lr = Ridge(alpha=1e-6, fit_intercept=False, normalize=False)
+    elif algorithm == 'ridge':
+        alpha = float(regularization) / n_features  # account for scaling
+        lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
         new_code = lr.coef_
 
@@ -153,7 +155,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 # XXX : could be moved to the linear_model module
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
-                  max_iter=1000, n_jobs=1, pool=None):
+                  max_iter=1000, n_jobs=1, pool=None,
+                  random_state=None):
     """Sparse coding
 
     Each row of the result is the solution to a sparse coding problem.
@@ -179,7 +182,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     cov: array, shape=(n_components, n_samples)
         Precomputed covariance, dictionary' * X
 
-    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold', 'ols'}
+    algorithm: {'lasso_lars', 'lasso_cd', 'lars', 'omp', 'threshold', 'ridge'}
         lars: uses the least angle regression method (linear_model.lars_path)
         lasso_lars: uses Lars to compute the Lasso solution
         lasso_cd: uses the coordinate descent method to compute the
@@ -254,18 +257,20 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         return _sparse_encode(X, dictionary, gram, cov=cov,
                               algorithm=algorithm,
                               regularization=regularization, copy_cov=copy_cov,
-                              init=init, max_iter=max_iter)
+                              init=init, max_iter=max_iter, random_state=random_state)
 
     # Enter parallel code block
     code = np.empty((n_samples, n_components))
 
     if pool is not None and algorithm is 'lasso_cd':
+        random_state = check_random_state(random_state)
         slices = list(gen_even_slices(n_samples, pool._processes))
-        code_views = pool.map(lambda this_slice_: _sparse_encode(X[this_slice_], dictionary, gram, cov[:, this_slice_], algorithm,
+        seeds = random_state.randint(np.iinfo(np.int32).max, size=n_samples)
+        code_views = pool.map(lambda this_slice_, this_seed: _sparse_encode(X[this_slice_], dictionary, gram, cov[:, this_slice_], algorithm,
                                                     regularization=regularization, copy_cov=copy_cov,
                                                     init=init[this_slice_] if init is not None else None,
-                                                    max_iter=max_iter),
-                              slices)
+                                                    max_iter=max_iter, random_state=this_seed),
+                              zip(slices, seeds))
     else:
         slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
         code_views = Parallel(n_jobs=n_jobs, backend='threading' if algorithm == 'lasso_cd' else 'multiprocessing')(
@@ -281,9 +286,10 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     return code
 
 
-def _update_dict_unitary_component(dictionary, Y, code, verbose=False, return_r2=False,
-                                   online=False,
-                                   random_state=None):
+def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+                                update_dict_dir='component',
+                                l1_ratio=0.1, radius=1., online=False, random_state=None,
+                                pool=None):
     """Update the dense dictionary factor in place, constraining dictionary component to have a unit l2 norm.
 
     Parameters
@@ -311,6 +317,9 @@ def _update_dict_unitary_component(dictionary, Y, code, verbose=False, return_r2
     random_state: int or RandomState
         Pseudo number generator state used for random sampling.
 
+    pool : ThreadPool, optional
+        thread pool to use
+
     Returns
     -------
     dictionary: array of shape (n_features, n_components)
@@ -319,41 +328,62 @@ def _update_dict_unitary_component(dictionary, Y, code, verbose=False, return_r2
     """
 
     n_components = len(code)
+    component_range = random_state.permutation(n_components)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(dictionary, code)
     R += Y
-    R = np.asfortranarray(R)
-    ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
-    for k in range(n_components):
-        # R <- 1.0 * U_k * V_k^T + R
-        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-        if online:
-            dictionary[:, k] = R[:, k]
-        else:
-            dictionary[:, k] = np.dot(R, code[k, :].T)
-        # Scale k'th atom
-        atom_norm_square = np.dot(dictionary[:, k], dictionary[:, k])
-        if atom_norm_square < 1e-20:
-            if verbose == 1:
-                sys.stdout.write("+")
-                sys.stdout.flush()
-            elif verbose:
-                print("Adding new random atom")
-            dictionary[:, k] = random_state.randn(n_features)
-            # Setting corresponding coefs to 0
-            code[k, :] = 0.0
-            dictionary[:, k] /= sqrt(np.dot(dictionary[:, k],
-                                            dictionary[:, k]))
 
+    if update_dict_dir == 'component':
+        # radius *= n_components
+        threshold = 1e-20 # * n_components
+        R = np.asfortranarray(R)
+        ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+        for k in component_range:
+            # R <- 1.0 * U_k * V_k^T + R
+            R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+            if online:
+                dictionary[:, k] = R[:, k]
+            else:
+                dictionary[:, k] = np.dot(R, code[k, :].T)
+            # Scale k'th atom
+            atom_norm_square = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
+            if atom_norm_square < threshold:
+                if verbose == 1:
+                    sys.stdout.write("+")
+                    sys.stdout.flush()
+                elif verbose:
+                    print("Adding new random atom")
+                dictionary[:, k] = 10 * random_state.randn(n_features)
+                # Setting corresponding coefs to 0
+                code[k, :] = 0.0
+                dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
+                                                   l1_ratio=l1_ratio)
+            else:
+                dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
+                                                   l1_ratio=l1_ratio)
+                # R <- -1.0 * U_k * V_k^T + R
+                R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+    # XXX: This is untested and EXPERIMENTAL
+    elif update_dict_dir == 'feature':
+        # radius *= n_features
+        # We use a cython auxiliary function, because:
+        # We enter a large loop with n_features iterations, that can be parallelized releasing the GIL
+        if pool is None:
+            _update_dict_feature_wise_fast(dictionary, R, code, l1_ratio, radius)
         else:
-            dictionary[:, k] /= sqrt(atom_norm_square)
-            # R <- -1.0 * U_k * V_k^T + R
-            R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+            slices = list(gen_even_slices(n_features, pool._processes))
+            pool.map(lambda this_slice_: _update_dict_feature_wise_fast(dictionary[this_slice_], R[this_slice_],
+                                                                        code, l1_ratio, radius),
+                     slices)
+    else:
+        raise ValueError('Wrong argument for direction of dictionary update')
 
     if return_r2:
         if online:
+            # Y = B_t in online setting
+            # 1 / 2 Tr(D^T D A_t) - Tr(D^T B_t)
             R += Y
             residual = -np.sum(dictionary * R) / 2
         else:
@@ -364,67 +394,6 @@ def _update_dict_unitary_component(dictionary, Y, code, verbose=False, return_r2
             # striding
             R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
             residual = np.sum(R)
-        return dictionary, residual
-    return dictionary
-
-
-def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
-                 l1_ratio=0.1, radius=1.,
-                 random_state=None,
-                 pool=None):
-    """Update the dense dictionary factor in place, constraining feature vectors (holding each component value for this
-    feature) to stay on an elastic net ball, which allows sparsity enforcement.
-
-    Parameters
-    ----------
-    dictionary: array of shape (n_features, n_components)
-        Value of the dictionary at the previous iteration.
-
-    Y: array of shape (n_features, n_samples)
-        Data matrix.
-
-    code: array of shape (n_components, n_samples)
-        Sparse coding of the data against which to optimize the dictionary.
-
-    l1_ratio: float,
-        Sparsity controlling parameter for dictionary components in elastic net setting
-
-    verbose:
-        Degree of output the procedure will print.
-
-    return_r2: bool
-        Whether to compute and return the residual sum of squares corresponding
-        to the computed solution.
-
-    random_state: int or RandomState
-        Pseudo number generator state used for random sampling.
-
-    pool : ThreadPool,
-        thread pool to use
-
-    Returns
-    -------
-    dictionary: array of shape (n_features, n_components)
-        Updated dictionary.
-
-    """
-    # Residuals, computed 'in-place' for efficiency
-    n_features = dictionary.shape[0]
-
-    R = -np.dot(dictionary, code)
-    R += Y
-    # permutation = random_state.permutation(n_features)
-    if pool is None:
-        _update_dict_fast(dictionary, R, code, l1_ratio, radius)
-    # Cythonized because of large loop with n_features iterations
-    else:
-        slices = list(gen_even_slices(n_features, pool._processes))
-        pool.map_async(lambda this_slice_: _update_dict_fast(dictionary[this_slice_], R[this_slice_],
-                                                             code, l1_ratio, radius),
-                 slices).get()
-    if return_r2:
-        R += Y
-        residual = -np.sum(dictionary * R) / 2
         return dictionary, residual
     return dictionary
 
@@ -572,8 +541,9 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         code = sparse_encode(X, dictionary, algorithm=method, alpha=alpha,
                              init=code, n_jobs=n_jobs)
         # Update dictionary
-        dictionary, residuals = _update_dict_unitary_component(dictionary.T, X.T, code.T,
+        dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
                                                                verbose=verbose, return_r2=True,
+                                                               online=False,
                                                                random_state=random_state)
         dictionary = dictionary.T
 
@@ -603,11 +573,11 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
 def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
-                         method='lars', constraint='unitary_component',
+                         method='lars', update_dict_dir='component',
                          iter_offset=0, tol=1e-4,
                          random_state=None,
                          return_inner_stats=False, inner_stats=None,
-                         return_n_iter=False):
+                         return_n_iter=False, return_debug_info=False):
     """Solves a dictionary learning matrix factorization problem online.
 
     Finds the best dictionary and the corresponding sparse code for
@@ -658,7 +628,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
     n_jobs : int,
         Number of parallel jobs to run, or -1 to autodetect.
 
-    method : {'lars', 'cd', 'ols'}
+    method : {'lars', 'cd', 'ridge'}
         lars: uses the least angle regression method to solve the lasso problem
         (linear_model.lars_path)
         cd: uses the coordinate descent method to compute the
@@ -666,13 +636,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
         the estimated components are sparse.
         ols: compute code using an ordinary least square method. alpha will be ignored
 
-    constraint : {'unitary_component', 'enet'}
-        Constraint on the dictionary used when updating it
-        unitary_component: constraining the dictionary to stay on the l2 unit ball. l1_ratio will be ignored
-        enet: constraining the dictionary to stay on the enet ball
+    update_dict_dir : {'component', 'feature'}
+        Direction of convex set projection for dictionary update
 
     l1_ratio: float,
-        Sparsity controlling parameter for enet projection
+        Sparsity controlling parameter for dictionary projection. In [0, 1]
 
     tol: float,
         Stop controlling parameter
@@ -697,6 +665,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
         A (n_components, n_components) is the dictionary covariance matrix.
         B (n_features, n_components) is the data approximation matrix
 
+    return_debug_info: bool,
+        Whether to keep track of objective value, sparsity value and to keep a record of 10 dictionary trajectory
+
     return_n_iter : bool
         Whether or not to return the number of iterations.
 
@@ -712,6 +683,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
         Number of iterations run. Returned only if `return_n_iter` is
         set to `True`.
 
+    debug_info: tuple of (residuals, density, values),
+        Debug Info
+
     See also
     --------
     dict_learning
@@ -724,9 +698,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
     if n_components is None:
         n_components = X.shape[1]
 
-    if constraint not in ('unitary_component', 'enet'):
-        raise ValueError('Dictionary constraint not supported as a fit algorithm.')
-    if method not in ('lars', 'cd', 'ols'):
+    if update_dict_dir not in ('component', 'feature'):
+        raise ValueError("Update dictionary direction mispecified")
+    if method not in ('lars', 'cd', 'ridge'):
         raise ValueError('Coding method not supported as a fit algorithm.')
     if method in ('lars', 'cd'):
         method = 'lasso_' + method
@@ -740,8 +714,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
     if n_jobs == -1:
         n_jobs = cpu_count()
 
-    # Using a thread pool in the enet constraint setting
-    # if constraint is 'enet':
+    # Using a thread pool in the feature constraint setting
     if n_jobs > 1:
         pool = ThreadPool(n_jobs)
     else:
@@ -784,7 +757,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
         B = inner_stats[1].copy()
 
     # Residual variable for tolerance computation
-    last_residual = float("inf")
+    last_residual = np.iinfo(np.int32).max
     this_residual = 0
     penalty = 0
     patience = max(1, n_samples / (10*batch_size))
@@ -793,11 +766,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
 
-    # XXX: To be removed, for testing purpose only
-    # residuals = np.zeros(n_iter)
-    # density = np.zeros(n_iter)
-    # values = np.zeros((n_iter, 10))
-    # voxels = random_state.permutation(n_features)[:10]
+    # XXX: To remove, for testing purpose only
+    if return_debug_info:
+        residuals = np.zeros(n_iter)
+        density = np.zeros(n_iter)
+        values = np.zeros((n_iter, 10))
+        recorded_features = random_state.permutation(n_features)[:10]
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         this_X = X_train[batch]
@@ -811,7 +785,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
                        % (ii, dt, dt / 60))
         # Setting n_jobs > 1 does not improve performance
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                  alpha=0.1, pool=pool).T
+                                  alpha=alpha, n_jobs=1).T
 
         # Update the auxiliary variables
         if ii < batch_size - 1:
@@ -826,22 +800,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
         B += np.dot(this_X.T, this_code.T)
 
         # Update dictionary
-        if constraint == 'unitary_component':
-            dictionary, this_residual = _update_dict_unitary_component(dictionary, B, A, verbose=verbose,
-                                                                       random_state=random_state, return_r2=True,
-                                                                       )
-        else:
-            dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose,
-                                                     l1_ratio=l1_ratio,
-                                                     radius=1,
-                                                     random_state=random_state, return_r2=True,
-                                                     pool=pool)
-
-        # Residual handling
-        # XXX: How should we scale the penalty so it stays coherent for all algorithm ?
-        if method != 'ols':
+        dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,
+                                                 random_state=random_state, return_r2=True,
+                                                 online=True, pool=pool
+                                                 )
+        this_residual /= 2
+        if method in ('lars', 'cd'):
             penalty += alpha * np.sum(this_code)
-            this_residual += penalty
+        this_residual += penalty + np.sum(this_X ** 2) / 2
         this_residual /= iter_offset + (ii * batch_size) + 1
         change_ratio = abs(this_residual / last_residual - 1)
         if last_residual == 0:
@@ -852,14 +818,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
             else:
                 this_patience = 0
         if this_patience >= patience:
-            print(u'{0:d} itertation'.format(ii))
             break
         last_residual = this_residual
 
         # XXX: To be removed, for testing purpose only
-        # residuals[ii] = this_residual
-        # values[ii] = dictionary[voxels, 0] / sqrt(np.sum(dictionary[:, 0] ** 2))
-        # density[ii] = 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary)
+        if return_debug_info:
+            residuals[ii] = this_residual
+            values[ii] = dictionary[recorded_features, 0] / sqrt(np.sum(dictionary[:, 0] ** 2))
+            density[ii] = 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary)
 
         # Maybe we need a stopping criteria based on the amount of
         # modification in the dictionary
@@ -868,20 +834,20 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
 
     if pool is not None:
         pool.close()
-    #
-    # if constraint == 'enet':
-    #     # Spatial maps need to be L2 normalized for consistency
-    #     S = np.sum(dictionary ** 2, axis=1)
-    #     dictionary /= S[:, np.newaxis]
 
-    # XXX: To be removed, for testing purpose only
-    # np.save('tests/residuals', residuals)
-    # np.save('tests/density', density)
-    # np.save('tests/values', values)
+    # XXX: To remove, for testing purpose only
+    if return_debug_info:
+        debug_info = (residuals, density, values)
+        return_inner_stats = True
+        return_n_iter = True
 
     if return_inner_stats:
         if return_n_iter:
-            return dictionary.T, (A, B), ii - iter_offset + 1
+            # XXX: To remove
+            if return_debug_info:
+                return dictionary.T, (A, B), ii - iter_offset + 1, debug_info
+            else:
+                return dictionary.T, (A, B), ii - iter_offset + 1
         else:
             return dictionary.T, (A, B)
     if return_code:
@@ -895,7 +861,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
             dt = (time.time() - t0)
             print('done (total time: % 3is, % 4.1fmn)' % (dt, dt / 60))
         if return_n_iter:
-            return code, dictionary.T, ii - iter_offset + 1
+            if debug_info:
+                code, dictionary.T, ii - iter_offset + 1, debug_info
+            else:
+                return code, dictionary.T, ii - iter_offset + 1
         else:
             return code, dictionary.T
 
@@ -1236,7 +1205,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     n_iter : int,
         total number of iterations to perform
 
-    fit_algorithm : {'lars', 'cd', 'ols'}
+    fit_algorithm : {'lars', 'cd', 'ridge'}
         lars: uses the least angle regression method to solve the lasso problem
         (linear_model.lars_path)
         cd: uses the coordinate descent method to compute the
@@ -1245,13 +1214,11 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         elastic_net: Perform gradient-descent with elastic net projection
         to enforce dictionary sparsity, outputting non sparse code
 
-    fit_constraint : {'unitary_component', 'enet'}
-        Constraint on the dictionary used when updating it
-        unitary_component: constraining the dictionary to stay on the l2 unit ball. l1_ratio will be ignored
-        enet: constraining the dictionary to stay on the enet ball
+    fit_update_dict_dir : {'component', 'feature'}
+        Direction of convex set projection for dictionary update
 
     transform_algorithm : {'lasso_lars', 'lasso_cd', 'lars', 'omp', \
-    'threshold', 'ols'}
+    'threshold', 'ridge'}
         Algorithm used to transform the data.
         lars: uses the least angle regression method (linear_model.lars_path)
         lasso_lars: uses Lars to compute the Lasso solution
@@ -1338,17 +1305,19 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
     """
     def __init__(self, n_components=None, alpha=1, l1_ratio=0.5, n_iter=1000,
-                 fit_algorithm='lars', fit_constraint='unitary_component', n_jobs=1, batch_size=3,
+                 fit_algorithm='lars', fit_update_dict_dir='component', n_jobs=1, batch_size=3,
                  shuffle=True, dict_init=None, transform_algorithm='omp', tol=1e-4,
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
-                 random_state=None):
+                 random_state=None,
+                 debug_info=False):
         self._set_sparse_coding_params(n_components, transform_algorithm,
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
         self.alpha = alpha
         self.n_iter = n_iter
         self.fit_algorithm = fit_algorithm
+        self.fit_update_dict_dir = fit_update_dict_dir
         self.dict_init = dict_init
         self.verbose = verbose
         self.shuffle = shuffle
@@ -1356,8 +1325,9 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.split_sign = split_sign
         self.random_state = random_state
         self.l1_ratio = l1_ratio
-        self.fit_constraint = fit_constraint
         self.tol = tol
+        # XXX: To remove
+        self.debug_info = debug_info
 
     def fit(self, X, y=None):
         """Fit the model from data in X.
@@ -1376,19 +1346,23 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         random_state = check_random_state(self.random_state)
         X = check_array(X)
 
-        U, (A, B), self.n_iter_ = dict_learning_online(
+        U, (A, B), self.n_iter_, debug_info = dict_learning_online(
             X, self.n_components, self.alpha,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
-            constraint=self.fit_constraint,
+            update_dict_dir=self.fit_update_dict_dir,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=random_state,
             l1_ratio=self.l1_ratio,
             tol=self.tol,
             return_inner_stats=True,
-            return_n_iter=True)
+            return_n_iter=True,
+            return_debug_info=self.debug_info)
         self.components_ = U
+        # XXX: to remove
+        if self.debug_info:
+            self.residuals_, self.density_, self.values_ = debug_info
         # Keep track of the state of the algorithm to be able to do
         # some online fitting (partial_fit)
         self.inner_stats_ = (A, B)
@@ -1428,7 +1402,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         U, (A, B) = dict_learning_online(
             X, self.n_components, self.alpha,
             n_iter=self.n_iter, method=self.fit_algorithm,
-            constraint=self.fit_constraint,
+            update_dict_dir=self.fit_update_dict_dir,
             l1_ratio=self.l1_ratio,
             n_jobs=self.n_jobs, dict_init=dict_init,
             batch_size=len(X), shuffle=False,

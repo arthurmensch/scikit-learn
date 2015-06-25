@@ -91,10 +91,10 @@ def test_dict_learning_split():
 
 
 def test_dict_learning_online_shapes():
-    for constraint in ['unitary_component', 'enet']:
+    for update_dict_dir in ['component', 'feature']:
         rng = np.random.RandomState(0)
         n_components = 8
-        code, dictionary = dict_learning_online(X, n_components=n_components, constraint=constraint,
+        code, dictionary = dict_learning_online(X, n_components=n_components, update_dict_dir=update_dict_dir,
                                                 alpha=1, random_state=rng)
         assert_equal(code.shape, (n_samples, n_components))
         assert_equal(dictionary.shape, (n_components, n_features))
@@ -102,7 +102,7 @@ def test_dict_learning_online_shapes():
 
 
 def test_dict_learning_online_verbosity():
-    for constraint in ['unitary_component', 'enet']:
+    for update_dict_dir in ['component', 'feature']:
         n_components = 5
         # test verbosity
         from sklearn.externals.six.moves import cStringIO as StringIO
@@ -111,15 +111,15 @@ def test_dict_learning_online_verbosity():
         old_stdout = sys.stdout
         try:
             sys.stdout = StringIO()
-            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=1, fit_constraint=constraint,
+            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=1, update_dict_dir=update_dict_dir,
                                                random_state=0)
             dico.fit(X)
-            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=2, fit_constraint=constraint,
+            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=2, update_dict_dir=update_dict_dir,
                                                random_state=0)
             dico.fit(X)
-            dict_learning_online(X, n_components=n_components, alpha=1, verbose=1, constraint=constraint,
+            dict_learning_online(X, n_components=n_components, alpha=1, verbose=1, update_dict_dir=update_dict_dir,
                                  random_state=0)
-            dict_learning_online(X, n_components=n_components, alpha=1, verbose=2, constraint=constraint,
+            dict_learning_online(X, n_components=n_components, alpha=1, verbose=2, update_dict_dir=update_dict_dir,
                                  random_state=0)
         finally:
             sys.stdout = old_stdout
@@ -128,45 +128,45 @@ def test_dict_learning_online_verbosity():
 
 
 def test_dict_learning_online_estimator_shapes():
-    for constraint in ['unitary_component', 'enet']:
+    for update_dict_dir in ['component', 'feature']:
         n_components = 5
-        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, fit_constraint=constraint, random_state=0)
+        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, update_dict_dir=update_dict_dir, random_state=0)
         dico.fit(X)
         assert_true(dico.components_.shape == (n_components, n_features))
 
 
 def test_dict_learning_online_overcomplete():
-    for constraint in ['unitary_component', 'enet']:
+    for update_dict_dir in ['component', 'feature']:
         n_components = 12
-        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, fit_constraint=constraint,
+        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, update_dict_dir=update_dict_dir,
                                            random_state=0).fit(X)
         assert_true(dico.components_.shape == (n_components, n_features))
 
 
 def test_dict_learning_online_initialization():
-    for constraint in ['unitary_component', 'enet']:
+    for update_dict_dir in ['component', 'feature']:
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)
         dico = MiniBatchDictionaryLearning(n_components, n_iter=0,
-                                           dict_init=V, fit_constraint=constraint, random_state=0).fit(X)
+                                           dict_init=V, fit_update_dict_dir=update_dict_dir, random_state=0).fit(X)
         assert_array_equal(dico.components_, V)
 
 
 def test_dict_learning_online_partial_fit():
-    for constraint, algorithm in zip(['unitary_component', 'enet'], ['lars', 'ols']):
+    for update_dict_dir, algorithm in zip(['component', 'feature'], ['lars', 'ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
         V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
         dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
-                                            batch_size=1, fit_constraint=constraint,
+                                            batch_size=1, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
                                             alpha=1, shuffle=False, dict_init=V,
                                             l1_ratio=0.00001,
                                             random_state=0).fit(X)
         dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
-                                            n_iter=1, dict_init=V, fit_constraint=constraint,
+                                            n_iter=1, dict_init=V, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
                                             l1_ratio=0.00001,
                                             random_state=0)

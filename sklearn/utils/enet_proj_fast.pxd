@@ -14,6 +14,7 @@ cimport numpy as np
 ctypedef np.float64_t DOUBLE
 ctypedef np.uint32_t UINT32_t
 ctypedef np.uint8_t UINT8_t
+ctypedef np.int64_t INT64_t
 cdef enum:
     MASKED = 0
     UNMASKED = 1

@@ -66,12 +66,12 @@ cdef int _choose_index_in_mask(UINT8_t * mask, int size, UINT32_t* random_state)
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef void _random_unit_vector(DOUBLE[:] res, int size, double radius, double l1_ratio):
+cdef DOUBLE[:] _random_unit_vector(DOUBLE[:] res, int size, double radius, double l1_ratio):
     """
     Utility function used to generate a random vector on elastic-net ball
     """
     cdef DOUBLE[:] temp = 10 * radius * np.random.randn(size)
-    enet_projection(res, temp, radius, l1_ratio)
+    return enet_projection(temp, radius, l1_ratio)
 
 
 @cython.boundscheck(False)
@@ -181,7 +181,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
 @cython.wraparound(False)
 @cython.initializedcheck(False)
 @cython.nonecheck(False)
-cpdef void enet_projection(DOUBLE[:] res, DOUBLE[:] v, double radius, double l1_ratio) nogil:
+cpdef DOUBLE[:] enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
     """
     Project a vector on the elastic-net ball
 
@@ -198,8 +198,10 @@ cpdef void enet_projection(DOUBLE[:] res, DOUBLE[:] v, double radius, double l1_
     """
     cdef int n = v.shape[0]
     cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
+    cdef DOUBLE[:] res = <DOUBLE[:n]> (<DOUBLE *>malloc(n * sizeof(DOUBLE)))
     cdef double norm = _enet_projection_with_mask(res, v, mask, radius, l1_ratio, 0)
     free(mask)
+    return res
 
 
 @cython.boundscheck(False)

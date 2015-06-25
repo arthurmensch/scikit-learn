@@ -88,7 +88,7 @@ def test_fast_enet_projection_norm():
     for i in range(10):
         a = random_state.randn(100)
         c = np.zeros(100)
-        enet_projection(c[:], a, 1, 0.1)
+        c[:] = enet_projection(a, 1, 0.1)
         norms[i] = enet_norm(c, l1_ratio=0.1)
     assert_array_almost_equal(norms, np.ones(10))
 
@@ -100,7 +100,7 @@ def test_fast_enet_projection():
     for i in range(10):
         a = random_state.randn(100)
         b[i, :] = enet_projection_slow(a, radius=1, l1_ratio=0.1)
-        enet_projection(c[i], a, 1, 0.1)
+        c[i] = enet_projection(a, 1, 0.1)
     assert_array_almost_equal(c, b, 4)
 
 
@@ -110,7 +110,7 @@ def test_fast_enet_l2_ball():
     for i in range(10):
         a = random_state.randn(100)
         c = np.zeros(100)
-        enet_projection(c[:], a, 1, 0.0)
+        c[:] = enet_projection(a, 1, 0.0)
         norms[i] = np.sqrt(np.sum(c ** 2))
     assert_array_almost_equal(norms, np.ones(10))
 
@@ -121,6 +121,6 @@ def test_fast_enet_l1_ball():
     for i in range(10):
         a = random_state.randn(100)
         b = np.zeros(100)
-        enet_projection(b[:], a, 1, 1.0)
+        b[:] = enet_projection(a, 1, 1.0)
         norms[i] = np.sum(np.abs(b))
     assert_array_almost_equal(norms, np.ones(10))
