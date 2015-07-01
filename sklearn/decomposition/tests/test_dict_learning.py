@@ -154,23 +154,27 @@ def test_dict_learning_online_initialization():
 
 
 def test_dict_learning_online_partial_fit():
-    for update_dict_dir, algorithm in zip(['component'], ['lars', 'ridge']):
+    for update_dict_dir, algorithm in zip(['component'], ['lars']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
         V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
-        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
+        rng = np.random.RandomState(0)
+        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=1 * len(X),
                                             batch_size=1, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
+                                            verbose=1,
                                             alpha=1, shuffle=False, dict_init=V,
                                             l1_ratio=0.,
-                                            random_state=0).fit(X)
+                                            random_state=rng).fit(X)
+        rng = np.random.RandomState(0)
         dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
                                             n_iter=1, dict_init=V, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
+                                            verbose=1,
                                             l1_ratio=0.,
-                                            random_state=0)
-        for i in range(10):
+                                            random_state=rng)
+        for i in range(1):
             for sample in X:
                 dict2.partial_fit(sample)
 
