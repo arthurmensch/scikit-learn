@@ -111,10 +111,10 @@ def test_dict_learning_online_verbosity():
         old_stdout = sys.stdout
         try:
             sys.stdout = StringIO()
-            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=1, update_dict_dir=update_dict_dir,
+            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=1, fit_update_dict_dir=update_dict_dir,
                                                random_state=0)
             dico.fit(X)
-            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=2, update_dict_dir=update_dict_dir,
+            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=2, fit_update_dict_dir=update_dict_dir,
                                                random_state=0)
             dico.fit(X)
             dict_learning_online(X, n_components=n_components, alpha=1, verbose=1, update_dict_dir=update_dict_dir,
@@ -130,7 +130,7 @@ def test_dict_learning_online_verbosity():
 def test_dict_learning_online_estimator_shapes():
     for update_dict_dir in ['component', 'feature']:
         n_components = 5
-        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, update_dict_dir=update_dict_dir, random_state=0)
+        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, fit_update_dict_dir=update_dict_dir, random_state=0)
         dico.fit(X)
         assert_true(dico.components_.shape == (n_components, n_features))
 
@@ -138,7 +138,7 @@ def test_dict_learning_online_estimator_shapes():
 def test_dict_learning_online_overcomplete():
     for update_dict_dir in ['component', 'feature']:
         n_components = 12
-        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, update_dict_dir=update_dict_dir,
+        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, fit_update_dict_dir=update_dict_dir,
                                            random_state=0).fit(X)
         assert_true(dico.components_.shape == (n_components, n_features))
 
@@ -154,7 +154,7 @@ def test_dict_learning_online_initialization():
 
 
 def test_dict_learning_online_partial_fit():
-    for update_dict_dir, algorithm in zip(['component', 'feature'], ['lars', 'ridge']):
+    for update_dict_dir, algorithm in zip(['component'], ['lars', 'ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
@@ -163,12 +163,12 @@ def test_dict_learning_online_partial_fit():
                                             batch_size=1, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
                                             alpha=1, shuffle=False, dict_init=V,
-                                            l1_ratio=0.00001,
+                                            l1_ratio=0.,
                                             random_state=0).fit(X)
         dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
                                             n_iter=1, dict_init=V, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
-                                            l1_ratio=0.00001,
+                                            l1_ratio=0.,
                                             random_state=0)
         for i in range(10):
             for sample in X:

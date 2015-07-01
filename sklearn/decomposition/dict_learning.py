@@ -542,9 +542,10 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
                              init=code, n_jobs=n_jobs)
         # Update dictionary
         dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
-                                                               verbose=verbose, return_r2=True,
-                                                               online=False,
-                                                               random_state=random_state)
+                                             verbose=verbose, return_r2=True,
+                                             online=False,
+                                             random_state=random_state,
+                                             l1_ratio=0.)
         dictionary = dictionary.T
 
         # Cost function
@@ -770,8 +771,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
     if return_debug_info:
         residuals = np.zeros(n_iter)
         density = np.zeros(n_iter)
-        values = np.zeros((n_iter, 10))
-        recorded_features = random_state.permutation(n_features)[:10]
+        values = np.zeros((n_iter, 2))
+        recorded_features = random_state.permutation(n_features)[:2]
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         this_X = X_train[batch]
@@ -1194,7 +1195,10 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         number of dictionary elements to extract
 
     alpha : float,
-        sparsity controlling parameter
+        sparsity controlling parameter for code
+
+    l1_ratio: float,
+        Sparsity controlling parameter for dictionary components
 
     l1_ratio: float,
         sparsity controlling parameter, for 'elastic_net' method only
@@ -1255,12 +1259,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     dict_init : array of shape (n_components, n_features),
         initial value of the dictionary for warm restart scenarios
 
-    dict_constraint : {'elastic_net', None}
-        elastic_net : constraint dictionary on the elastic net ball, yielding sparse components
-
-    l1_ratio: float,
-        Sparsity controlling parameter for dictionary components
-
     verbose :
         degree of verbosity of the printed output
 
@@ -1310,7 +1308,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
                  random_state=None,
-                 debug_info=False):
+                 debug_info=True):
         self._set_sparse_coding_params(n_components, transform_algorithm,
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
