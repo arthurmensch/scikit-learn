@@ -109,13 +109,13 @@ estimators = [
     #  True),
 
     ('Sparse comp. - MiniBatchDictionaryLearning',
-     decomposition.MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1,
+     decomposition.MiniBatchDictionaryLearning(n_components=n_components, alpha=0.001,
                                                n_iter=40, batch_size=10,
-                                               fit_algorithm='cd',
-                                               fit_update_dict_dir='feature',
+                                               fit_algorithm='ridge',
+                                               fit_update_dict_dir='component',
                                                tol=1e-4,
                                                verbose=10,
-                                               l1_ratio=0.03,
+                                               l1_ratio=0.01,
                                                random_state=rng,
                                                n_jobs=5,
                                                debug_info=True),
@@ -160,7 +160,7 @@ for i, (name, estimator, center) in enumerate(estimators):
         print("%s - Component density" % name)
         print 1 - np.sum(components_ == 0) / float(np.size(components_))
         print("%s - Component density" % name)
-        code = sparse_encode(data, components_, algorithm='lasso_cd', alpha=alpha)
+        code = sparse_encode(data, components_, algorithm='ridge', alpha=alpha)
         print 1 - np.sum(code == 0) / float(np.size(code))
         plot_gallery('%s - Reconstruction' % name,
                      code[:n_components].dot(components_))
