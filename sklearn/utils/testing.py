@@ -30,6 +30,7 @@ except ImportError:
 
 import sklearn
 from sklearn.base import BaseEstimator
+from sklearn.externals import joblib
 
 # Conveniently import all assertions in one place.
 from nose.tools import assert_equal
