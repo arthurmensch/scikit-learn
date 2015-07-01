@@ -207,7 +207,7 @@ cpdef DOUBLE[:] enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:
+cpdef double enet_norm(double[:] v, double l1_ratio=0.1) nogil:
     """Returns the elastic net norm of a vector
 
     Parameters

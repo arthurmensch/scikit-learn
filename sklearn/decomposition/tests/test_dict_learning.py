@@ -154,7 +154,7 @@ def test_dict_learning_online_initialization():
 
 
 def test_dict_learning_online_partial_fit():
-    for update_dict_dir, algorithm in zip(['component'], ['lars']):
+    for update_dict_dir, algorithm in zip(['component', 'feature'], ['ridge', 'lars']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init

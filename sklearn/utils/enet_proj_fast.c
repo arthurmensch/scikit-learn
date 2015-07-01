@@ -868,7 +868,7 @@ enum  {
 /* "sklearn/utils/enet_proj_fast.pyx":210
  * @cython.wraparound(False)
  * @cython.initializedcheck(False)
- * cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:             # <<<<<<<<<<<<<<
+ * cpdef double enet_norm(double[:] v, double l1_ratio=0.1) nogil:             # <<<<<<<<<<<<<<
  *     """Returns the elastic net norm of a vector
  * 
  */
@@ -1350,6 +1350,8 @@ static int __Pyx_ValidateAndInit_memviewslice(
 
 static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE(PyObject *);
 
+static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_double(PyObject *);
+
 static CYTHON_INLINE PyObject* __Pyx_PyInt_From_int(int value);
 
 static CYTHON_INLINE int __Pyx_PyInt_As_int(PyObject *);
@@ -1597,6 +1599,7 @@ static void __pyx_memoryview_slice_assign_scalar(__Pyx_memviewslice *, int, size
 static void __pyx_memoryview__slice_assign_scalar(char *, Py_ssize_t *, Py_ssize_t *, int, size_t, void *); /*proto*/
 static PyObject *__pyx_format_from_typeinfo(__Pyx_TypeInfo *); /*proto*/
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE = { "DOUBLE", NULL, sizeof(__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE), { 0 }, 0, 'R', 0, 0 };
+static __Pyx_TypeInfo __Pyx_TypeInfo_double = { "double", NULL, sizeof(double), { 0 }, 0, 'R', 0, 0 };
 #define __Pyx_MODULE_NAME "sklearn.utils.enet_proj_fast"
 int __pyx_module_is_main_sklearn__utils__enet_proj_fast = 0;
 
@@ -3282,7 +3285,7 @@ static PyObject *__pyx_pf_7sklearn_5utils_14enet_proj_fast_enet_projection(CYTHO
 /* "sklearn/utils/enet_proj_fast.pyx":210
  * @cython.wraparound(False)
  * @cython.initializedcheck(False)
- * cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:             # <<<<<<<<<<<<<<
+ * cpdef double enet_norm(double[:] v, double l1_ratio=0.1) nogil:             # <<<<<<<<<<<<<<
  *     """Returns the elastic net norm of a vector
  * 
  */
@@ -3297,7 +3300,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
   double __pyx_r;
   int __pyx_t_1;
   int __pyx_t_2;
-  __pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE __pyx_t_3;
+  double __pyx_t_3;
   int __pyx_t_4;
   int __pyx_t_5;
   int __pyx_t_6;
@@ -3353,12 +3356,12 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
  *     return res
  */
     __pyx_t_4 = __pyx_v_i;
-    if ((((*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_4 * __pyx_v_v.strides[0]) ))) > 0.) != 0)) {
+    if ((((*((double *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_4 * __pyx_v_v.strides[0]) ))) > 0.) != 0)) {
       __pyx_t_5 = __pyx_v_i;
-      __pyx_t_3 = (*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_5 * __pyx_v_v.strides[0]) )));
+      __pyx_t_3 = (*((double *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_5 * __pyx_v_v.strides[0]) )));
     } else {
       __pyx_t_6 = __pyx_v_i;
-      __pyx_t_3 = (-(*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_6 * __pyx_v_v.strides[0]) ))));
+      __pyx_t_3 = (-(*((double *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_6 * __pyx_v_v.strides[0]) ))));
     }
     __pyx_v_b_ = __pyx_t_3;
 
@@ -3382,7 +3385,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
   /* "sklearn/utils/enet_proj_fast.pyx":210
  * @cython.wraparound(False)
  * @cython.initializedcheck(False)
- * cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:             # <<<<<<<<<<<<<<
+ * cpdef double enet_norm(double[:] v, double l1_ratio=0.1) nogil:             # <<<<<<<<<<<<<<
  *     """Returns the elastic net norm of a vector
  * 
  */
@@ -3438,7 +3441,7 @@ static PyObject *__pyx_pw_7sklearn_5utils_14enet_proj_fast_3enet_norm(PyObject *
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_v = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE(values[0]); if (unlikely(!__pyx_v_v.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_v = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0]); if (unlikely(!__pyx_v_v.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
     if (values[1]) {
       __pyx_v_l1_ratio = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_l1_ratio == (double)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
     } else {
@@ -19791,6 +19794,28 @@ static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn_
     retcode = __Pyx_ValidateAndInit_memviewslice(axes_specs, 0,
                                                  PyBUF_RECORDS, 1,
                                                  &__Pyx_TypeInfo_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, stack,
+                                                 &result, obj);
+    if (unlikely(retcode == -1))
+        goto __pyx_fail;
+    return result;
+__pyx_fail:
+    result.memview = NULL;
+    result.data = NULL;
+    return result;
+}
+
+static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_double(PyObject *obj) {
+    __Pyx_memviewslice result = { 0, 0, { 0 }, { 0 }, { 0 } };
+    __Pyx_BufFmt_StackElem stack[1];
+    int axes_specs[] = { (__Pyx_MEMVIEW_DIRECT | __Pyx_MEMVIEW_STRIDED) };
+    int retcode;
+    if (obj == Py_None) {
+        result.memview = (struct __pyx_memoryview_obj *) Py_None;
+        return result;
+    }
+    retcode = __Pyx_ValidateAndInit_memviewslice(axes_specs, 0,
+                                                 PyBUF_RECORDS, 1,
+                                                 &__Pyx_TypeInfo_double, stack,
                                                  &result, obj);
     if (unlikely(retcode == -1))
         goto __pyx_fail;
