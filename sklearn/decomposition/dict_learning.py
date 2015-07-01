@@ -326,7 +326,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         Updated dictionary.
 
     """
-    print(update_dict_dir)
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
