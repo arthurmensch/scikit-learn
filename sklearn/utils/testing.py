@@ -34,7 +34,7 @@ import tempfile
 
 try:
     WindowsError
-except ImportError:
+except NameError:
     WindowsError = None
 
 import os.path as op
