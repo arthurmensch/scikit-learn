@@ -546,7 +546,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
                                              verbose=verbose, return_r2=True,
                                              online=False,
-                                             update_dict_dir="component"
+                                             update_dict_dir="component",
                                              random_state=random_state,
                                              l1_ratio=0.)
         dictionary = dictionary.T
