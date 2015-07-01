@@ -326,6 +326,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         Updated dictionary.
 
     """
+    print(update_dict_dir)
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
@@ -545,6 +546,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
                                              verbose=verbose, return_r2=True,
                                              online=False,
+                                             update_dict_dir="component"
                                              random_state=random_state,
                                              l1_ratio=0.)
         dictionary = dictionary.T
@@ -804,6 +806,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,
                                                  random_state=random_state, return_r2=True,
+                                                 update_dict_dir=update_dict_dir,
                                                  online=True, pool=pool
                                                  )
         this_residual /= 2
@@ -1472,7 +1475,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             iter_offset=iter_offset, random_state=self.random_state_,
             return_inner_stats=True, inner_stats=inner_stats,
             return_n_iter=True,
-            return_debug_info=True)
+            return_debug_info=self.debug_info)
 
         # XXX: To remove
         if self.debug_info:

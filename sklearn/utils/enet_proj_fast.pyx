@@ -9,12 +9,17 @@ for sparse coding (http://www.di.ens.fr/sierra/pdfs/icml09.pdf)
 # License: BSD
 
 cimport cython
+from cython cimport view
+
 cimport numpy as np
 from libc.math cimport sqrt
 
 from libc.stdlib cimport malloc, free
 
 from enet_proj_fast cimport DOUBLE, UINT32_t, UINT8_t
+
+cdef void callback_free_data(void *p):
+    free(p)
 
 # The following two functions are shamelessly copied from the tree code.
 @cython.cdivision(True)
@@ -181,7 +186,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
 @cython.wraparound(False)
 @cython.initializedcheck(False)
 @cython.nonecheck(False)
-cpdef DOUBLE[:] enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
+def enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
     """
     Project a vector on the elastic-net ball
 
@@ -198,7 +203,7 @@ cpdef DOUBLE[:] enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
     """
     cdef int n = v.shape[0]
     cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
-    cdef DOUBLE[:] res = <DOUBLE[:n]> (<DOUBLE *>malloc(n * sizeof(DOUBLE)))
+    cdef DOUBLE[:] res = view.array(shape=(n,), itemsize=sizeof(DOUBLE), format="d")
     cdef double norm = _enet_projection_with_mask(res, v, mask, radius, l1_ratio, 0)
     free(mask)
     return res
