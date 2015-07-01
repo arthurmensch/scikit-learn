@@ -329,7 +329,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
-    component_range = random_state.permutation(n_components)
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(dictionary, code)
     R += Y
@@ -339,6 +338,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         threshold = 1e-20 # * n_components
         R = np.asfortranarray(R)
         ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+        component_range = random_state.permutation(n_components)
         for k in component_range:
             # R <- 1.0 * U_k * V_k^T + R
             R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
@@ -372,9 +372,16 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         if pool is None:
             _update_dict_feature_wise_fast(dictionary, R, code, l1_ratio, radius)
         else:
-            slices = list(gen_even_slices(n_features, pool._processes))
-            pool.map(lambda this_slice_: _update_dict_feature_wise_fast(dictionary[this_slice_], R[this_slice_],
-                                                                        code, l1_ratio, radius),
+            ratio = 10
+            slices = list(gen_even_slices(n_features / ratio, pool._processes))
+            # XXX: could be useful (diagonalisation process, but random_state.choice is too slow
+            # Good result quality
+            permutation = random_state.choice(n_features, n_features / ratio, replace=False)
+            pool.map(lambda this_slice_:
+                     _update_dict_feature_wise_fast(dictionary, R,
+                                                    code,
+                                                    permutation[this_slice_],
+                                                    l1_ratio, radius),
                      slices)
     else:
         raise ValueError('Wrong argument for direction of dictionary update')

@@ -35,12 +35,14 @@ cdef extern from "cblas.h":
 @cython.initializedcheck(False)
 cpdef void _update_dict_feature_wise_fast(DOUBLE[:, :] dictionary, DOUBLE[:, :] R,
                              DOUBLE[:, :] code,
+                             INT64_t[:] permutation,
                              double l1_ratio,
                              double radius) nogil:
-    cdef int n_features = dictionary.shape[0]
+    cdef int n_features = permutation.shape[0]
     cdef int n_components = dictionary.shape[1]
     cdef int n_samples = code.shape[1]
     cdef int j
+    cdef int idx
     cdef double atom_norm_square
     cdef double * dictionary_ptr = &dictionary[0, 0]
     cdef double * code_ptr = &code[0,0]
@@ -51,7 +53,8 @@ cpdef void _update_dict_feature_wise_fast(DOUBLE[:, :] dictionary, DOUBLE[:, :] 
     with nogil:
         # Initializing mask here to avoid too much malloc
         mask = <UINT8_t *>malloc(n_components * sizeof(UINT8_t))
-        for j in range(n_features):
+        for idx in range(n_features):
+            j = permutation[idx]
             # R[j, :] += np.dot(dictionary[j, :], code)
             dgemv(CblasRowMajor, CblasTrans, n_components, n_samples, 1., code_ptr, n_components,
                  dictionary_ptr + j * n_components, 1, 1., R_ptr + j * n_samples, 1)
