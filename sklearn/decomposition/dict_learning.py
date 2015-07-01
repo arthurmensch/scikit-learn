@@ -492,6 +492,8 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
     alpha = float(alpha)
     random_state = check_random_state(random_state)
 
+    X = check_array(X, dtype=np.float64)
+
     if n_jobs == -1:
         n_jobs = cpu_count()
 
