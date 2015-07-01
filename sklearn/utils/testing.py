@@ -31,6 +31,7 @@ except ImportError:
 <<<<<<< HEAD
 =======
 import tempfile
+import shutil
 
 try:
     WindowsError
