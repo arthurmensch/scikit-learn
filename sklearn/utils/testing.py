@@ -28,6 +28,19 @@ except ImportError:
     from urllib.request import urlopen
     from urllib.error import HTTPError
 
+<<<<<<< HEAD
+=======
+import tempfile
+
+try:
+    WindowsError
+except ImportError:
+    WindowsError = None
+
+import os.path as op
+import atexit
+
+>>>>>>> cb8e107... Windows compatibility
 import sklearn
 from sklearn.base import BaseEstimator
 from sklearn.externals import joblib
