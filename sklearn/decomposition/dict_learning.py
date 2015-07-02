@@ -100,7 +100,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         cov = np.dot(dictionary, X.T)
 
     if algorithm == 'lasso_lars':
-        alpha = float(regularization) / n_features  # account for scaling
+        alpha = float(regularization) / sqrt(n_features)  # account for scaling
         try:
             err_mgt = np.seterr(all='ignore')
             lasso_lars = LassoLars(alpha=alpha, fit_intercept=False,
@@ -112,7 +112,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
             np.seterr(**err_mgt)
 
     elif algorithm == 'lasso_cd':
-        alpha = float(regularization) / n_features  # account for scaling
+        alpha = float(regularization) / sqrt(n_features)  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
                     max_iter=max_iter, selection='random', random_state=random_state, warm_start=True)
         clf.coef_ = init
@@ -719,6 +719,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
     n_samples, n_features = X.shape
     # Avoid integer division problems
     alpha = float(alpha)
+    l1_ratio = float(l1_ratio)
+    if l1_ratio != 0:
+        l1_ratio /= (1 + (1-l1_ratio)/(l1_ratio*sqrt(n_features)))
     random_state = check_random_state(random_state)
 
     if n_jobs == -1:
