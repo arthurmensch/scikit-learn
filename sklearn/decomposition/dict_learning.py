@@ -372,7 +372,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         if pool is None:
             _update_dict_feature_wise_fast(dictionary, R, code, l1_ratio, radius)
         else:
-            ratio = 10
+            ratio = 1
             slices = list(gen_even_slices(n_features / ratio, pool._processes))
             # XXX: could be useful (diagonalisation process, but random_state.choice is too slow
             # Good result quality

@@ -41,11 +41,14 @@ rng = RandomState(0)
 # Load faces data
 dataset = fetch_olivetti_faces(shuffle=True, random_state=rng)
 faces = dataset.data
+faces = np.tile(faces, (1, 4))
+image_shape = (128, 128)
+
 
 n_samples, n_features = faces.shape
 
-l1_ratio = 0.001
-alpha = 0.2
+l1_ratio = 0.0
+alpha = 0.01
 
 # global centering
 faces_centered = faces - faces.mean(axis=0)
@@ -109,13 +112,13 @@ estimators = [
     #  True),
 
     ('Sparse comp. - MiniBatchDictionaryLearning',
-     decomposition.MiniBatchDictionaryLearning(n_components=n_components, alpha=0.001,
-                                               n_iter=200, batch_size=10,
-                                               fit_algorithm='ridge',
-                                               fit_update_dict_dir='feature',
+     decomposition.MiniBatchDictionaryLearning(n_components=n_components, alpha=alpha,
+                                               n_iter=400, batch_size=10,
+                                               fit_algorithm='cd',
+                                               fit_update_dict_dir='component',
                                                tol=1e-4,
                                                verbose=10,
-                                               l1_ratio=0.2,
+                                               l1_ratio=l1_ratio,
                                                random_state=rng,
                                                n_jobs=3,
                                                debug_info=True),
@@ -159,8 +162,8 @@ for i, (name, estimator, center) in enumerate(estimators):
     if name == 'Sparse comp. - MiniBatchDictionaryLearning':
         print("%s - Component density" % name)
         print 1 - np.sum(components_ == 0) / float(np.size(components_))
-        print("%s - Component density" % name)
-        code = sparse_encode(data, components_, algorithm='ridge', alpha=alpha)
+        print("%s - Code density" % name)
+        code = sparse_encode(data, components_, algorithm='lasso_cd', alpha=alpha)
         print 1 - np.sum(code == 0) / float(np.size(code))
         plot_gallery('%s - Reconstruction' % name,
                      code[:n_components].dot(components_))
