@@ -33,6 +33,11 @@ import shutil
 import os.path as op
 import atexit
 
+try:
+    WindowsError
+except NameError:
+    WindowsError = None
+
 import sklearn
 from sklearn.base import BaseEstimator
 from sklearn.externals import joblib
@@ -710,7 +715,7 @@ def _delete_folder(folder_path, warn=False):
     try:
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path)  # This can fail under windows, but will succeed when called by atexit
-    except shutil.WindowsError:
+    except WindowsError:
         if warn:
             warnings.warn("Could not delete temporary folder %s" % folder_path)
 
