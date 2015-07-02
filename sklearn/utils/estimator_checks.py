@@ -9,7 +9,12 @@ import inspect
 import pickle
 import tempfile
 import shutil
-import atexit
+
+try:
+    WindowsError
+except NameError:
+    WindowsError = None
+
 from copy import deepcopy
 
 import numpy as np
@@ -269,7 +274,7 @@ def _clear_temp_memory(warn=False):
         _TEMP_MEMORY = None
         try:
             shutil.rmtree(cachedir)
-        except shutil.WindowsError:
+        except WindowsError:
             if warn:
                 warnings.warn("Could not delete temporary folder %s" % cachedir)
 
