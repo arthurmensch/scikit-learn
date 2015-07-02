@@ -28,20 +28,11 @@ except ImportError:
     from urllib.request import urlopen
     from urllib.error import HTTPError
 
-<<<<<<< HEAD
-=======
 import tempfile
 import shutil
-
-try:
-    WindowsError
-except NameError:
-    WindowsError = None
-
 import os.path as op
 import atexit
 
->>>>>>> cb8e107... Windows compatibility
 import sklearn
 from sklearn.base import BaseEstimator
 from sklearn.externals import joblib
@@ -711,6 +702,35 @@ def check_skip_travis():
     """Skip test if being run on Travis."""
     if os.environ.get('TRAVIS') == "true":
         raise SkipTest("This test needs to be skipped on Travis")
+
+
+def _delete_folder(folder_path, warn=False):
+    """Utility function to cleanup a temporary folder if still existing.
+    Copy from joblib.pool (for independance)"""
+    try:
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)  # This can fail under windows, but will succeed when called by atexit
+    except shutil.WindowsError:
+        if warn:
+            warnings.warn("Could not delete temporary folder %s" % folder_path)
+
+
+class TempMemmap(object):
+    def __init__(self, data, mmap_mode='r'):
+        self.temp_folder = tempfile.mkdtemp(prefix='sklearn_testing_')
+        self.mmap_mode = mmap_mode
+        self.data = data
+
+    def __enter__(self):
+        fpath = op.join(self.temp_folder, 'data.pkl')
+        joblib.dump(self.data, fpath)
+        data_read_only = joblib.load(fpath, mmap_mode=self.mmap_mode)
+        atexit.register(lambda: _delete_folder(self.temp_folder, warn=True))
+        return data_read_only
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        _delete_folder(self.temp_folder)
+
 
 with_network = with_setup(check_skip_network)
 with_travis = with_setup(check_skip_travis)
