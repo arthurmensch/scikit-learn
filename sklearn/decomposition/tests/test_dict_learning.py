@@ -164,11 +164,11 @@ def test_dict_learning_online_partial_fit():
                                             batch_size=1, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
                                             verbose=1,
-                                            alpha=1, shuffle=False, dict_init=V,
+                                            alpha=0.1, shuffle=False, dict_init=V,
                                             l1_ratio=0.,
                                             random_state=rng).fit(X)
         rng = np.random.RandomState(0)
-        dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
+        dict2 = MiniBatchDictionaryLearning(n_components, alpha=0.1,
                                             n_iter=1, dict_init=V, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
                                             verbose=1,
