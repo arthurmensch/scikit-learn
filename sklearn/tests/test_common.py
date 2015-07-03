@@ -25,6 +25,7 @@ from sklearn.cluster.bicluster import BiclusterMixin
 from sklearn.linear_model.base import LinearClassifierMixin
 from sklearn.utils.estimator_checks import (
     _yield_all_checks,
+    _clear_temp_memory,
     CROSS_DECOMPOSITION,
     check_parameters_default_constructible,
     check_class_weight_balanced_linear_classifier,
@@ -65,6 +66,7 @@ def test_non_meta_estimators():
             continue
         for check in _yield_all_checks(name, Estimator):
             yield check, name, Estimator
+    _clear_temp_memory(warn=False)
 
 
 def test_configure():

@@ -715,7 +715,11 @@ def _delete_folder(folder_path, warn=False):
     try:
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path)  # This can fail under windows, but will succeed when called by atexit
+<<<<<<< HEAD
     except WindowsError:
+=======
+    except shutil.WindowsError:
+>>>>>>> origin/common_test_read_only_improvement
         if warn:
             warnings.warn("Could not delete temporary folder %s" % folder_path)
 
