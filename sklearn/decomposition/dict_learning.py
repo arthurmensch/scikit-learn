@@ -580,7 +580,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         return code, dictionary, errors
 
 
-def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.5, n_iter=100,
+def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          method='lars', update_dict_dir='component',
@@ -1135,7 +1135,7 @@ class DictionaryLearning(BaseEstimator, SparseCodingMixin):
     SparsePCA
     MiniBatchSparsePCA
     """
-    def __init__(self, n_components=None, alpha=1, max_iter=1000, tol=1e-8,
+    def __init__(self, n_components=None, alpha=0.1, max_iter=1000, tol=1e-8,
                  fit_algorithm='lars', transform_algorithm='omp',
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  n_jobs=1, code_init=None, dict_init=None, verbose=False,
@@ -1313,7 +1313,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     MiniBatchSparsePCA
 
     """
-    def __init__(self, n_components=None, alpha=1, l1_ratio=0.5, n_iter=1000,
+    def __init__(self, n_components=None, alpha=0.1, l1_ratio=0.5, n_iter=1000,
                  fit_algorithm='lars', fit_update_dict_dir='component', n_jobs=1, batch_size=3,
                  shuffle=True, dict_init=None, transform_algorithm='omp', tol=1e-4,
                  transform_n_nonzero_coefs=None, transform_alpha=None,
