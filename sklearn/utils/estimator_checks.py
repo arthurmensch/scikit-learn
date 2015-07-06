@@ -199,7 +199,7 @@ def check_estimator(Estimator):
         check(name, Estimator)
 
 
-def _boston_subset(n_samples=200):
+def _boston_subset(n_samples=200, scale_y=False):
     """Utility function used to cache boston subset into a global variable"""
     global BOSTON
     if BOSTON is None:
@@ -207,24 +207,27 @@ def _boston_subset(n_samples=200):
         X, y = boston.data, boston.target
         X, y = shuffle(X, y, random_state=0)
         X, y = X[:n_samples], y[:n_samples]
+        if scale_y:
+            y = StandardScaler().fit_transform(y)
         X = StandardScaler().fit_transform(X)
         BOSTON = X, y
     return BOSTON
 
 
-def _readonly_boston_subset(n_samples=200):
+def _readonly_boston_subset(*args, **kwargs):
     """Utility function used to return a r-o memmap, without recreating a new memory map at each call"""
     _init_temp_memory()
     f = _TEMP_READONLY_MEMMAP_MEMORY.cache(_boston_subset)
-    return f(n_samples=n_samples)
+    return f(**kwargs)
 
 
-def _boston_subset_with_mode(readonly=False):
+def _boston_subset_with_mode(*args, **kwargs):
     """Factorisation function used in checks"""
+    readonly = kwargs.pop('readonly', None)
     if readonly:
-        return _readonly_boston_subset()
+        return _readonly_boston_subset(**kwargs)
     else:
-        return _boston_subset()
+        return _boston_subset(**kwargs)
 
 
 def _make_blobs(*args, **kwargs):
@@ -1053,8 +1056,7 @@ def check_regressors_train_readonly(name, Regressors):
 
 
 def check_regressors_train(name, Regressor, readonly=False):
-    X, y = _boston_subset_with_mode(readonly)
-    y = StandardScaler().fit_transform(y)   # X is already scaled
+    X, y = _boston_subset_with_mode(readonly, scale_y=True)
     y = multioutput_estimator_convert_y_2d(name, y)
     rnd = np.random.RandomState(0)
     # catch deprecation warnings
@@ -1090,8 +1092,7 @@ def check_regressors_train(name, Regressor, readonly=False):
 
 
 def check_regressors_pickle(name, Regressor):
-    X, y = _boston_subset()
-    y = StandardScaler().fit_transform(y)   # X is already scaled
+    X, y = _boston_subset(scale_y=True)
     y = multioutput_estimator_convert_y_2d(name, y)
     rnd = np.random.RandomState(0)
     # catch deprecation warnings
