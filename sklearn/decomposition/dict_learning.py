@@ -373,7 +373,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         # We use a cython auxiliary function, because
         # we enter a large loop with n_features iterations, that can be parallelized releasing the GIL
         if pool is None:
-            _update_dict_feature_wise_fast(dictionary, R, code, l1_ratio, radius)
+            _update_dict_feature_wise_fast(dictionary, R, code, permutation, l1_ratio, radius)
         else:
             slices = list(gen_even_slices(n_features / ratio, pool._processes))
             pool.map(lambda this_slice_:
