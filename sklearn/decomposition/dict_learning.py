@@ -27,6 +27,7 @@ from ..utils.enet_proj_fast import enet_projection, enet_norm
 
 from multiprocessing.pool import ThreadPool
 
+from distutils.version import LooseVersion
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
@@ -369,7 +370,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         # XXX: could be useful (diagonalisation process, but random_state.choice is too slow
         # Good result quality
         ratio = 1
-        permutation = random_state.choice(n_features, n_features / ratio, replace=False)
+        if(LooseVersion(np.__version__).version[1] >= 7):
+            permutation = random_state.choice(n_features, n_features / ratio, replace=False)
+        else:
+            permutation = random_state.permutation(n_features)[:(n_features / ratio)]
         # We use a cython auxiliary function, because
         # we enter a large loop with n_features iterations, that can be parallelized releasing the GIL
         if pool is None:
