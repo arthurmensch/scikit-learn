@@ -366,17 +366,16 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                 R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
     # XXX: This is untested and EXPERIMENTAL
     elif update_dict_dir == 'feature':
-        # radius *= n_features
-        # We use a cython auxiliary function, because:
-        # We enter a large loop with n_features iterations, that can be parallelized releasing the GIL
+        # XXX: could be useful (diagonalisation process, but random_state.choice is too slow
+        # Good result quality
+        ratio = 1
+        permutation = random_state.choice(n_features, n_features / ratio, replace=False)
+        # We use a cython auxiliary function, because
+        # we enter a large loop with n_features iterations, that can be parallelized releasing the GIL
         if pool is None:
             _update_dict_feature_wise_fast(dictionary, R, code, l1_ratio, radius)
         else:
-            ratio = 1
             slices = list(gen_even_slices(n_features / ratio, pool._processes))
-            # XXX: could be useful (diagonalisation process, but random_state.choice is too slow
-            # Good result quality
-            permutation = random_state.choice(n_features, n_features / ratio, replace=False)
             pool.map(lambda this_slice_:
                      _update_dict_feature_wise_fast(dictionary, R,
                                                     code,
