@@ -106,7 +106,7 @@ def test_fit_transform_tall():
     U1 = spca_lars.fit_transform(Y)
     spca_lasso = SparsePCA(n_components=3, method='cd', random_state=rng)
     U2 = spca_lasso.fit(Y).transform(Y)
-    assert_array_almost_equal(U1, U2)
+    assert_array_almost_equal(U1, U2, 4)
 
 
 def test_initialization():
