@@ -365,7 +365,7 @@ def check_array(array, accept_sparse=None, dtype="numeric", order=None,
     else:
         if ensure_2d:
             array = np.atleast_2d(array)
-        # If copy=False and array is a np.memmap, we avoid copying array by using function np.asarray
+
         array = np.asarray(array, dtype=dtype, order=order)
         # make sure we actually converted to numeric:
         if dtype_numeric and array.dtype.kind == "O":
