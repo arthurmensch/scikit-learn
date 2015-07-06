@@ -206,28 +206,30 @@ def _boston_subset(n_samples=200, scale_y=False):
         boston = load_boston()
         X, y = boston.data, boston.target
         X, y = shuffle(X, y, random_state=0)
+        X = StandardScaler().fit_transform(X)
+        BOSTON = X, y
+    else:
+        X, y = BOSTON
         X, y = X[:n_samples], y[:n_samples]
         if scale_y:
             y = StandardScaler().fit_transform(y)
-        X = StandardScaler().fit_transform(X)
-        BOSTON = X, y
-    return BOSTON
+    return X, y
 
 
 def _readonly_boston_subset(*args, **kwargs):
     """Utility function used to return a r-o memmap, without recreating a new memory map at each call"""
     _init_temp_memory()
     f = _TEMP_READONLY_MEMMAP_MEMORY.cache(_boston_subset)
-    return f(**kwargs)
+    return f(*args, **kwargs)
 
 
 def _boston_subset_with_mode(*args, **kwargs):
     """Factorisation function used in checks"""
     readonly = kwargs.pop('readonly', None)
     if readonly:
-        return _readonly_boston_subset(**kwargs)
+        return _readonly_boston_subset(*args, **kwargs)
     else:
-        return _boston_subset(**kwargs)
+        return _boston_subset(*args, **kwargs)
 
 
 def _make_blobs(*args, **kwargs):
@@ -1056,7 +1058,7 @@ def check_regressors_train_readonly(name, Regressors):
 
 
 def check_regressors_train(name, Regressor, readonly=False):
-    X, y = _boston_subset_with_mode(readonly, scale_y=True)
+    X, y = _boston_subset_with_mode(readonly=readonly, scale_y=True)
     y = multioutput_estimator_convert_y_2d(name, y)
     rnd = np.random.RandomState(0)
     # catch deprecation warnings
