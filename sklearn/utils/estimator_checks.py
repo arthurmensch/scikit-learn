@@ -9,7 +9,7 @@ import inspect
 import pickle
 import tempfile
 import shutil
-
+# WindowsError only exist in Windows
 try:
     WindowsError
 except NameError:
@@ -56,7 +56,7 @@ from sklearn.datasets import load_iris, load_boston, make_blobs
 
 
 BOSTON = None
-_TEMP_MEMORY = None
+_TEMP_READONLY_MEMMAP_MEMORY = None
 CROSS_DECOMPOSITION = ['PLSCanonical', 'PLSRegression', 'CCA', 'PLSSVD']
 
 
@@ -215,7 +215,7 @@ def _boston_subset(n_samples=200):
 def _readonly_boston_subset(n_samples=200):
     """Utility function used to return a r-o memmap, without recreating a new memory map at each call"""
     _init_temp_memory()
-    f = _TEMP_MEMORY.cache(_boston_subset)
+    f = _TEMP_READONLY_MEMMAP_MEMORY.cache(_boston_subset)
     return f(n_samples=n_samples)
 
 
@@ -242,7 +242,7 @@ def _make_blobs(*args, **kwargs):
 def _readonly_make_blobs(*args, **kwargs):
     """Utility function used to return a r-o memmap, without recreating a new memory map at each call"""
     _init_temp_memory()
-    f = _TEMP_MEMORY.cache(_make_blobs)
+    f = _TEMP_READONLY_MEMMAP_MEMORY.cache(_make_blobs)
     return f(*args, **kwargs)
 
 
@@ -255,23 +255,23 @@ def _make_blobs_with_mode(*args, **kwargs):
         return _make_blobs(*args, **kwargs)
 
 
-def _init_temp_memory():
+def _init_temp_memory(mmap_mode='r'):
     """Utility function used to initialize a temp folder"""
-    global _TEMP_MEMORY
-    if _TEMP_MEMORY is None:
+    global _TEMP_READONLY_MEMMAP_MEMORY
+    if _TEMP_READONLY_MEMMAP_MEMORY is None:
         temp_folder = tempfile.mkdtemp(prefix='sklearn_checks_temp_')
-        _TEMP_MEMORY = Memory(cachedir=temp_folder, mmap_mode='r', verbose=0)
+        _TEMP_READONLY_MEMMAP_MEMORY = Memory(cachedir=temp_folder, mmap_mode=mmap_mode, verbose=0)
         # Cannot use atexit as it is called everytime a test end, thus forcing us to regenerate cache at every check
         # atexit.register(_clear_temp_memory(warn=True))
 
 
 def _clear_temp_memory(warn=False):
     """Utility function used to delete the local temp folder"""
-    global _TEMP_MEMORY
-    if _TEMP_MEMORY is not None:
+    global _TEMP_READONLY_MEMMAP_MEMORY
+    if _TEMP_READONLY_MEMMAP_MEMORY is not None:
         # Recovering temp_folder
-        cachedir = os.path.dirname(_TEMP_MEMORY.cachedir)
-        _TEMP_MEMORY = None
+        cachedir = os.path.dirname(_TEMP_READONLY_MEMMAP_MEMORY.cachedir)
+        _TEMP_READONLY_MEMMAP_MEMORY = None
         try:
             shutil.rmtree(cachedir)
         except WindowsError:
@@ -406,9 +406,7 @@ def check_transformer_general(name, Transformer, readonly=False):
     X, y = _make_blobs_with_mode(n_samples=30, centers=[[0, 0, 0], [1, 1, 1]],
                                  random_state=0, n_features=2, cluster_std=0.1,
                                  readonly=readonly, positive=True, scale=True)
-    # Put into _make_blobs :
-    # X -= X.min()
-    # X = StandardScaler().fit_transform(X)
+
     _check_transformer(name, Transformer, X, y)
     _check_transformer(name, Transformer, X.tolist(), y.tolist())
 

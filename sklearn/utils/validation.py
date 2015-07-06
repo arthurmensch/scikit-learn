@@ -333,6 +333,8 @@ def check_array(array, accept_sparse=None, dtype="numeric", order=None,
     if isinstance(accept_sparse, str):
         accept_sparse = [accept_sparse]
 
+    # store reference to original array to check if copy is needed when function returns
+    array_orig = array
     # store whether originally we wanted numeric dtype
     dtype_numeric = dtype == "numeric"
 
@@ -364,10 +366,7 @@ def check_array(array, accept_sparse=None, dtype="numeric", order=None,
         if ensure_2d:
             array = np.atleast_2d(array)
         # If copy=False and array is a np.memmap, we avoid copying array by using function np.asarray
-        if not copy:
-            array = np.asarray(array, dtype=dtype, order=order)
-        else:
-            array = np.array(array, dtype=dtype, order=order, copy=copy)
+        array = np.asarray(array, dtype=dtype, order=order)
         # make sure we actually converted to numeric:
         if dtype_numeric and array.dtype.kind == "O":
             array = array.astype(np.float64)
@@ -400,6 +399,10 @@ def check_array(array, accept_sparse=None, dtype="numeric", order=None,
                 estimator = estimator.__class__.__name__
             msg += " by %s" % estimator
         warnings.warn(msg, DataConversionWarning)
+
+    if copy and array is array_orig:
+        array = array.copy()
+
     return array
 
 
