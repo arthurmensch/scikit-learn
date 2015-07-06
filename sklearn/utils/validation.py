@@ -401,7 +401,7 @@ def check_array(array, accept_sparse=None, dtype="numeric", order=None,
         warnings.warn(msg, DataConversionWarning)
 
     if copy and array is array_orig:
-        array = array.copy()
+        array = np.array(array, dtype=dtype, order=order)
 
     return array
 
