@@ -47,17 +47,17 @@ def test_dict_learning_reconstruction():
     # nonzero atoms is right.
 
 
-def test_dict_learning_reconstruction_parallel():
-    # regression test that parallel reconstruction works with n_jobs=-1
-    n_components = 12
-    dico = DictionaryLearning(n_components, transform_algorithm='omp',
-                              transform_alpha=0.001, random_state=0, n_jobs=-1)
-    code = dico.fit(X).transform(X)
-    assert_array_almost_equal(np.dot(code, dico.components_), X)
-
-    dico.set_params(transform_algorithm='lasso_lars')
-    code = dico.transform(X)
-    assert_array_almost_equal(np.dot(code, dico.components_), X, decimal=2)
+# def test_dict_learning_reconstruction_parallel():
+#     # regression test that parallel reconstruction works with n_jobs=-1
+#     n_components = 12
+#     dico = DictionaryLearning(n_components, transform_algorithm='omp',
+#                               transform_alpha=0.001, random_state=0, n_jobs=-1)
+#     code = dico.fit(X).transform(X)
+#     assert_array_almost_equal(np.dot(code, dico.components_), X)
+#
+#     dico.set_params(transform_algorithm='lasso_lars')
+#     code = dico.transform(X)
+#     assert_array_almost_equal(np.dot(code, dico.components_), X, decimal=2)
 
 
 def test_dict_learning_nonzero_coefs():
@@ -91,90 +91,87 @@ def test_dict_learning_split():
 
 
 def test_dict_learning_online_shapes():
-    for update_dict_dir in ['component', 'feature']:
-        rng = np.random.RandomState(0)
-        n_components = 8
-        code, dictionary = dict_learning_online(X, n_components=n_components, update_dict_dir=update_dict_dir,
-                                                alpha=1, random_state=rng)
-        assert_equal(code.shape, (n_samples, n_components))
-        assert_equal(dictionary.shape, (n_components, n_features))
-        assert_equal(np.dot(code, dictionary).shape, X.shape)
+    rng = np.random.RandomState(0)
+    n_components = 8
+    code, dictionary = dict_learning_online(X, n_components=n_components,
+                                            alpha=1, random_state=rng)
+    assert_equal(code.shape, (n_samples, n_components))
+    assert_equal(dictionary.shape, (n_components, n_features))
+    assert_equal(np.dot(code, dictionary).shape, X.shape)
 
 
 def test_dict_learning_online_verbosity():
-    for update_dict_dir in ['component', 'feature']:
-        n_components = 5
-        # test verbosity
-        from sklearn.externals.six.moves import cStringIO as StringIO
-        import sys
+    n_components = 5
+    # test verbosity
+    from sklearn.externals.six.moves import cStringIO as StringIO
+    import sys
 
-        old_stdout = sys.stdout
-        try:
-            sys.stdout = StringIO()
-            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=1, fit_update_dict_dir=update_dict_dir,
-                                               random_state=0)
-            dico.fit(X)
-            dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=2, fit_update_dict_dir=update_dict_dir,
-                                               random_state=0)
-            dico.fit(X)
-            dict_learning_online(X, n_components=n_components, alpha=1, verbose=1, update_dict_dir=update_dict_dir,
-                                 random_state=0)
-            dict_learning_online(X, n_components=n_components, alpha=1, verbose=2, update_dict_dir=update_dict_dir,
-                                 random_state=0)
-        finally:
-            sys.stdout = old_stdout
+    old_stdout = sys.stdout
+    try:
+        sys.stdout = StringIO()
+        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=1,
+                                           random_state=0)
+        dico.fit(X)
+        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, verbose=2,
+                                           random_state=0)
+        dico.fit(X)
+        dict_learning_online(X, n_components=n_components, alpha=1, verbose=1,
+                             random_state=0)
+        dict_learning_online(X, n_components=n_components, alpha=1, verbose=2,
+                             random_state=0)
+    finally:
+        sys.stdout = old_stdout
 
-        assert_true(dico.components_.shape == (n_components, n_features))
+    assert_true(dico.components_.shape == (n_components, n_features))
 
 
 def test_dict_learning_online_estimator_shapes():
-    for update_dict_dir in ['component', 'feature']:
-        n_components = 5
-        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, fit_update_dict_dir=update_dict_dir, random_state=0)
-        dico.fit(X)
-        assert_true(dico.components_.shape == (n_components, n_features))
+    n_components = 5
+    dico = MiniBatchDictionaryLearning(n_components, n_iter=20, random_state=0)
+    dico.fit(X)
+    assert_true(dico.components_.shape == (n_components, n_features))
 
 
 def test_dict_learning_online_overcomplete():
-    for update_dict_dir in ['component', 'feature']:
-        n_components = 12
-        dico = MiniBatchDictionaryLearning(n_components, n_iter=20, fit_update_dict_dir=update_dict_dir,
-                                           random_state=0).fit(X)
-        assert_true(dico.components_.shape == (n_components, n_features))
+    n_components = 12
+    dico = MiniBatchDictionaryLearning(n_components, n_iter=20,
+                                       random_state=0).fit(X)
+    assert_true(dico.components_.shape == (n_components, n_features))
 
 
 def test_dict_learning_online_initialization():
-    for update_dict_dir in ['component', 'feature']:
-        n_components = 12
-        rng = np.random.RandomState(0)
-        V = rng.randn(n_components, n_features)
-        dico = MiniBatchDictionaryLearning(n_components, n_iter=0,
-                                           dict_init=V, fit_update_dict_dir=update_dict_dir, random_state=0).fit(X)
-        assert_array_equal(dico.components_, V)
+    n_components = 12
+    rng = np.random.RandomState(0)
+    V = rng.randn(n_components, n_features)
+    dico = MiniBatchDictionaryLearning(n_components, n_iter=0,
+                                       dict_init=V, random_state=0).fit(X)
+    assert_array_equal(dico.components_, V)
 
 
 def test_dict_learning_online_partial_fit():
-    for update_dict_dir, algorithm in zip(['component', 'feature'], ['ridge', 'lars']):
+    for l1_ratio, algorithm in zip([0.1, 0.0], ['ridge', 'cd']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
         V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
         rng = np.random.RandomState(0)
-        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
-                                            batch_size=1, fit_update_dict_dir=update_dict_dir,
+        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=1 * len(X),
+                                            batch_size=1,
                                             fit_algorithm=algorithm,
                                             verbose=1,
                                             alpha=0.1, shuffle=False, dict_init=V,
-                                            l1_ratio=0.,
+                                            l1_ratio=l1_ratio,
                                             random_state=rng).fit(X)
         rng = np.random.RandomState(0)
         dict2 = MiniBatchDictionaryLearning(n_components, alpha=0.1,
-                                            n_iter=1, dict_init=V, fit_update_dict_dir=update_dict_dir,
+                                            n_iter=10 * len(X), dict_init=V,
+                                            batch_size=1,
                                             fit_algorithm=algorithm,
+                                            shuffle=False,
                                             verbose=1,
-                                            l1_ratio=0.,
+                                            l1_ratio=l1_ratio,
                                             random_state=rng)
-        for i in range(10):
+        for i in range(1):
             for sample in X:
                 dict2.partial_fit(sample)
 

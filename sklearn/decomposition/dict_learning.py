@@ -22,12 +22,8 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
 from ..utils.extmath import randomized_svd, row_norms
 from ..utils.validation import check_is_fitted
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge
-from .dict_learning_fast import _update_dict_feature_wise_fast
 from ..utils.enet_proj_fast import enet_projection, enet_norm
 
-from multiprocessing.pool import ThreadPool
-
-from distutils.version import LooseVersion
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
@@ -156,7 +152,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 # XXX : could be moved to the linear_model module
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
-                  max_iter=1000, n_jobs=1, pool=None,
+                  max_iter=1000, n_jobs=1,
                   random_state=None):
     """Sparse coding
 
@@ -254,33 +250,26 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         if regularization is None:
             regularization = 1.
 
-    if (pool is None and n_jobs == 1) or algorithm == 'threshold':
-        return _sparse_encode(X, dictionary, gram, cov=cov,
+    if n_jobs == 1 or algorithm == 'threshold':
+        code = _sparse_encode(X, dictionary, gram, cov=cov,
                               algorithm=algorithm,
                               regularization=regularization, copy_cov=copy_cov,
                               init=init, max_iter=max_iter, random_state=random_state)
+        if code.ndim == 1:
+            code = code[np.newaxis, :]
+        return code
 
     # Enter parallel code block
     code = np.empty((n_samples, n_components))
 
-    if pool is not None and algorithm is 'lasso_cd':
-        random_state = check_random_state(random_state)
-        slices = list(gen_even_slices(n_samples, pool._processes))
-        seeds = random_state.randint(np.iinfo(np.int32).max, size=n_samples)
-        code_views = pool.map(lambda this_slice_, this_seed: _sparse_encode(X[this_slice_], dictionary, gram, cov[:, this_slice_], algorithm,
-                                                    regularization=regularization, copy_cov=copy_cov,
-                                                    init=init[this_slice_] if init is not None else None,
-                                                    max_iter=max_iter, random_state=this_seed),
-                              zip(slices, seeds))
-    else:
-        slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
-        code_views = Parallel(n_jobs=n_jobs, backend='threading' if algorithm == 'lasso_cd' else 'multiprocessing')(
-            delayed(_sparse_encode)(
-                X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
-                regularization=regularization, copy_cov=copy_cov,
-                init=init[this_slice] if init is not None else None,
-                max_iter=max_iter)
-            for this_slice in slices)
+    slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
+    code_views = Parallel(n_jobs=n_jobs, backend='threading' if algorithm == 'lasso_cd' else 'multiprocessing')(
+        delayed(_sparse_encode)(
+            X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
+            regularization=regularization, copy_cov=copy_cov,
+            init=init[this_slice] if init is not None else None,
+            max_iter=max_iter)
+        for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
             code[this_slice] = this_view
 
@@ -288,9 +277,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
 
 def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
-                 update_dict_dir='component',
-                 l1_ratio=0.1, radius=1., online=False, random_state=None,
-                 pool=None):
+                 l1_ratio=0.1, radius=1., online=False, random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary component to have a unit l2 norm.
 
     Parameters
@@ -318,9 +305,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     random_state: int or RandomState
         Pseudo number generator state used for random sampling.
 
-    pool : ThreadPool, optional
-        thread pool to use
-
     Returns
     -------
     dictionary: array of shape (n_features, n_components)
@@ -334,60 +318,36 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     R = -np.dot(dictionary, code)
     R += Y
 
-    if update_dict_dir == 'component':
-        # radius *= n_components
-        threshold = 1e-20 # * n_components
-        R = np.asfortranarray(R)
-        ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
-        component_range = random_state.permutation(n_components)
-        for k in component_range:
-            # R <- 1.0 * U_k * V_k^T + R
-            R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-            if online:
-                dictionary[:, k] = R[:, k]
-            else:
-                dictionary[:, k] = np.dot(R, code[k, :].T)
-            # Scale k'th atom
-            atom_norm_square = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
-            if atom_norm_square < threshold:
-                if verbose == 1:
-                    sys.stdout.write("+")
-                    sys.stdout.flush()
-                elif verbose:
-                    print("Adding new random atom")
-                dictionary[:, k] = 10 * random_state.randn(n_features)
-                # Setting corresponding coefs to 0
-                code[k, :] = 0.0
-                dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
-                                                   l1_ratio=l1_ratio)
-            else:
-                dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
-                                                   l1_ratio=l1_ratio)
-                # R <- -1.0 * U_k * V_k^T + R
-                R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-    # XXX: This is untested and EXPERIMENTAL
-    elif update_dict_dir == 'feature':
-        # XXX: could be useful (diagonalisation process, but random_state.choice is too slow
-        # Good result quality
-        ratio = 1
-        if LooseVersion(np.__version__).version[1] >= 7:
-            permutation = random_state.choice(n_features, n_features / ratio, replace=False)
+    # radius *= n_components
+    threshold = 1e-20 # * n_components
+    R = np.asfortranarray(R)
+    ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+    component_range = random_state.permutation(n_components)
+    for k in component_range:
+        # R <- 1.0 * U_k * V_k^T + R
+        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        if online:
+            dictionary[:, k] = R[:, k]
         else:
-            permutation = random_state.permutation(n_features)[:(n_features / ratio)]
-        # We use a cython auxiliary function, because
-        # we enter a large loop with n_features iterations, that can be parallelized releasing the GIL
-        if pool is None:
-            _update_dict_feature_wise_fast(dictionary, R, code, permutation, l1_ratio, radius)
+            dictionary[:, k] = np.dot(R, code[k, :].T)
+        # Scale k'th atom
+        atom_norm_square = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
+        if atom_norm_square < threshold:
+            if verbose == 1:
+                sys.stdout.write("+")
+                sys.stdout.flush()
+            elif verbose:
+                print("Adding new random atom")
+            dictionary[:, k] = 10 * random_state.randn(n_features)
+            # Setting corresponding coefs to 0
+            code[k, :] = 0.0
+            dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
+                                               l1_ratio=l1_ratio)
         else:
-            slices = list(gen_even_slices(n_features / ratio, pool._processes))
-            pool.map(lambda this_slice_:
-                     _update_dict_feature_wise_fast(dictionary, R,
-                                                    code,
-                                                    permutation[this_slice_],
-                                                    l1_ratio, radius),
-                     slices)
-    else:
-        raise ValueError('Wrong argument for direction of dictionary update')
+            dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
+                                               l1_ratio=l1_ratio)
+            # R <- -1.0 * U_k * V_k^T + R
+            R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
 
     if return_r2:
         if online:
@@ -555,7 +515,6 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
                                              verbose=verbose, return_r2=True,
                                              online=False,
-                                             update_dict_dir="component",
                                              random_state=random_state,
                                              l1_ratio=0.)
         dictionary = dictionary.T
@@ -586,7 +545,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
 def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
-                         method='lars', update_dict_dir='component',
+                         method='lars',
                          iter_offset=0, tol=1e-4,
                          random_state=None,
                          return_inner_stats=False, inner_stats=None,
@@ -649,9 +608,6 @@ def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
         the estimated components are sparse.
         ols: compute code using an ordinary least square method. alpha will be ignored
 
-    update_dict_dir : {'component', 'feature'}
-        Direction of convex set projection for dictionary update
-
     l1_ratio: float,
         Sparsity controlling parameter for dictionary projection. In [0, 1]
 
@@ -711,8 +667,6 @@ def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
     if n_components is None:
         n_components = X.shape[1]
 
-    if update_dict_dir not in ('component', 'feature'):
-        raise ValueError("Update dictionary direction mispecified")
     if method not in ('lars', 'cd', 'ridge'):
         raise ValueError('Coding method not supported as a fit algorithm.')
     if method in ('lars', 'cd'):
@@ -729,12 +683,6 @@ def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
 
     if n_jobs == -1:
         n_jobs = cpu_count()
-
-    # Using a thread pool in the feature constraint setting
-    if n_jobs > 1:
-        pool = ThreadPool(n_jobs)
-    else:
-        pool = None
 
     # Init V with SVD of X
     if dict_init is not None:
@@ -802,7 +750,8 @@ def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
         # Setting n_jobs > 1 does not improve performance
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=1, random_state=random_state).T
-
+        if this_code.ndim == 1:
+            raise ValueError()
         # Update the auxiliary variables
         if ii < batch_size - 1:
             theta = float((ii + 1) * batch_size)
@@ -818,9 +767,7 @@ def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,
                                                  random_state=random_state, return_r2=True,
-                                                 update_dict_dir=update_dict_dir,
-                                                 online=True, pool=pool
-                                                 )
+                                                 online=True)
         this_residual /= 2
         penalty += np.sum(this_X ** 2) / 2
         if method in ('lars', 'cd'):
@@ -850,25 +797,16 @@ def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
         if callback is not None:
             callback(locals())
 
-    if pool is not None:
-        pool.close()
-
     # XXX: To remove, for testing purpose only
     if return_debug_info:
         debug_info = (residuals, density, values)
-        return_inner_stats = True
-        return_n_iter = True
 
     if return_inner_stats:
         if return_n_iter:
-            # XXX: To remove
-            if return_debug_info:
-                return dictionary.T, (A, B, penalty), ii - iter_offset + 1, debug_info
-            else:
-                return dictionary.T, (A, B, penalty), ii - iter_offset + 1
+            res = dictionary.T, (A, B, penalty), ii - iter_offset + 1
         else:
-            return dictionary.T, (A, B, penalty)
-    if return_code:
+            res = dictionary.T, (A, B, penalty)
+    elif return_code:
         if verbose > 1:
             print('Learning code...', end=' ')
         elif verbose == 1:
@@ -879,17 +817,19 @@ def dict_learning_online(X, n_components=2, alpha=0.1, l1_ratio=0.5, n_iter=100,
             dt = (time.time() - t0)
             print('done (total time: % 3is, % 4.1fmn)' % (dt, dt / 60))
         if return_n_iter:
-            if return_debug_info:
-                code, dictionary.T, ii - iter_offset + 1, debug_info
-            else:
-                return code, dictionary.T, ii - iter_offset + 1
+            res = code, dictionary.T, ii - iter_offset + 1
         else:
-            return code, dictionary.T
+            res = code, dictionary.T
 
-    if return_n_iter:
-        return dictionary.T, ii - iter_offset + 1
+    elif return_n_iter:
+        res = dictionary.T, ii - iter_offset + 1
     else:
-        return dictionary.T
+        res = dictionary.T
+    # XXX: to be removed
+    if return_debug_info:
+        return res + debug_info
+    else:
+        return res
 
 
 class SparseCodingMixin(TransformerMixin):
@@ -1232,9 +1172,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         elastic_net: Perform gradient-descent with elastic net projection
         to enforce dictionary sparsity, outputting non sparse code
 
-    fit_update_dict_dir : {'component', 'feature'}
-        Direction of convex set projection for dictionary update
-
     transform_algorithm : {'lasso_lars', 'lasso_cd', 'lars', 'omp', \
     'threshold', 'ridge'}
         Algorithm used to transform the data.
@@ -1317,7 +1254,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
     """
     def __init__(self, n_components=None, alpha=0.1, l1_ratio=0.5, n_iter=1000,
-                 fit_algorithm='lars', fit_update_dict_dir='component', n_jobs=1, batch_size=3,
+                 fit_algorithm='lars', n_jobs=1, batch_size=3,
                  shuffle=True, dict_init=None, transform_algorithm='omp', tol=1e-4,
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
@@ -1329,7 +1266,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.alpha = alpha
         self.n_iter = n_iter
         self.fit_algorithm = fit_algorithm
-        self.fit_update_dict_dir = fit_update_dict_dir
         self.dict_init = dict_init
         self.verbose = verbose
         self.shuffle = shuffle
@@ -1357,35 +1293,22 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         """
         random_state_ = check_random_state(self.random_state)
         X = check_array(X)
-
+        res = dict_learning_online(
+            X, self.n_components, self.alpha,
+            n_iter=self.n_iter, return_code=False,
+            method=self.fit_algorithm,
+            n_jobs=self.n_jobs, dict_init=self.dict_init,
+            batch_size=self.batch_size, shuffle=self.shuffle,
+            verbose=self.verbose, random_state=random_state_,
+            l1_ratio=self.l1_ratio,
+            tol=self.tol,
+            return_inner_stats=True,
+            return_n_iter=True,
+            return_debug_info=self.debug_info)
         if self.debug_info:
-            U, (A, B, penalty), self.n_iter_, debug_info = dict_learning_online(
-                X, self.n_components, self.alpha,
-                n_iter=self.n_iter, return_code=False,
-                method=self.fit_algorithm,
-                update_dict_dir=self.fit_update_dict_dir,
-                n_jobs=self.n_jobs, dict_init=self.dict_init,
-                batch_size=self.batch_size, shuffle=self.shuffle,
-                verbose=self.verbose, random_state=random_state_,
-                l1_ratio=self.l1_ratio,
-                tol=self.tol,
-                return_inner_stats=True,
-                return_n_iter=True,
-                return_debug_info=self.debug_info)
+            U, (A, B, penalty), self.n_iter_, debug_info = res
         else:
-            U, (A, B, penalty), self.n_iter_ = dict_learning_online(
-                X, self.n_components, self.alpha,
-                n_iter=self.n_iter, return_code=False,
-                method=self.fit_algorithm,
-                update_dict_dir=self.fit_update_dict_dir,
-                n_jobs=self.n_jobs, dict_init=self.dict_init,
-                batch_size=self.batch_size, shuffle=self.shuffle,
-                verbose=self.verbose, random_state=random_state_,
-                l1_ratio=self.l1_ratio,
-                tol=self.tol,
-                return_inner_stats=True,
-                return_n_iter=True,
-                return_debug_info=self.debug_info)
+            U, (A, B, penalty), self.n_iter_ = res
         self.components_ = U
         # XXX: to remove
         if self.debug_info:
@@ -1397,54 +1320,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         return self
 
     def partial_fit(self, X, y=None, iter_offset=None):
-        """Updates the model using the data in X as a mini-batch.
-
-        Parameters
-        ----------
-        X: array-like, shape (n_samples, n_features)
-            Training vector, where n_samples in the number of samples
-            and n_features is the number of features.
-
-        iter_offset: integer, optional
-            The number of iteration on data batches that has been
-            performed before this call to partial_fit. This is optional:
-            if no number is passed, the memory of the object is
-            used.
-
-        Returns
-        -------
-        self : object
-            Returns the instance itself.
-        """
-        if not hasattr(self, 'random_state_'):
-            self.random_state_ = check_random_state(self.random_state)
-        X = check_array(X)
-        if hasattr(self, 'components_'):
-            dict_init = self.components_
-        else:
-            dict_init = self.dict_init
-        inner_stats = getattr(self, 'inner_stats_', None)
-        if iter_offset is None:
-            iter_offset = getattr(self, 'iter_offset_', 0)
-        U, (A, B, penalty) = dict_learning_online(
-            X, self.n_components, self.alpha,
-            n_iter=self.n_iter, method=self.fit_algorithm,
-            update_dict_dir=self.fit_update_dict_dir,
-            l1_ratio=self.l1_ratio,
-            n_jobs=self.n_jobs, dict_init=dict_init,
-            batch_size=len(X), shuffle=False,
-            verbose=self.verbose, return_code=False,
-            iter_offset=iter_offset, random_state=self.random_state_,
-            return_inner_stats=True, inner_stats=inner_stats)
-        self.components_ = U
-
-        # Keep track of the state of the algorithm to be able to do
-        # some online fitting (partial_fit)
-        self.inner_stats_ = (A, B, penalty)
-        self.iter_offset_ = iter_offset + self.n_iter
-        return self
-
-    def incremental_fit(self, X, y=None, iter_offset=None):
         """Updates the model using the data in X
 
         Parameters
@@ -1474,11 +1349,12 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         inner_stats = getattr(self, 'inner_stats_', None)
         if iter_offset is None:
             iter_offset = getattr(self, 'iter_offset_', 0)
-        U, (A, B, penalty), self.n_iter_, debug_info = dict_learning_online(
+        data_size = len(X)
+        n_iter = int(ceil(float(data_size) / self.batch_size))
+        res = dict_learning_online(
             X, self.n_components, self.alpha,
-            n_iter=(len(X) - 1) / self.batch_size + 1,
+            n_iter=n_iter,
             method=self.fit_algorithm,
-            update_dict_dir=self.fit_update_dict_dir,
             l1_ratio=self.l1_ratio,
             n_jobs=self.n_jobs, dict_init=dict_init,
             batch_size=self.batch_size,
@@ -1486,10 +1362,12 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             verbose=self.verbose, return_code=False,
             iter_offset=iter_offset, random_state=self.random_state_,
             return_inner_stats=True, inner_stats=inner_stats,
-            return_n_iter=True,
             return_debug_info=self.debug_info)
-
         # XXX: To remove
+        if self.debug_info:
+            U, (A, B, penalty), debug_info = res
+        else:
+            U, (A, B, penalty) = res
         if self.debug_info:
             if not hasattr(self, 'values_'):
                 self.residuals_, self.density_, self.values_ = debug_info
@@ -1502,5 +1380,5 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         # Keep track of the state of the algorithm to be able to do
         # some online fitting (partial_fit)
         self.inner_stats_ = (A, B, penalty)
-        self.iter_offset_ = iter_offset + self.n_iter_
+        self.iter_offset_ = iter_offset + n_iter
         return self
