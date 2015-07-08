@@ -288,9 +288,9 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
 
 def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
-                                update_dict_dir='component',
-                                l1_ratio=0.1, radius=1., online=False, random_state=None,
-                                pool=None):
+                 update_dict_dir='component',
+                 l1_ratio=0.1, radius=1., online=False, random_state=None,
+                 pool=None):
     """Update the dense dictionary factor in place, constraining dictionary component to have a unit l2 norm.
 
     Parameters
@@ -370,7 +370,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         # XXX: could be useful (diagonalisation process, but random_state.choice is too slow
         # Good result quality
         ratio = 1
-        if(LooseVersion(np.__version__).version[1] >= 7):
+        if LooseVersion(np.__version__).version[1] >= 7:
             permutation = random_state.choice(n_features, n_features / ratio, replace=False)
         else:
             permutation = random_state.permutation(n_features)[:(n_features / ratio)]
@@ -391,9 +391,9 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
 
     if return_r2:
         if online:
-            # Y = B_t in online setting
-            # 1 / 2 Tr(D^T D A_t) - Tr(D^T B_t)
+            # Y = B_t, code = A_t, dictionary = D in online setting
             R += Y
+            # residual = 1 / 2 Tr(D^T D A_t) - Tr(D^T B_t)
             residual = -np.sum(dictionary * R) / 2
         else:
             R **= 2
