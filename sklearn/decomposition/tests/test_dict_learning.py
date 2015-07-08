@@ -47,17 +47,17 @@ def test_dict_learning_reconstruction():
     # nonzero atoms is right.
 
 
-# def test_dict_learning_reconstruction_parallel():
-#     # regression test that parallel reconstruction works with n_jobs=-1
-#     n_components = 12
-#     dico = DictionaryLearning(n_components, transform_algorithm='omp',
-#                               transform_alpha=0.001, random_state=0, n_jobs=-1)
-#     code = dico.fit(X).transform(X)
-#     assert_array_almost_equal(np.dot(code, dico.components_), X)
-#
-#     dico.set_params(transform_algorithm='lasso_lars')
-#     code = dico.transform(X)
-#     assert_array_almost_equal(np.dot(code, dico.components_), X, decimal=2)
+def test_dict_learning_reconstruction_parallel():
+    # regression test that parallel reconstruction works with n_jobs=-1
+    n_components = 12
+    dico = DictionaryLearning(n_components, transform_algorithm='omp',
+                              transform_alpha=0.001, random_state=0, n_jobs=-1)
+    code = dico.fit(X).transform(X)
+    assert_array_almost_equal(np.dot(code, dico.components_), X)
+
+    dico.set_params(transform_algorithm='lasso_lars')
+    code = dico.transform(X)
+    assert_array_almost_equal(np.dot(code, dico.components_), X, decimal=2)
 
 
 def test_dict_learning_nonzero_coefs():
@@ -160,7 +160,7 @@ def test_dict_learning_online_partial_fit():
         V = rng.randn(n_components, n_features)  # random init
         V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
         rng = np.random.RandomState(0)
-        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=1 * len(X),
+        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
                                             batch_size=1, fit_update_dict_dir=update_dict_dir,
                                             fit_algorithm=algorithm,
                                             verbose=1,
@@ -174,7 +174,7 @@ def test_dict_learning_online_partial_fit():
                                             verbose=1,
                                             l1_ratio=0.,
                                             random_state=rng)
-        for i in range(1):
+        for i in range(10):
             for sample in X:
                 dict2.partial_fit(sample)
 
