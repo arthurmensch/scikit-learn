@@ -217,7 +217,7 @@ def test_dict_learning_online_fit_convergence():
                                             l1_ratio=l1_ratio,
                                             random_state=0)
         dict.fit(X)
-        assert_true(dict.n_iter_ < 10 * len(X) - 1
+        assert_true(dict.n_iter_ < 10 * len(X) - 1)
 
 
 def test_dict_learning_online_deterministic():
