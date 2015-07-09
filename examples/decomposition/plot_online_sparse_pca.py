@@ -18,16 +18,19 @@ import logging
 from time import time
 
 from numpy.random import RandomState
+import matplotlib
+matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
 
 from sklearn.datasets import fetch_olivetti_faces
-from sklearn.cluster import MiniBatchKMeans
-from sklearn import decomposition
+from sklearn.decomposition.dict_learning import sparse_encode, MiniBatchDictionaryLearning
+
+import numpy as np
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
-n_row, n_col = 2, 3
+n_row, n_col = 5, 3
 n_components = n_row * n_col
 image_shape = (64, 64)
 rng = RandomState(0)
@@ -47,7 +50,6 @@ faces_centered -= faces_centered.mean(axis=1).reshape(n_samples, -1)
 
 print("Dataset consists of %d faces" % n_samples)
 
-
 ###############################################################################
 def plot_gallery(title, images, n_col=n_col, n_row=n_row):
     plt.figure(figsize=(2. * n_col, 2.26 * n_row))
@@ -65,42 +67,17 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 ###############################################################################
 # List of the different estimators, whether to center and transpose the
 # problem, and whether the transformer uses the clustering API.
-estimators = [
-    ('Eigenfaces - RandomizedPCA',
-     decomposition.RandomizedPCA(n_components=n_components, whiten=True),
-     True),
-
-    ('Non-negative components - NMF',
-     decomposition.NMF(n_components=n_components, init='nndsvda', beta=5.0,
-                       tol=5e-3, sparseness='components'),
-     False),
-
-    ('Independent components - FastICA',
-     decomposition.FastICA(n_components=n_components, whiten=True),
-     True),
-
-    ('Sparse comp. - MiniBatchSparsePCA',
-     decomposition.MiniBatchSparsePCA(n_components=n_components, alpha=0.8,
-                                      n_iter=100, batch_size=3,
-                                      random_state=rng),
-     True),
-
-    ('MiniBatchDictionaryLearning',
-        decomposition.MiniBatchDictionaryLearning(n_components=15, alpha=0.1,
-                                                  n_iter=50, batch_size=3,
-                                                  random_state=rng),
-     True),
-
-    ('Cluster centers - MiniBatchKMeans',
-        MiniBatchKMeans(n_clusters=n_components, tol=1e-3, batch_size=20,
-                        max_iter=50, random_state=rng),
-     True),
-
-    ('Factor Analysis components - FA',
-     decomposition.FactorAnalysis(n_components=n_components, max_iter=2),
-     True),
-]
-
+dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.,
+                                            n_iter=1000, batch_size=10,
+                                            fit_algorithm='ridge',
+                                            transform_algorithm='ridge',
+                                            transform_alpha=0.,
+                                            tol=1e-4,
+                                            verbose=10,
+                                            l1_ratio=0.1,
+                                            random_state=rng,
+                                            n_jobs=3,
+                                            debug_info=True)
 
 ###############################################################################
 # Plot a sample of the input data
@@ -109,25 +86,27 @@ plot_gallery("First centered Olivetti faces", faces_centered[:n_components])
 
 ###############################################################################
 # Do the estimation and plot it
+name = "Online Dictionary learning"
+print("Extracting the top %d %s..." % (n_components, name))
+t0 = time()
+data = faces
+dict_learning.fit(faces_centered)
+train_time = (time() - t0)
+print("done in %0.3fs" % train_time)
+plot_gallery('%s - Train time %.1fs' % (name, train_time),
+             dict_learning.components_[:n_components])
 
-for name, estimator, center in estimators:
-    print("Extracting the top %d %s..." % (n_components, name))
-    t0 = time()
-    data = faces
-    if center:
-        data = faces_centered
-    estimator.fit(data)
-    train_time = (time() - t0)
-    print("done in %0.3fs" % train_time)
-    if hasattr(estimator, 'cluster_centers_'):
-        components_ = estimator.cluster_centers_
-    else:
-        components_ = estimator.components_
-    if hasattr(estimator, 'noise_variance_'):
-        plot_gallery("Pixelwise variance",
-                     estimator.noise_variance_.reshape(1, -1), n_col=1,
-                     n_row=1)
-    plot_gallery('%s - Train time %.1fs' % (name, train_time),
-                 components_[:n_components])
+np.save('values', dict_learning.values_)
+np.save('density', dict_learning.density_)
+np.save('residuals', dict_learning.residuals_, )
+
+print("%s - Component density" % name)
+print 1 - np.sum(dict_learning.components_ == 0) / float(np.size(dict_learning.components_))
+print("Code density")
+code = dict_learning.transform(data)
+print 1 - np.sum(code == 0) / float(np.size(code))
+plot_gallery('%s - Reconstruction' % name,
+             code[:n_components].dot(dict_learning.components_))
 
 plt.show()
+plt.close()

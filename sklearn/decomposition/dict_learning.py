@@ -687,9 +687,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     n_samples, n_features = X.shape
     # Avoid integer division problems
     alpha = float(alpha)
+
+    # Scaling l1_ratio
     l1_ratio = float(l1_ratio)
-    if l1_ratio != 0:
-        l1_ratio /= (1 + (1-l1_ratio)/(l1_ratio*sqrt(n_features)))
+    l1_ratio /= l1_ratio + (1-l1_ratio)*sqrt(n_features)
+
     random_state = check_random_state(random_state)
 
     if n_jobs == -1:
@@ -776,6 +778,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,
                                                  random_state=random_state, return_r2=True,
+                                                 radius=1,
                                                  online=True, shuffle=shuffle)
         #Residual computation
         this_residual /= 2
@@ -837,7 +840,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         res = dictionary.T
 
     if return_debug_info:
-        return res + debug_info
+        return res + (debug_info, )
     else:
         return res
 
