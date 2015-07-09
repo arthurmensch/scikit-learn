@@ -103,7 +103,7 @@ np.save('residuals', dict_learning.residuals_, )
 print("%s - Component density" % name)
 print 1 - np.sum(dict_learning.components_ == 0) / float(np.size(dict_learning.components_))
 print("Code density")
-code = dict_learning.transform(data)
+code = dict_learning.transform(faces_centered)
 print 1 - np.sum(code == 0) / float(np.size(code))
 plot_gallery('%s - Reconstruction' % name,
              code[:n_components].dot(dict_learning.components_))
