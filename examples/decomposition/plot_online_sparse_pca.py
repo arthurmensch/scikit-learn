@@ -67,16 +67,17 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 ###############################################################################
 # List of the different estimators, whether to center and transpose the
 # problem, and whether the transformer uses the clustering API.
-dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.,
+dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.0,
                                             n_iter=1000, batch_size=10,
                                             fit_algorithm='ridge',
+                                            fit_update_dict_dir='feature',
                                             transform_algorithm='ridge',
-                                            transform_alpha=0.,
+                                            transform_alpha=0.0,
                                             tol=1e-4,
                                             verbose=10,
-                                            l1_ratio=0.1,
+                                            l1_ratio=0.8,
                                             random_state=rng,
-                                            n_jobs=3,
+                                            n_jobs=8,
                                             debug_info=True)
 
 ###############################################################################
@@ -103,7 +104,7 @@ np.save('residuals', dict_learning.residuals_, )
 print("%s - Component density" % name)
 print 1 - np.sum(dict_learning.components_ == 0) / float(np.size(dict_learning.components_))
 print("Code density")
-code = dict_learning.transform(data)
+code = dict_learning.transform(faces_centered)
 print 1 - np.sum(code == 0) / float(np.size(code))
 plot_gallery('%s - Reconstruction' % name,
              code[:n_components].dot(dict_learning.components_))

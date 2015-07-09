@@ -738,7 +738,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
     # Scaling l1_ratio
     l1_ratio = float(l1_ratio)
-    l1_ratio /= l1_ratio + (1-l1_ratio)*sqrt(n_features)
+    n = n_features if update_dict_dir == 'component' else n_components
+    l1_ratio /= l1_ratio + (1-l1_ratio)*sqrt(n)
 
     random_state = check_random_state(random_state)
 
@@ -1340,6 +1341,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.alpha = alpha
         self.n_iter = n_iter
         self.fit_algorithm = fit_algorithm
+        self.fit_update_dict_dir = fit_update_dict_dir
         self.dict_init = dict_init
         self.verbose = verbose
         self.shuffle = shuffle
@@ -1374,6 +1376,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
+            update_dict_dir=self.fit_update_dict_dir,
             verbose=self.verbose, random_state=random_state,
             l1_ratio=self.l1_ratio,
             tol=self.tol,
