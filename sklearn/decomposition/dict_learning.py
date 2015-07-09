@@ -1321,7 +1321,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         else:
             U, (A, B, penalty), self.n_iter_ = res
         self.components_ = U
-        # XXX: to remove
         if self.debug_info:
             self.residuals_, self.density_, self.values_ = debug_info
         # Keep track of the state of the algorithm to be able to do
@@ -1351,7 +1350,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             Returns the instance itself.
         """
         warnings.warn("Partial fit will change its behaviour in the next release, and split the input data into batches"
-                     "of provided batch_size")
+                      "of provided batch_size")
         if not hasattr(self, 'random_state_'):
             self.random_state_ = check_random_state(self.random_state)
         X = check_array(X)

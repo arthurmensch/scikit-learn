@@ -168,8 +168,7 @@ def test_dict_learning_online():
 
     assert_true(not np.all(sparse_encode(X, dict1.components_, alpha=1) ==
                            0))
-    assert_array_almost_equal(dict1.components_, dict2.components_,
-                              decimal=2)
+    assert_array_almost_equal(dict1.components_, dict2.components_, decimal=6)
 
 def test_dict_learning_online_partial_fit_new():
     for l1_ratio, algorithm in zip([0.1], ['ridge']):
@@ -208,20 +207,20 @@ def test_dict_learning_online_fit_convergence():
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
         V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
-        dict = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
-                                            batch_size=1,
-                                            fit_algorithm=algorithm,
-                                            verbose=1,
-                                            tol=1e-2,
-                                            alpha=1, shuffle=False, dict_init=V,
-                                            l1_ratio=l1_ratio,
-                                            random_state=0)
-        dict.fit(X)
-        assert_true(dict.n_iter_ < 10 * len(X) - 1)
+        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
+                                           batch_size=1,
+                                           fit_algorithm=algorithm,
+                                           verbose=1,
+                                           tol=1e-2,
+                                           alpha=1, shuffle=False, dict_init=V,
+                                           l1_ratio=l1_ratio,
+                                           random_state=0)
+        dict1.fit(X)
+        assert_true(dict1.n_iter_ < 10 * len(X) - 1)
 
 
 def test_dict_learning_online_deterministic():
-  for l1_ratio, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
+    for l1_ratio, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
