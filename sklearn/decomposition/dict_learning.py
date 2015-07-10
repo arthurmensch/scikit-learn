@@ -346,8 +346,9 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         else:
             dictionary[:, k] = np.dot(R, code[k, :].T)
             if l1_ratio != 0.:
-                if np.sum(code[k, :] ** 2) > 1e-6:
-                    dictionary[:, k] /= np.sum(code[k, :] ** 2)
+                s = np.sum(code[k, :] ** 2)
+                if s > 1e-6:
+                    dictionary[:, k] /= s
                 else:
                     dictionary[:, k] = 0
         # Scale k'th atom

@@ -65,8 +65,8 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
     plt.subplots_adjust(0.01, 0.05, 0.99, 0.93, 0.04, 0.)
 
 ###############################################################################
-# List of the different estimators, whether to center and transpose the
-# problem, and whether the transformer uses the clustering API.
+# It is necessary to add regularisation to sparse encoder (either l1 or l2).
+# XXX: This should be mentionned in the documentation
 dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1 * n_components,
                                             n_iter=1000, batch_size=10,
                                             fit_algorithm='ridge',
