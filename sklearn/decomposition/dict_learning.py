@@ -337,9 +337,9 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         if online:
-            dictionary[:, k] = R[:, k]
+            dictionary[:, k] = R[:, k] / code[k, k]
         else:
-            dictionary[:, k] = np.dot(R, code[k, :].T)
+            dictionary[:, k] = np.dot(R, code[k, :].T) / np.sum(code[k, :] ** 2)
         # Scale k'th atom
         atom_norm_square = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
         if atom_norm_square < threshold:
@@ -690,7 +690,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
     # Scaling l1_ratio
     l1_ratio = float(l1_ratio)
-    l1_ratio /= l1_ratio + (1-l1_ratio)*sqrt(n_features)
+    # n = n_features if update_dict_dir == 'component' else n_components
+    # l1_ratio /= l1_ratio + (1-l1_ratio)*sqrt(n)
 
     random_state = check_random_state(random_state)
 
@@ -746,8 +747,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     if return_debug_info:
         residuals = np.zeros(n_iter)
         density = np.zeros(n_iter)
-        values = np.zeros((n_iter, 2))
-        recorded_features = random_state.permutation(n_features)[:2]
+        values = np.zeros((n_iter, 100))
+        recorded_features = random_state.permutation(n_features)[:100]
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         this_X = X_train[batch]
@@ -764,16 +765,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=1, random_state=random_state).T
         # Update the auxiliary variables
-        if ii < batch_size - 1:
-            theta = float((ii + 1) * batch_size)
-        else:
-            theta = float(batch_size ** 2 + ii + 1 - batch_size)
+        # if ii < batch_size - 1:
+        theta = float((ii + 1) * batch_size)
+        # else:
+        #     theta = float(batch_size ** 2 + ii + 1 - batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
-
         A *= beta
-        A += np.dot(this_code, this_code.T)
+        A += np.dot(this_code, this_code.T) * (1 - beta) / batch_size
         B *= beta
-        B += np.dot(this_X.T, this_code.T)
+        B += np.dot(this_X.T, this_code.T) * (1 - beta) / batch_size
 
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,

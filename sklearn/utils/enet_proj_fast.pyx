@@ -120,7 +120,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
             res[i] = v[i] / norm
         return radius
 
-    gamma = 2 * (1/l1_ratio - 1)
+    gamma = 2 / l1_ratio
 
     # res = np.sign(v)
     # v = np.abs(v)
@@ -234,5 +234,5 @@ cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:
     cdef int i
     for i in range(n):
         b_ = v[i] if v[i] > 0. else - v[i]
-        res += b_ * (l1_ratio + (1. - l1_ratio) * b_)
+        res += b_ * (l1_ratio + b_)
     return res

@@ -17,7 +17,7 @@ def enet_norm_slow(v, l1_ratio=0.1):
     if l1_ratio == 0:
         return sqrt(np.sum(v ** 2))
     b_abs = np.abs(v)
-    return np.sum(b_abs * (l1_ratio + (1 - l1_ratio) * b_abs))
+    return np.sum(b_abs * (l1_ratio + b_abs))
 
 
 def enet_projection_slow(v, radius=1, l1_ratio=0.1):
@@ -30,7 +30,7 @@ def enet_projection_slow(v, radius=1, l1_ratio=0.1):
     random_state = check_random_state(None)
     if l1_ratio == 0:
         return v / sqrt(np.sum(v ** 2))
-    gamma = 2 * (1/l1_ratio - 1)
+    gamma = 2 / l1_ratio
     radius /= l1_ratio
     m = v.shape[0]
     b_abs = np.abs(v)
@@ -71,12 +71,23 @@ def enet_projection_slow(v, radius=1, l1_ratio=0.1):
         return b_sign * np.maximum(np.zeros_like(b_abs), b_abs - l) / (1 + l * gamma)
 
 
+def test_slow_enet_norm():
+    norms = np.zeros(10)
+    norms2 = np.zeros(10)
+    random_state = check_random_state(0)
+
+    for i in range(10):
+        a = np.random.randn(10000)
+        norms[i] = enet_norm_slow(a, l1_ratio=0.1)
+        norms2[i] = (a ** 2).sum() + 0.1 * np.abs(a).sum()
+    assert_array_almost_equal(norms, norms2)
+
 def test_slow_enet_projection_norm():
     norms = np.zeros(10)
     random_state = check_random_state(0)
 
     for i in range(10):
-        a = np.random.randn(100)
+        a = np.random.randn(10000)
         b = np.asarray(enet_projection_slow(a, radius=1, l1_ratio=0.1))
         norms[i] = enet_norm_slow(b, l1_ratio=0.1)
     assert_array_almost_equal(norms, np.ones(10))
@@ -86,10 +97,11 @@ def test_fast_enet_projection_norm():
     random_state = check_random_state(0)
     norms = np.zeros(10)
     for i in range(10):
-        a = random_state.randn(100)
-        c = np.zeros(100)
-        c[:] = enet_projection(a, 1, 0.1)
-        norms[i] = enet_norm(c, l1_ratio=0.1)
+        a = random_state.randn(20000)
+        a /= np.sqrt(np.sum(a ** 2))
+        c = np.zeros(20000)
+        c[:] = enet_projection(a, 1, 0.15)
+        norms[i] = enet_norm(c, l1_ratio=0.15)
     assert_array_almost_equal(norms, np.ones(10))
 
 

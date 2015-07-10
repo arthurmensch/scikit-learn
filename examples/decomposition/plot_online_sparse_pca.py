@@ -67,14 +67,14 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 ###############################################################################
 # List of the different estimators, whether to center and transpose the
 # problem, and whether the transformer uses the clustering API.
-dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.,
+dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1 * n_components,
                                             n_iter=1000, batch_size=10,
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
                                             transform_alpha=0.,
                                             tol=1e-4,
                                             verbose=10,
-                                            l1_ratio=0.1,
+                                            l1_ratio=0.9,
                                             random_state=rng,
                                             n_jobs=3,
                                             debug_info=True)
