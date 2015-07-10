@@ -127,12 +127,12 @@ def test_fast_enet_l2_ball():
     assert_array_almost_equal(norms, np.ones(10))
 
 
-def test_fast_enet_l1_ball():
-    random_state = check_random_state(0)
-    norms = np.zeros(10)
-    for i in range(10):
-        a = random_state.randn(100)
-        b = np.zeros(100)
-        b[:] = enet_projection(a, 1, 1.0)
-        norms[i] = np.sum(np.abs(b))
-    assert_array_almost_equal(norms, np.ones(10))
+# def test_fast_enet_l1_ball():
+#     random_state = check_random_state(0)
+#     norms = np.zeros(10)
+#     for i in range(10):
+#         a = random_state.randn(100)
+#         b = np.zeros(100)
+#         b[:] = enet_projection(a, 1, 1.0)
+#         norms[i] = np.sum(np.abs(b))
+#     assert_array_almost_equal(norms, np.ones(10))

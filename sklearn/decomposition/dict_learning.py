@@ -337,9 +337,19 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         if online:
-            dictionary[:, k] = R[:, k] / code[k, k]
+            dictionary[:, k] = R[:, k]
+            if l1_ratio != 0.:
+                if code[k,k] > 1e-6:
+                    dictionary[:, k] /= code[k, k]
+                else:
+                    dictionary[:, k] = 0
         else:
-            dictionary[:, k] = np.dot(R, code[k, :].T) / np.sum(code[k, :] ** 2)
+            dictionary[:, k] = np.dot(R, code[k, :].T)
+            if l1_ratio != 0.:
+                if np.sum(code[k, :] ** 2) > 1e-6:
+                    dictionary[:, k] /= np.sum(code[k, :] ** 2)
+                else:
+                    dictionary[:, k] = 0
         # Scale k'th atom
         atom_norm_square = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
         if atom_norm_square < threshold:
