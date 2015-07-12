@@ -724,6 +724,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                            np.zeros((n_components - r, dictionary.shape[1]))]
     dictionary = np.ascontiguousarray(dictionary.T)
 
+    # Initial scaling of dictionary
+    dictionary /= np.sqrt(np.sum(dictionary ** 2, axis=0))
+    for k in range(n_components):
+        enet_projection(dictionary[:, k], radius=1, l1_ratio=l1_ratio)
+
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
@@ -776,15 +781,16 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=1, random_state=random_state).T
         # Update the auxiliary variables
-        # if ii < batch_size - 1:
-        theta = float((ii + 1) * batch_size)
-        # else:
-        #     theta = float(batch_size ** 2 + ii + 1 - batch_size)
+        # This trick raise the learning rate of a factor batch_size during the first batch_size iterations
+        if ii < batch_size - 1:
+            theta = float((ii + 1) * batch_size)
+        else:
+            theta = float(batch_size ** 2 + ii + 1 - batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
         A *= beta
-        A += np.dot(this_code, this_code.T) * (1 - beta) / batch_size
+        A += np.dot(this_code, this_code.T) * (1 - beta)
         B *= beta
-        B += np.dot(this_X.T, this_code.T) * (1 - beta) / batch_size
+        B += np.dot(this_X.T, this_code.T) * (1 - beta)
 
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,
