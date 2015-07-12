@@ -724,11 +724,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                            np.zeros((n_components - r, dictionary.shape[1]))]
     dictionary = np.ascontiguousarray(dictionary.T)
 
-    # Initial scaling of dictionary
-    dictionary /= np.sqrt(np.sum(dictionary ** 2, axis=0))
-    for k in range(n_components):
-        enet_projection(dictionary[:, k], radius=1, l1_ratio=l1_ratio)
-
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
