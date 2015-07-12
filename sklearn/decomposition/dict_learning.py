@@ -788,9 +788,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
             theta = float(batch_size ** 2 + ii + 1 - batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
         A *= beta
-        A += np.dot(this_code, this_code.T) * (1 - beta)
+        A += np.dot(this_code, this_code.T) / batch_size  # * (1 - beta)
         B *= beta
-        B += np.dot(this_X.T, this_code.T) * (1 - beta)
+        B += np.dot(this_X.T, this_code.T) / batch_size  # * (1 - beta)
 
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,
