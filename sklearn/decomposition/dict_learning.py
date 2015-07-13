@@ -325,7 +325,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     R = -np.dot(dictionary, code)
     R += Y
 
-    # radius *= n_components
     threshold = 1e-20  # * n_components
     R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
@@ -339,7 +338,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         if online:
             dictionary[:, k] = R[:, k]
             if l1_ratio != 0.:
-                if code[k,k] > 1e-6:
+                if code[k, k] > 1e-6:
                     dictionary[:, k] /= code[k, k]
                 else:
                     dictionary[:, k] = 0
