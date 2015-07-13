@@ -83,6 +83,8 @@ dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=2,
 
 plot_gallery("First centered Olivetti faces", faces_centered[:n_components])
 
+plt.savefig('faces.pdf')
+
 ###############################################################################
 # Do the estimation and plot it
 name = "Online Dictionary learning"
