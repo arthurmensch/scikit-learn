@@ -71,10 +71,10 @@ dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1
                                             n_iter=1000, batch_size=10,
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
-                                            transform_alpha=0.,
+                                            transform_alpha=0.1 * n_components,
                                             tol=1e-4,
                                             verbose=10,
-                                            l1_ratio=0.9,
+                                            l1_ratio=2,
                                             random_state=rng,
                                             n_jobs=3,
                                             debug_info=True)
