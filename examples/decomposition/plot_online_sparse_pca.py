@@ -30,7 +30,7 @@ import numpy as np
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
-n_row, n_col = 5, 3
+n_row, n_col = 5, 6
 n_components = n_row * n_col
 image_shape = (64, 64)
 rng = RandomState(0)
@@ -52,7 +52,7 @@ print("Dataset consists of %d faces" % n_samples)
 
 ###############################################################################
 def plot_gallery(title, images, n_col=n_col, n_row=n_row):
-    plt.figure(figsize=(2. * n_col, 2.26 * n_row))
+    plt.figure(figsize=(1. * n_col, 1.13 * n_row))
     plt.suptitle(title, size=16)
     for i, comp in enumerate(images):
         plt.subplot(n_row, n_col, i + 1)
@@ -67,14 +67,14 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 ###############################################################################
 # It is necessary to add regularisation to sparse encoder (either l1 or l2).
 # XXX: This should be mentionned in the documentation
-dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=0.1 * n_components,
-                                            n_iter=1000, batch_size=10,
+dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=2,
+                                            n_iter=100, batch_size=10,
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
-                                            transform_alpha=0.,
+                                            transform_alpha=2,
                                             tol=1e-4,
                                             verbose=10,
-                                            l1_ratio=0.9,
+                                            l1_ratio=3,
                                             random_state=rng,
                                             n_jobs=3,
                                             debug_info=True)
@@ -107,6 +107,19 @@ code = dict_learning.transform(faces_centered)
 print 1 - np.sum(code == 0) / float(np.size(code))
 plot_gallery('%s - Reconstruction' % name,
              code[:n_components].dot(dict_learning.components_))
+fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(6, 9))
+ax1.plot(dict_learning.values_)
+ax1.set_xlabel("Iteration")
+ax1.set_ylabel("Dictionary pixel values")
+
+ax2.plot(dict_learning.residuals_)
+ax2.set_xlabel("Iteration")
+ax2.set_ylabel("Objective surrogate")
+
+ax3.plot(dict_learning.density_)
+ax3.set_xlabel("Iteration")
+ax3.set_ylabel("Dictionary density")
+
 
 plt.show()
 plt.close()
