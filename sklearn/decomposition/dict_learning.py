@@ -64,7 +64,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 
     regularization : int | float
         The regularization parameter. It corresponds to alpha when
-        algorithm is 'lasso_lars', 'lasso_cd' or 'threshold'.
+        algorithm is 'lasso_lars', 'lasso_cd', 'threshold' or 'ridge'
         Otherwise it corresponds to n_nonzero_coefs.
 
     init: array of shape (n_samples, n_components)
@@ -200,8 +200,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         and is overridden by `alpha` in the `omp` case.
 
     alpha: float, 1. by default
-        If `algorithm='lasso_lars'` or `algorithm='lasso_cd'`, `alpha` is the
-        penalty applied to the L1 norm.
+        If `algorithm='lasso_lars'` or `algorithm='lasso_cd'` or `algorithm='ridge'`,
+        `alpha` is the penalty applied to the L1 norm.
         If `algorithm='threhold'`, `alpha` is the absolute value of the
         threshold below which coefficients will be squashed to zero.
         If `algorithm='omp'`, `alpha` is the tolerance parameter: the value of
@@ -595,7 +595,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         Number of dictionary atoms to extract.
 
     alpha : float,
-        Sparsity controlling parameter.
+        Sparsity controlling parameter if `method='lars'` or `method='cd'
+        Regularization parameter if `method='ridge'` : rising it will also increase dictionary regularity and sparsity.
 
     n_iter : int,
         Number of iterations to perform.
@@ -630,7 +631,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         ols: compute code using an ordinary least square method. alpha will be ignored
 
     l1_ratio: float,
-        Sparsity controlling parameter for dictionary projection. In [0, 1]
+        Sparsity controlling parameter for dictionary projection.
+        The higher it is, the sparser the dictionary component will be.
 
     tol: float,
         Stop controlling parameter
