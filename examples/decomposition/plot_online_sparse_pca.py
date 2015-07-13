@@ -3,10 +3,9 @@
 Faces dataset decompositions
 ============================
 
-This example applies to :ref:`olivetti_faces` different unsupervised
-matrix decomposition (dimension reduction) methods from the module
-:py:mod:`sklearn.decomposition` (see the documentation chapter
-:ref:`decompositions`) .
+This example applies to :ref:`olivetti_faces` online sparse PCA (dictionary learning enforcing dictionary atom sparsity),
+from the module :py:mod:`sklearn.decomposition` (see the documentation chapter
+:ref:`decompositions`), and display some convergence curve.
 
 """
 print(__doc__)
@@ -107,6 +106,7 @@ code = dict_learning.transform(faces_centered)
 print 1 - np.sum(code == 0) / float(np.size(code))
 plot_gallery('%s - Reconstruction' % name,
              code[:n_components].dot(dict_learning.components_))
+
 fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(6, 9))
 ax1.plot(dict_learning.values_)
 ax1.set_xlabel("Iteration")
@@ -119,7 +119,6 @@ ax2.set_ylabel("Objective surrogate")
 ax3.plot(dict_learning.density_)
 ax3.set_xlabel("Iteration")
 ax3.set_ylabel("Dictionary density")
-
 
 plt.show()
 plt.close()
