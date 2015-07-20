@@ -288,7 +288,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
 
 def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
-                 l1_gamma=1, radius=1., online=False, shuffle=False,
+                 l1_gamma=1., radius=1., online=False, shuffle=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
     component to have a unit l2 norm.
