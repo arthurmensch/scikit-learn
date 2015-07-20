@@ -3,7 +3,8 @@
 Faces dataset decompositions
 ============================
 
-This example applies to :ref:`olivetti_faces` online sparse PCA (dictionary learning enforcing dictionary atom sparsity),
+This example applies to :ref:`olivetti_faces` online sparse PCA
+(a dictionary learning enforcing dictionary atom sparsity),
 from the module :py:mod:`sklearn.decomposition` (see the documentation chapter
 :ref:`decompositions`), and display some convergence curve.
 
@@ -22,7 +23,8 @@ matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
 
 from sklearn.datasets import fetch_olivetti_faces
-from sklearn.decomposition.dict_learning import sparse_encode, MiniBatchDictionaryLearning
+from sklearn.decomposition.dict_learning import sparse_encode,\
+    MiniBatchDictionaryLearning
 
 import numpy as np
 
@@ -66,14 +68,14 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 ###############################################################################
 # It is necessary to add regularisation to sparse encoder (either l1 or l2).
 # XXX: This should be mentionned in the documentation
-dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=2,
+dict_learning = MiniBatchDictionaryLearning(n_components=n_components, alpha=1,
                                             n_iter=100, batch_size=10,
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
                                             transform_alpha=2,
                                             tol=1e-4,
                                             verbose=10,
-                                            l1_ratio=3,
+                                            l1_gamma=1,
                                             random_state=rng,
                                             n_jobs=3,
                                             debug_info=True)
@@ -102,7 +104,8 @@ np.save('density', dict_learning.density_)
 np.save('residuals', dict_learning.residuals_, )
 
 print("%s - Component density" % name)
-print 1 - np.sum(dict_learning.components_ == 0) / float(np.size(dict_learning.components_))
+print(1 - np.sum(dict_learning.components_ == 0)\
+          / float(np.size(dict_learning.components_)))
 print("Code density")
 code = dict_learning.transform(faces_centered)
 print 1 - np.sum(code == 0) / float(np.size(code))

@@ -47,7 +47,9 @@ cdef inline double _positive(double a) nogil:
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef double _enet_norm_for_projection(DOUBLE[:] v, UINT8_t * mask, int size, int masker, double gamma) nogil:
+cdef double _enet_norm_for_projection(DOUBLE[:] v,
+                                      UINT8_t * mask, int size,
+                                      int masker, double gamma) nogil:
     cdef double res = 0
     for i in range(size):
         if mask[i] == masker:
@@ -58,7 +60,8 @@ cdef double _enet_norm_for_projection(DOUBLE[:] v, UINT8_t * mask, int size, int
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef int _choose_index_in_mask(UINT8_t * mask, int size, UINT32_t* random_state) nogil:
+cdef int _choose_index_in_mask(UINT8_t * mask, int size,
+                               UINT32_t* random_state) nogil:
     cdef int rand_i = _rand_int(size, random_state)
     cdef int i
     for i in range(size):
@@ -71,12 +74,13 @@ cdef int _choose_index_in_mask(UINT8_t * mask, int size, UINT32_t* random_state)
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef DOUBLE[:] _random_unit_vector(DOUBLE[:] res, int size, double radius, double l1_ratio):
+cdef DOUBLE[:] _random_unit_vector(DOUBLE[:] res, int size,
+                                   double radius, double l1_gamma):
     """
     Utility function used to generate a random vector on elastic-net ball
     """
     cdef DOUBLE[:] temp = 10 * radius * np.random.randn(size)
-    return enet_projection(temp, radius, l1_ratio)
+    return enet_projection(temp, radius, l1_gamma)
 
 
 @cython.boundscheck(False)
@@ -84,8 +88,9 @@ cdef DOUBLE[:] _random_unit_vector(DOUBLE[:] res, int size, double radius, doubl
 @cython.initializedcheck(False)
 @cython.cdivision(True)
 @cython.nonecheck(False)
-cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mask, double radius,
-                             double l1_ratio, UINT32_t random_state) nogil:
+cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
+                                       UINT8_t * mask, double radius,
+                             double l1_gamma, UINT32_t random_state) nogil:
     """
     Projecting v on the elastic net ball and storing result in res
     """
@@ -109,7 +114,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
     n = v.shape[0]
 
     # res /= max(1/radius, np.linalg.norm(res))
-    if l1_ratio == 0.:  # projection onto the l2 ball
+    if l1_gamma == 0.:  # projection onto the l2 ball
         norm = 0.
         for i in range(n):
             norm += v[i] ** 2
@@ -121,7 +126,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
             res[i] = v[i] / norm
         return radius
 
-    gamma = 2 / l1_ratio
+    gamma = 2 / l1_gamma
 
     # res = np.sign(v)
     # v = np.abs(v)
@@ -133,7 +138,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
             v[i] *= -1
         mask[i] = UNMASKED
     norm = _enet_norm_for_projection(v, mask, n, UNMASKED, gamma)
-    radius /= l1_ratio
+    radius /= l1_gamma
 
     # Return res if it is already in the elastic-net ball
     if norm <= radius:
@@ -157,7 +162,8 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
                     mask[i] = LOWER
                     L_true_size += 1
         d_s = _enet_norm_for_projection(v, mask, n, GREATER, gamma)
-        if s + d_s - (rho + G_true_size) * (1. + gamma / 2. * v[idx]) * v[idx] < radius * (1. + gamma * v[idx]) ** 2:
+        if s + d_s - (rho + G_true_size) * (1. + gamma / 2. * v[idx]) * v[idx]\
+                < radius * (1. + gamma * v[idx]) ** 2:
             s += d_s
             rho += G_true_size
             for i in range(n):
@@ -170,7 +176,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
                     mask[i] = MASKED
             mask[idx] = MASKED
             true_size = G_true_size - 1
-    # if l1_ratio = 1
+    # if l1_gamma = 1
     if gamma != 0.:
         a = gamma ** 2 * radius + gamma * rho * 0.5
         b_ = 2 * radius * gamma + rho
@@ -189,7 +195,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mas
 @cython.wraparound(False)
 @cython.initializedcheck(False)
 @cython.nonecheck(False)
-def enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
+def enet_projection(DOUBLE[:] v, double radius, double l1_gamma):
     """
     Project a vector on the elastic-net ball
 
@@ -201,13 +207,15 @@ def enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
         Vector to project
     radius: float,
         Radius of the elastic-net ball
-    l1_ratio: float,
+    l1_gamma: float,
         Ratio of L1 norm (between 0 and 1)
     """
     cdef int n = v.shape[0]
     cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
-    cdef DOUBLE[:] res = view.array(shape=(n,), itemsize=sizeof(DOUBLE), format="d")
-    cdef double norm = _enet_projection_with_mask(res, v, mask, radius, l1_ratio, 0)
+    cdef DOUBLE[:] res = view.array(shape=(n,),
+                                    itemsize=sizeof(DOUBLE), format="d")
+    cdef double norm = _enet_projection_with_mask(res, v, mask,
+                                                  radius, l1_gamma, 0)
     free(mask)
     return res
 
@@ -215,7 +223,7 @@ def enet_projection(DOUBLE[:] v, double radius, double l1_ratio):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:
+cpdef double enet_norm(DOUBLE[:] v, double l1_gamma=0.1) nogil:
     """Returns the elastic net norm of a vector
 
     Parameters
@@ -223,7 +231,7 @@ cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:
     v: double memory-view,
         Vector
 
-    l1_ratio: float,
+    l1_gamma: float,
         Ratio of l1 norm (between 0 and 1)
 
     Returns
@@ -237,5 +245,5 @@ cpdef double enet_norm(DOUBLE[:] v, double l1_ratio=0.1) nogil:
     cdef int i
     for i in range(n):
         b_ = v[i] if v[i] > 0. else - v[i]
-        res += b_ * (l1_ratio + b_)
+        res += b_ * (l1_gamma + b_)
     return res

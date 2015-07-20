@@ -26,5 +26,7 @@ cdef enum:
     # particularly tiny on Windows/MSVC.
     RAND_R_MAX = 0x7FFFFFFF
 
-cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v, UINT8_t * mask, double radius,
-                             double l1_ratio, UINT32_t random_state) nogil
+cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
+                                       UINT8_t * mask, double radius,
+                                       double l1_gamma,
+                                       UINT32_t random_state) nogil

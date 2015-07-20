@@ -47,17 +47,17 @@ def test_dict_learning_reconstruction():
     # nonzero atoms is right.
 
 
-# def test_dict_learning_reconstruction_parallel():
-#     # regression test that parallel reconstruction works with n_jobs=-1
-#     n_components = 12
-#     dico = DictionaryLearning(n_components, transform_algorithm='omp',
-#                               transform_alpha=0.001, random_state=0, n_jobs=-1)
-#     code = dico.fit(X).transform(X)
-#     assert_array_almost_equal(np.dot(code, dico.components_), X)
-#
-#     dico.set_params(transform_algorithm='lasso_lars')
-#     code = dico.transform(X)
-#     assert_array_almost_equal(np.dot(code, dico.components_), X, decimal=2)
+def test_dict_learning_reconstruction_parallel():
+    # regression test that parallel reconstruction works with n_jobs=-1
+    n_components = 12
+    dico = DictionaryLearning(n_components, transform_algorithm='omp',
+                              transform_alpha=0.001, random_state=0, n_jobs=-1)
+    code = dico.fit(X).transform(X)
+    assert_array_almost_equal(np.dot(code, dico.components_), X)
+
+    dico.set_params(transform_algorithm='lasso_lars')
+    code = dico.transform(X)
+    assert_array_almost_equal(np.dot(code, dico.components_), X, decimal=2)
 
 
 def test_dict_learning_nonzero_coefs():
@@ -171,7 +171,7 @@ def test_dict_learning_online():
     assert_array_almost_equal(dict1.components_, dict2.components_, decimal=6)
 
 def test_dict_learning_online_partial_fit_new():
-    for l1_ratio, algorithm in zip([0.1], ['ridge']):
+    for l1_gamma, algorithm in zip([0.1], ['ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
@@ -180,8 +180,9 @@ def test_dict_learning_online_partial_fit_new():
                                             batch_size=1,
                                             fit_algorithm=algorithm,
                                             verbose=1,
-                                            alpha=1, shuffle=False, dict_init=V,
-                                            l1_ratio=l1_ratio,
+                                            alpha=1, shuffle=False,
+                                            dict_init=V,
+                                            l1_gamma=l1_gamma,
                                             random_state=0).fit(X)
         dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
                                             n_iter=1, dict_init=V,
@@ -189,7 +190,7 @@ def test_dict_learning_online_partial_fit_new():
                                             fit_algorithm=algorithm,
                                             shuffle=False,
                                             verbose=1,
-                                            l1_ratio=l1_ratio,
+                                            l1_gamma=l1_gamma,
                                             random_state=0)
         for i in range(10):
             for sample in X:
@@ -202,25 +203,26 @@ def test_dict_learning_online_partial_fit_new():
 
 
 def test_dict_learning_online_fit_convergence():
-    for l1_ratio, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
+    for l1_gamma, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
         V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
         dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
-                                           batch_size=1,
-                                           fit_algorithm=algorithm,
-                                           verbose=1,
-                                           tol=1e-2,
-                                           alpha=1, shuffle=False, dict_init=V,
-                                           l1_ratio=l1_ratio,
-                                           random_state=0)
+                                            batch_size=1,
+                                            fit_algorithm=algorithm,
+                                            verbose=1,
+                                            tol=1e-2,
+                                            alpha=1, shuffle=False,
+                                            dict_init=V,
+                                            l1_gamma=l1_gamma,
+                                            random_state=0)
         dict1.fit(X)
         assert_true(dict1.n_iter_ < 10 * len(X) - 1)
 
 
 def test_dict_learning_online_deterministic():
-    for l1_ratio, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
+    for l1_gamma, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
@@ -229,15 +231,17 @@ def test_dict_learning_online_deterministic():
                                             batch_size=1,
                                             fit_algorithm=algorithm,
                                             verbose=1,
-                                            alpha=1, shuffle=False, dict_init=V,
-                                            l1_ratio=l1_ratio,
+                                            alpha=1, shuffle=False,
+                                            dict_init=V,
+                                            l1_gamma=l1_gamma,
                                             random_state=0).fit(X)
         dict2 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
                                             batch_size=1,
                                             fit_algorithm=algorithm,
                                             verbose=1,
-                                            alpha=1, shuffle=False, dict_init=V,
-                                            l1_ratio=l1_ratio,
+                                            alpha=1, shuffle=False,
+                                            dict_init=V,
+                                            l1_gamma=l1_gamma,
                                             random_state=0).fit(X)
         assert_array_almost_equal(dict1.components_, dict2.components_,
                                   decimal=6)
