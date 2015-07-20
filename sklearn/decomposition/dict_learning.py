@@ -60,7 +60,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         omp: uses orthogonal matching pursuit to estimate the sparse solution
         threshold: squashes to zero all coefficients less than regularization
         from the projection dictionary * data'
-        ols: uses a non-penalized least square fit (regularization parameter is ignored)
+        ols: uses a non-penalized least square fit (regularization parameter is
+        ignored)
 
     regularization : int | float
         The regularization parameter. It corresponds to alpha when
@@ -115,7 +116,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         # XXX: should be sqrt(n_features)
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
-                    max_iter=max_iter, selection='random', random_state=random_state, warm_start=True)
+                    max_iter=max_iter, selection='random',
+                    random_state=random_state, warm_start=True)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T)
         new_code = clf.coef_
@@ -148,7 +150,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 
     else:
         raise ValueError('Sparse coding method must be "lasso_lars" '
-                         '"lasso_cd",  "lasso", "threshold", "ols" or "omp", got %s.'
+                         '"lasso_cd",  "lasso", "threshold", "ols" or "omp",'
+                         ' got %s.'
                          % algorithm)
     return new_code
 
@@ -192,7 +195,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         omp: uses orthogonal matching pursuit to estimate the sparse solution
         threshold: squashes to zero all coefficients less than alpha from
         the projection dictionary * X'
-        ols: uses a non-penalized least square fit (regularization parameter is ignored)
+        ridge: uses a penalized least square fit
 
     n_nonzero_coefs: int, 0.1 * n_features by default
         Number of nonzero coefficients to target in each column of the
@@ -200,7 +203,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         and is overridden by `alpha` in the `omp` case.
 
     alpha: float, 1. by default
-        If `algorithm='lasso_lars'` or `algorithm='lasso_cd'` or `algorithm='ridge'`,
+        If `algorithm='lasso_lars'` or `algorithm='lasso_cd'`
+        or `algorithm='ridge'`,
         `alpha` is the penalty applied to the L1 norm.
         If `algorithm='threhold'`, `alpha` is the absolute value of the
         threshold below which coefficients will be squashed to zero.
@@ -258,7 +262,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         code = _sparse_encode(X, dictionary, gram, cov=cov,
                               algorithm=algorithm,
                               regularization=regularization, copy_cov=copy_cov,
-                              init=init, max_iter=max_iter, random_state=random_state)
+                              init=init, max_iter=max_iter,
+                              random_state=random_state)
         if code.ndim == 1:
             code = code[np.newaxis, :]
         return code
@@ -267,7 +272,9 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     code = np.empty((n_samples, n_components))
 
     slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
-    code_views = Parallel(n_jobs=n_jobs, backend='threading' if algorithm == 'lasso_cd' else 'multiprocessing')(
+    code_views = Parallel(n_jobs=n_jobs,
+                          backend='threading' if
+                          algorithm == 'lasso_cd' else 'multiprocessing')(
         delayed(_sparse_encode)(
             X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
             regularization=regularization, copy_cov=copy_cov,
@@ -282,7 +289,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
 def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                  l1_ratio=0.1, radius=1., online=False, shuffle=False, random_state=None):
-    """Update the dense dictionary factor in place, constraining dictionary component to have a unit l2 norm.
+    """Update the dense dictionary factor in place, constraining dictionary
+    component to have a unit l2 norm.
 
     Parameters
     ----------
@@ -303,11 +311,12 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         to the computed solution.
 
     online: bool,
-        Whether the update we perform is part of an online algorithm or not (this changes derivation of residuals
-        and of step size)
+        Whether the update we perform is part of an online algorithm or not
+        (this changes derivation of residuals and of step size).
 
     shuffle: bool,
-        Whether to shuffle the components when performing sequential coordinate update
+        Whether to shuffle the components when performing sequential
+        coordinate update.
 
     random_state: int or RandomState
         Pseudo number generator state used for random sampling.
@@ -596,7 +605,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
     alpha : float,
         Sparsity controlling parameter if `method='lars'` or `method='cd'
-        Regularization parameter if `method='ridge'` : rising it will also increase dictionary regularity and sparsity.
+        Regularization parameter if `method='ridge'` : increasing it will also
+        increase dictionary regularity and sparsity.
 
     n_iter : int,
         Number of iterations to perform.
@@ -628,7 +638,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         cd: uses the coordinate descent method to compute the
         Lasso solution (linear_model.Lasso). Lars will be faster if
         the estimated components are sparse.
-        ols: compute code using an ordinary least square method. alpha will be ignored
+        ridge: compute code using an ordinary least square method.
 
     l1_ratio: float,
         Sparsity controlling parameter for dictionary projection.
@@ -658,7 +668,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         B (n_features, n_components) is the data approximation matrix
 
     return_debug_info: bool,
-        Whether to keep track of objective value, sparsity value and to keep a record of 10 dictionary trajectory
+        Whether to keep track of objective value, sparsity value and to record
+        up to of 100 dictionary trajectory
 
     return_n_iter : bool
         Whether or not to return the number of iterations.
@@ -775,9 +786,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
         # Setting n_jobs > 1 does not improve performance
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                  alpha=alpha, n_jobs=1, random_state=random_state).T
+                                  alpha=alpha, n_jobs=1,
+                                  random_state=random_state).T
         # Update the auxiliary variables
-        # This trick raise the learning rate of a factor batch_size during the first batch_size iterations
+        # This trick raise the learning rate of a factor batch_size
+        #  during the first batch_size iterations
         if ii < batch_size - 1:
             theta = float((ii + 1) * batch_size)
         else:
@@ -789,8 +802,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         B += np.dot(this_X.T, this_code.T) / batch_size  # * (1 - beta)
 
         # Update dictionary
-        dictionary, this_residual = _update_dict(dictionary, B, A, verbose=verbose, l1_ratio=l1_ratio,
-                                                 random_state=random_state, return_r2=True,
+        dictionary, this_residual = _update_dict(dictionary, B, A,
+                                                 verbose=verbose,
+                                                 l1_ratio=l1_ratio,
+                                                 random_state=random_state,
+                                                 return_r2=True,
                                                  radius=1,
                                                  online=True, shuffle=shuffle)
         #Residual computation
@@ -816,8 +832,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
         if return_debug_info:
             residuals[ii-iter_offset] = this_residual
-            values[ii-iter_offset] = dictionary[recorded_features, 0] / sqrt(np.sum(dictionary[:, 0] ** 2))
-            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary)
+            values[ii-iter_offset] = dictionary[recorded_features, 0]\
+                                     / sqrt(np.sum(dictionary[:, 0] ** 2))
+            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
+                                          / np.size(dictionary)
 
         # Maybe we need a stopping criteria based on the amount of
         # modification in the dictionary
@@ -1209,7 +1227,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         omp: uses orthogonal matching pursuit to estimate the sparse solution
         threshold: squashes to zero all coefficients less than alpha from
         the projection dictionary * X'
-        ridge: uses a non-penalized least square fit (regularization parameter is ignored)
+        ridge: uses a non-penalized least square fit (regularization parameter
+        is ignored)
 
     transform_n_nonzero_coefs : int, ``0.1 * n_features`` by default
         Number of nonzero coefficients to target in each column of the
@@ -1281,8 +1300,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     """
     def __init__(self, n_components=None, alpha=1, l1_ratio=0.0, n_iter=1000,
                  fit_algorithm='lars', n_jobs=1, batch_size=3,
-                 shuffle=True, dict_init=None, transform_algorithm='omp', tol=0.,
-                 transform_n_nonzero_coefs=None, transform_alpha=None,
+                 shuffle=True, dict_init=None, transform_algorithm='omp',
+                 tol=0., transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
                  random_state=None,
                  debug_info=False):
@@ -1365,7 +1384,9 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self : object
             Returns the instance itself.
         """
-        warnings.warn("Partial fit will change its behaviour in the next release, and split the input data into batches"
+        warnings.warn("Partial fit will change its behaviour"
+                      "in the next release,"
+                      " and split the input data into batches "
                       "of provided batch_size")
         if not hasattr(self, 'random_state_'):
             self.random_state_ = check_random_state(self.random_state)
@@ -1396,8 +1417,11 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             if not hasattr(self, 'values_'):
                 self.residuals_, self.density_, self.values_ = debug_info
             else:
-                for this_array, new_array in zip(('residuals_', 'density_', 'values_'), debug_info):
-                    temp = np.concatenate((getattr(self, this_array), new_array), axis=0)
+                for this_array, new_array in zip(('residuals_',
+                                                  'density_', 'values_'),
+                                                 debug_info):
+                    temp = np.concatenate((getattr(self, this_array),
+                                           new_array), axis=0)
                     setattr(self, this_array, temp)
         self.components_ = U
 
@@ -1428,7 +1452,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             Returns the instance itself.
         """
         if deprecated:
-            return self._partial_fit_deprecated(X, y=y, iter_offset=iter_offset)
+            return self._partial_fit_deprecated(X, y=y,
+                                                iter_offset=iter_offset)
 
         if not hasattr(self, 'random_state_'):
             self.random_state_ = check_random_state(self.random_state)
@@ -1463,8 +1488,10 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             if not hasattr(self, 'values_'):
                 self.residuals_, self.density_, self.values_ = debug_info
             else:
-                for this_array, new_array in zip(('residuals_', 'density_', 'values_'), debug_info):
-                    temp = np.concatenate((getattr(self, this_array), new_array), axis=0)
+                for this_array, new_array in zip(('residuals_', 'density_',
+                                                  'values_'), debug_info):
+                    temp = np.concatenate((getattr(self, this_array),
+                                           new_array), axis=0)
                     setattr(self, this_array, temp)
         self.components_ = U
 
