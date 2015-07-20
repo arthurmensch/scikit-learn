@@ -9,6 +9,13 @@ from the module :py:mod:`sklearn.decomposition` (see the documentation chapter
 :ref:`decompositions`), and display some convergence curve.
 
 """
+import os
+filename = os.environ.get('PYTHONSTARTUP')
+if filename and os.path.isfile(filename):
+    with open(filename) as fobj:
+       startup_file = fobj.read()
+    exec(startup_file)
+
 print(__doc__)
 
 # Authors: Vlad Niculae, Alexandre Gramfort
