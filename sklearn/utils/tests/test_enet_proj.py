@@ -44,7 +44,7 @@ def enet_projection_slow(v, radius=1, l1_gamma=0.1):
         mask = np.ones(m, dtype=np.bool)
         mask_non_zero = mask.nonzero()[0]
         while mask_non_zero.shape[0] != 0:
-            k = np.random.randint(mask_non_zero.shape[0])
+            k = random_state.randint(mask_non_zero.shape[0])
             idx = mask_non_zero[k]
             k = U[idx]
             sel = b_abs < b_abs[k]
