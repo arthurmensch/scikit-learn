@@ -13,14 +13,14 @@ def _enet_norm_for_projection(v, gamma):
     return np.sum(v * (1 + gamma / 2 * v))
 
 
-def enet_norm_slow(v, l1_ratio=0.1):
-    if l1_ratio == 0:
+def enet_norm_slow(v, l1_gamma=0.1):
+    if l1_gamma == 0:
         return sqrt(np.sum(v ** 2))
     b_abs = np.abs(v)
-    return np.sum(b_abs * (l1_ratio + b_abs))
+    return np.sum(b_abs * (l1_gamma + b_abs))
 
 
-def enet_projection_slow(v, radius=1, l1_ratio=0.1):
+def enet_projection_slow(v, radius=1, l1_gamma=0.1):
     """Projection on the elastic-net ball
     **References:**
 
@@ -28,10 +28,10 @@ def enet_projection_slow(v, radius=1, l1_ratio=0.1):
     for sparse coding (http://www.di.ens.fr/sierra/pdfs/icml09.pdf)
     """
     random_state = check_random_state(None)
-    if l1_ratio == 0:
+    if l1_gamma == 0:
         return v / sqrt(np.sum(v ** 2))
-    gamma = 2 / l1_ratio
-    radius /= l1_ratio
+    gamma = 2 / l1_gamma
+    radius /= l1_gamma
     m = v.shape[0]
     b_abs = np.abs(v)
     norm = _enet_norm_for_projection(b_abs, gamma)
@@ -78,7 +78,7 @@ def test_slow_enet_norm():
 
     for i in range(10):
         a = np.random.randn(10000)
-        norms[i] = enet_norm_slow(a, l1_ratio=0.1)
+        norms[i] = enet_norm_slow(a, l1_gamma=0.1)
         norms2[i] = (a ** 2).sum() + 0.1 * np.abs(a).sum()
     assert_array_almost_equal(norms, norms2)
 
@@ -88,8 +88,8 @@ def test_slow_enet_projection_norm():
 
     for i in range(10):
         a = np.random.randn(10000)
-        b = np.asarray(enet_projection_slow(a, radius=1, l1_ratio=0.1))
-        norms[i] = enet_norm_slow(b, l1_ratio=0.1)
+        b = np.asarray(enet_projection_slow(a, radius=1, l1_gamma=0.1))
+        norms[i] = enet_norm_slow(b, l1_gamma=0.1)
     assert_array_almost_equal(norms, np.ones(10))
 
 
@@ -101,7 +101,7 @@ def test_fast_enet_projection_norm():
         a /= np.sqrt(np.sum(a ** 2))
         c = np.zeros(20000)
         c[:] = enet_projection(a, 1, 0.15)
-        norms[i] = enet_norm(c, l1_ratio=0.15)
+        norms[i] = enet_norm(c, l1_gamma=0.15)
     assert_array_almost_equal(norms, np.ones(10))
 
 
@@ -111,7 +111,7 @@ def test_fast_enet_projection():
     random_state = check_random_state(0)
     for i in range(10):
         a = random_state.randn(100)
-        b[i, :] = enet_projection_slow(a, radius=1, l1_ratio=0.1)
+        b[i, :] = enet_projection_slow(a, radius=1, l1_gamma=0.1)
         c[i] = enet_projection(a, 1, 0.1)
     assert_array_almost_equal(c, b, 4)
 
