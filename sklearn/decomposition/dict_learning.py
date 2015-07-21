@@ -144,7 +144,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 
     elif algorithm == 'ridge':
         alpha = float(regularization) / n_features  # account for scaling
-        lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
+        lr = Ridge(alpha=2*alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
         new_code = lr.coef_
 
@@ -799,9 +799,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
             theta = float(batch_size ** 2 + ii + 1 - batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
         A *= beta
-        A += np.dot(this_code, this_code.T) / batch_size  # * (1 - beta)
+        A += np.dot(this_code, this_code.T) / batch_size * (1 - beta)
         B *= beta
-        B += np.dot(this_X.T, this_code.T) / batch_size  # * (1 - beta)
+        B += np.dot(this_X.T, this_code.T) / batch_size * (1 - beta)
 
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A,
