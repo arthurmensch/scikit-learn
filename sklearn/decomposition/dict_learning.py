@@ -345,6 +345,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        # XXX: this behavior is not backward compatible
         if online:
             dictionary[:, k] = R[:, k]
             # L2-ball scaling if we use an elastic net ball

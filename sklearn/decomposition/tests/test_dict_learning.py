@@ -208,7 +208,7 @@ def test_dict_learning_online_fit_convergence():
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
         V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
-        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
+        dict1 = MiniBatchDictionaryLearning(n_components, n_iter=100 * len(X),
                                             batch_size=1,
                                             fit_algorithm=algorithm,
                                             verbose=1,
@@ -218,7 +218,7 @@ def test_dict_learning_online_fit_convergence():
                                             l1_gamma=l1_gamma,
                                             random_state=0)
         dict1.fit(X)
-        assert_true(dict1.n_iter_ < 10 * len(X) - 1)
+        assert_true(dict1.n_iter_ < 100 * len(X) - 1)
 
 
 def test_dict_learning_online_deterministic():
