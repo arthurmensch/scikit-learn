@@ -874,7 +874,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         res = dictionary.T
 
     if return_debug_info:
-        return res + (debug_info, )
+        return res, debug_info
     else:
         return res
 
@@ -1355,7 +1355,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             return_n_iter=True,
             return_debug_info=self.debug_info)
         if self.debug_info:
-            U, (A, B, penalty), self.n_iter_, debug_info = res
+            (U, (A, B, penalty), self.n_iter_), debug_info = res
         else:
             U, (A, B, penalty), self.n_iter_ = res
         self.components_ = U
@@ -1413,7 +1413,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             return_debug_info=self.debug_info)
 
         if self.debug_info:
-            U, (A, B, penalty), debug_info = res
+            (U, (A, B, penalty)), debug_info = res
         else:
             U, (A, B, penalty) = res
         if self.debug_info:
@@ -1484,7 +1484,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             return_debug_info=self.debug_info)
         # XXX: To remove
         if self.debug_info:
-            U, (A, B, penalty), debug_info = res
+            (U, (A, B, penalty)), debug_info = res
         else:
             U, (A, B, penalty) = res
         if self.debug_info:
