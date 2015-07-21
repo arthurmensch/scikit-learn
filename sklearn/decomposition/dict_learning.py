@@ -717,8 +717,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
 
     # Scaling l1_gamma
     l1_gamma = float(l1_gamma)
-    # n = n_features if update_dict_dir == 'component' else n_components
-    # l1_gamma /= l1_gamma + (1-l1_gamma)*sqrt(n)
 
     random_state = check_random_state(random_state)
 

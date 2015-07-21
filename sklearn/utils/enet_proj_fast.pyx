@@ -186,7 +186,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
         l = (s - radius) / rho
     for i in range(n):
         sign = res[i]
-        res[i] *= _positive(v[i] - l) / ( 1 + l *gamma)
+        res[i] *= _positive(v[i] - l) / ( 1 + l * gamma)
         v[i] *= sign
     return norm
 
