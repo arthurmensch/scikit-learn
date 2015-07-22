@@ -16,10 +16,22 @@ from libc.math cimport sqrt
 
 from libc.stdlib cimport malloc, free
 
-from enet_proj_fast cimport DOUBLE, UINT32_t, UINT8_t
+ctypedef np.float64_t DOUBLE
+ctypedef np.uint32_t UINT32_t
+ctypedef np.uint8_t UINT8_t
 
-cdef void callback_free_data(void *p):
-    free(p)
+cdef enum:
+    MASKED = 0
+    UNMASKED = 1
+    GREATER = 2
+    LOWER = 3
+
+cdef enum:
+    # Max value for our rand_r replacement (near the bottom).
+    # We don't use RAND_MAX because it's different across platforms and
+    # particularly tiny on Windows/MSVC.
+    RAND_R_MAX = 0x7FFFFFFF
+
 
 # The following two functions are shamelessly copied from the tree code.
 @cython.cdivision(True)
@@ -47,7 +59,7 @@ cdef inline double _positive(double a) nogil:
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef double _enet_norm_for_projection(DOUBLE[:] v,
+cdef double _masked_enet_norm(DOUBLE[:] v,
                                       UINT8_t * mask, int size,
                                       int masker, double gamma) nogil:
     cdef double res = 0
@@ -74,28 +86,24 @@ cdef int _choose_index_in_mask(UINT8_t * mask, int size,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cdef DOUBLE[:] _random_unit_vector(DOUBLE[:] res, int size,
-                                   double radius, double l1_gamma):
-    """
-    Utility function used to generate a random vector on elastic-net ball
-    """
-    cdef DOUBLE[:] temp = 10 * radius * np.random.randn(size)
-    return enet_projection(temp, radius, l1_gamma)
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.initializedcheck(False)
-@cython.cdivision(True)
 @cython.nonecheck(False)
-cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
-                                       UINT8_t * mask, double radius,
-                             double l1_gamma, UINT32_t random_state) nogil:
+cpdef enet_projection(DOUBLE[:] v, double radius, double l1_gamma):
     """
-    Projecting v on the elastic net ball and storing result in res
+    Project a vector on the elastic-net ball
+
+    Parameters
+    ---------------------------------------------
+    res: double memory-view,
+        Vector in which to store the projection
+    v: double memory-view,
+        Vector to project
+    radius: float,
+        Radius of the elastic-net ball
+    l1_gamma: float,
+        Ratio of L1 norm (between 0 and 1)
     """
+    cdef int n = v.shape[0]
     cdef double gamma
-    cdef int n
     cdef double norm
     cdef double s
     cdef double rho
@@ -110,21 +118,23 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
     cdef int i
     cdef double norm2
     cdef double sign
+    cdef UINT32_t random_state = 0
+    cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
+    cdef DOUBLE[:] res = view.array(shape=(n,),
+                                    itemsize=sizeof(DOUBLE), format="d")
 
-    n = v.shape[0]
-
-    # res /= max(1/radius, np.linalg.norm(res))
-    if l1_gamma == 0.:  # projection onto the l2 ball
+    # projection onto the l2 ball
+    if l1_gamma == 0.:
         norm = 0.
         for i in range(n):
             norm += v[i] ** 2
-        norm = sqrt(norm) * radius
+        norm = sqrt(norm) / radius
         if norm <= 1:
             res[:] = v[:]
-            return norm
-        for i in range(n):
-            res[i] = v[i] / norm
-        return radius
+        else:
+            for i in range(n):
+                res[i] = v[i] / norm
+        return res
 
     gamma = 2 / l1_gamma
 
@@ -137,13 +147,13 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
             res[i] = -1
             v[i] *= -1
         mask[i] = UNMASKED
-    norm = _enet_norm_for_projection(v, mask, n, UNMASKED, gamma)
+    norm = _masked_enet_norm(v, mask, n, UNMASKED, gamma)
     radius /= l1_gamma
 
     # Return res if it is already in the elastic-net ball
     if norm <= radius:
         res[:] = v[:]
-        return norm
+        return res
 
     # Main loop for finding norm
     s = 0
@@ -161,7 +171,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
                 else:
                     mask[i] = LOWER
                     L_true_size += 1
-        d_s = _enet_norm_for_projection(v, mask, n, GREATER, gamma)
+        d_s = _masked_enet_norm(v, mask, n, GREATER, gamma)
         if s + d_s - (rho + G_true_size) * (1. + gamma / 2. * v[idx]) * v[idx]\
                 < radius * (1. + gamma * v[idx]) ** 2:
             s += d_s
@@ -176,7 +186,7 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
                     mask[i] = MASKED
             mask[idx] = MASKED
             true_size = G_true_size - 1
-    # if l1_gamma = 1
+    # if l1_gamma = np.inf
     if gamma != 0.:
         a = gamma ** 2 * radius + gamma * rho * 0.5
         b_ = 2 * radius * gamma + rho
@@ -188,35 +198,8 @@ cdef double _enet_projection_with_mask(DOUBLE[:] res, DOUBLE[:] v,
         sign = res[i]
         res[i] *= _positive(v[i] - l) / ( 1 + l * gamma)
         v[i] *= sign
-    return norm
-
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.initializedcheck(False)
-@cython.nonecheck(False)
-def enet_projection(DOUBLE[:] v, double radius, double l1_gamma):
-    """
-    Project a vector on the elastic-net ball
-
-    Parameters
-    ---------------------------------------------
-    res: double memory-view,
-        Vector in which to store the projection
-    v: double memory-view,
-        Vector to project
-    radius: float,
-        Radius of the elastic-net ball
-    l1_gamma: float,
-        Ratio of L1 norm (between 0 and 1)
-    """
-    cdef int n = v.shape[0]
-    cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
-    cdef DOUBLE[:] res = view.array(shape=(n,),
-                                    itemsize=sizeof(DOUBLE), format="d")
-    cdef double norm = _enet_projection_with_mask(res, v, mask,
-                                                  radius, l1_gamma, 0)
     free(mask)
+
     return res
 
 
