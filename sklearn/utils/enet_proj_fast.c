@@ -870,7 +870,7 @@ enum  {
   __pyx_e_7sklearn_5utils_14enet_proj_fast_RAND_R_MAX = 0x7FFFFFFF
 };
 
-/* "sklearn/utils/enet_proj_fast.pyx":209
+/* "sklearn/utils/enet_proj_fast.pyx":210
  * @cython.wraparound(False)
  * @cython.initializedcheck(False)
  * cpdef double enet_norm(DOUBLE[:] v, double l1_gamma=0.1) nogil:             # <<<<<<<<<<<<<<
@@ -2152,7 +2152,7 @@ static int __pyx_f_7sklearn_5utils_14enet_proj_fast__choose_index_in_mask(__pyx_
   return __pyx_r;
 }
 
-/* "sklearn/utils/enet_proj_fast.pyx":90
+/* "sklearn/utils/enet_proj_fast.pyx":91
  * @cython.initializedcheck(False)
  * @cython.nonecheck(False)
  * cpdef enet_projection(DOUBLE[:] v, double radius, double l1_gamma):             # <<<<<<<<<<<<<<
@@ -2216,7 +2216,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("enet_projection", 0);
 
-  /* "sklearn/utils/enet_proj_fast.pyx":105
+  /* "sklearn/utils/enet_proj_fast.pyx":106
  *         Ratio of L1 norm (between 0 and 1)
  *     """
  *     cdef int n = v.shape[0]             # <<<<<<<<<<<<<<
@@ -2225,7 +2225,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
  */
   __pyx_v_n = (__pyx_v_v.shape[0]);
 
-  /* "sklearn/utils/enet_proj_fast.pyx":121
+  /* "sklearn/utils/enet_proj_fast.pyx":122
  *     cdef double norm2
  *     cdef double sign
  *     cdef UINT32_t random_state = 0             # <<<<<<<<<<<<<<
@@ -2234,7 +2234,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
  */
   __pyx_v_random_state = 0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":122
+  /* "sklearn/utils/enet_proj_fast.pyx":123
  *     cdef double sign
  *     cdef UINT32_t random_state = 0
  *     cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))             # <<<<<<<<<<<<<<
@@ -2243,56 +2243,56 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
  */
   __pyx_v_mask = ((__pyx_t_7sklearn_5utils_14enet_proj_fast_UINT8_t *)malloc((__pyx_v_n * (sizeof(__pyx_t_7sklearn_5utils_14enet_proj_fast_UINT8_t)))));
 
-  /* "sklearn/utils/enet_proj_fast.pyx":123
+  /* "sklearn/utils/enet_proj_fast.pyx":124
  *     cdef UINT32_t random_state = 0
  *     cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
  *     cdef DOUBLE[:] res = view.array(shape=(n,),             # <<<<<<<<<<<<<<
  *                                     itemsize=sizeof(DOUBLE), format="d")
  * 
  */
-  __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_n); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_n); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_2);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_2);
   __pyx_t_2 = 0;
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_shape, __pyx_t_3) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_shape, __pyx_t_3) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":124
+  /* "sklearn/utils/enet_proj_fast.pyx":125
  *     cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
  *     cdef DOUBLE[:] res = view.array(shape=(n,),
  *                                     itemsize=sizeof(DOUBLE), format="d")             # <<<<<<<<<<<<<<
  * 
  *     # projection onto the l2 ball
  */
-  __pyx_t_3 = __Pyx_PyInt_FromSize_t((sizeof(__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE))); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = __Pyx_PyInt_FromSize_t((sizeof(__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE))); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 125; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_itemsize, __pyx_t_3) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_itemsize, __pyx_t_3) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_format, __pyx_n_s_d) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_format, __pyx_n_s_d) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "sklearn/utils/enet_proj_fast.pyx":123
+  /* "sklearn/utils/enet_proj_fast.pyx":124
  *     cdef UINT32_t random_state = 0
  *     cdef UINT8_t * mask = <UINT8_t *>malloc(n * sizeof(UINT8_t))
  *     cdef DOUBLE[:] res = view.array(shape=(n,),             # <<<<<<<<<<<<<<
  *                                     itemsize=sizeof(DOUBLE), format="d")
  * 
  */
-  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_array_type)), __pyx_empty_tuple, __pyx_t_1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_array_type)), __pyx_empty_tuple, __pyx_t_1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_t_4 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE(__pyx_t_3);
-  if (unlikely(!__pyx_t_4.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 123; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__pyx_t_4.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_v_res = __pyx_t_4;
   __pyx_t_4.memview = NULL;
   __pyx_t_4.data = NULL;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":127
+  /* "sklearn/utils/enet_proj_fast.pyx":128
  * 
  *     # projection onto the l2 ball
  *     if l1_gamma == 0.:             # <<<<<<<<<<<<<<
@@ -2302,7 +2302,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
   __pyx_t_5 = ((__pyx_v_l1_gamma == 0.) != 0);
   if (__pyx_t_5) {
 
-    /* "sklearn/utils/enet_proj_fast.pyx":128
+    /* "sklearn/utils/enet_proj_fast.pyx":129
  *     # projection onto the l2 ball
  *     if l1_gamma == 0.:
  *         norm = 0.             # <<<<<<<<<<<<<<
@@ -2311,7 +2311,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
  */
     __pyx_v_norm = 0.;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":129
+    /* "sklearn/utils/enet_proj_fast.pyx":130
  *     if l1_gamma == 0.:
  *         norm = 0.
  *         for i in range(n):             # <<<<<<<<<<<<<<
@@ -2322,7 +2322,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
     for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
       __pyx_v_i = __pyx_t_7;
 
-      /* "sklearn/utils/enet_proj_fast.pyx":130
+      /* "sklearn/utils/enet_proj_fast.pyx":131
  *         norm = 0.
  *         for i in range(n):
  *             norm += v[i] ** 2             # <<<<<<<<<<<<<<
@@ -2333,7 +2333,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
       __pyx_v_norm = (__pyx_v_norm + pow((*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_8 * __pyx_v_v.strides[0]) ))), 2.0));
     }
 
-    /* "sklearn/utils/enet_proj_fast.pyx":131
+    /* "sklearn/utils/enet_proj_fast.pyx":132
  *         for i in range(n):
  *             norm += v[i] ** 2
  *         norm = sqrt(norm) / radius             # <<<<<<<<<<<<<<
@@ -2349,11 +2349,11 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
       #ifdef WITH_THREAD
       PyGILState_Release(__pyx_gilstate_save);
       #endif
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 131; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 132; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_v_norm = (__pyx_t_9 / __pyx_v_radius);
 
-    /* "sklearn/utils/enet_proj_fast.pyx":132
+    /* "sklearn/utils/enet_proj_fast.pyx":133
  *             norm += v[i] ** 2
  *         norm = sqrt(norm) / radius
  *         if norm <= 1:             # <<<<<<<<<<<<<<
@@ -2363,7 +2363,7 @@ static PyObject *__pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__Pyx_
     __pyx_t_5 = ((__pyx_v_norm <= 1.0) != 0);
     if (__pyx_t_5) {
 
-      /* "sklearn/utils/enet_proj_fast.pyx":133
+      /* "sklearn/utils/enet_proj_fast.pyx":134
  *         norm = sqrt(norm) / radius
  *         if norm <= 1:
  *             res[:] = v[:]             # <<<<<<<<<<<<<<
@@ -2384,14 +2384,14 @@ __pyx_t_10.data = __pyx_v_res.data;
 __pyx_t_10.strides[0] = __pyx_v_res.strides[0];
     __pyx_t_10.suboffsets[0] = -1;
 
-if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 133; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 134; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       __PYX_XDEC_MEMVIEW(&__pyx_t_10, 1);
       __PYX_XDEC_MEMVIEW(&__pyx_t_4, 1);
       goto __pyx_L6;
     }
     /*else*/ {
 
-      /* "sklearn/utils/enet_proj_fast.pyx":135
+      /* "sklearn/utils/enet_proj_fast.pyx":136
  *             res[:] = v[:]
  *         else:
  *             for i in range(n):             # <<<<<<<<<<<<<<
@@ -2402,7 +2402,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
       for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
         __pyx_v_i = __pyx_t_7;
 
-        /* "sklearn/utils/enet_proj_fast.pyx":136
+        /* "sklearn/utils/enet_proj_fast.pyx":137
  *         else:
  *             for i in range(n):
  *                 res[i] = v[i] / norm             # <<<<<<<<<<<<<<
@@ -2419,7 +2419,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
           #ifdef WITH_THREAD
           PyGILState_Release(__pyx_gilstate_save);
           #endif
-          {__pyx_filename = __pyx_f[0]; __pyx_lineno = 136; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+          {__pyx_filename = __pyx_f[0]; __pyx_lineno = 137; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
         }
         __pyx_t_13 = __pyx_v_i;
         *((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_res.data + __pyx_t_13 * __pyx_v_res.strides[0]) )) = (__pyx_t_12 / __pyx_v_norm);
@@ -2427,7 +2427,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
     }
     __pyx_L6:;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":137
+    /* "sklearn/utils/enet_proj_fast.pyx":138
  *             for i in range(n):
  *                 res[i] = v[i] / norm
  *         return res             # <<<<<<<<<<<<<<
@@ -2435,14 +2435,14 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
  *     gamma = 2 / l1_gamma
  */
     __Pyx_XDECREF(__pyx_r);
-    __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_res, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, 0);; if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 137; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_res, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, 0);; if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 138; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_3);
     __pyx_r = __pyx_t_3;
     __pyx_t_3 = 0;
     goto __pyx_L0;
   }
 
-  /* "sklearn/utils/enet_proj_fast.pyx":139
+  /* "sklearn/utils/enet_proj_fast.pyx":140
  *         return res
  * 
  *     gamma = 2 / l1_gamma             # <<<<<<<<<<<<<<
@@ -2457,11 +2457,11 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
     #ifdef WITH_THREAD
     PyGILState_Release(__pyx_gilstate_save);
     #endif
-    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 140; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
   __pyx_v_gamma = (2.0 / __pyx_v_l1_gamma);
 
-  /* "sklearn/utils/enet_proj_fast.pyx":143
+  /* "sklearn/utils/enet_proj_fast.pyx":144
  *     # res = np.sign(v)
  *     # v = np.abs(v)
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -2472,7 +2472,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
   for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
     __pyx_v_i = __pyx_t_7;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":144
+    /* "sklearn/utils/enet_proj_fast.pyx":145
  *     # v = np.abs(v)
  *     for i in range(n):
  *         if v[i] >= 0:             # <<<<<<<<<<<<<<
@@ -2483,7 +2483,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
     __pyx_t_5 = (((*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_14 * __pyx_v_v.strides[0]) ))) >= 0.0) != 0);
     if (__pyx_t_5) {
 
-      /* "sklearn/utils/enet_proj_fast.pyx":145
+      /* "sklearn/utils/enet_proj_fast.pyx":146
  *     for i in range(n):
  *         if v[i] >= 0:
  *             res[i] = 1             # <<<<<<<<<<<<<<
@@ -2496,7 +2496,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
     }
     /*else*/ {
 
-      /* "sklearn/utils/enet_proj_fast.pyx":147
+      /* "sklearn/utils/enet_proj_fast.pyx":148
  *             res[i] = 1
  *         else:
  *             res[i] = -1             # <<<<<<<<<<<<<<
@@ -2506,7 +2506,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
       __pyx_t_16 = __pyx_v_i;
       *((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_res.data + __pyx_t_16 * __pyx_v_res.strides[0]) )) = -1.0;
 
-      /* "sklearn/utils/enet_proj_fast.pyx":148
+      /* "sklearn/utils/enet_proj_fast.pyx":149
  *         else:
  *             res[i] = -1
  *             v[i] *= -1             # <<<<<<<<<<<<<<
@@ -2518,7 +2518,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
     }
     __pyx_L11:;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":149
+    /* "sklearn/utils/enet_proj_fast.pyx":150
  *             res[i] = -1
  *             v[i] *= -1
  *         mask[i] = UNMASKED             # <<<<<<<<<<<<<<
@@ -2528,7 +2528,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
     (__pyx_v_mask[__pyx_v_i]) = __pyx_e_7sklearn_5utils_14enet_proj_fast_UNMASKED;
   }
 
-  /* "sklearn/utils/enet_proj_fast.pyx":150
+  /* "sklearn/utils/enet_proj_fast.pyx":151
  *             v[i] *= -1
  *         mask[i] = UNMASKED
  *     norm = _masked_enet_norm(v, mask, n, UNMASKED, gamma)             # <<<<<<<<<<<<<<
@@ -2537,7 +2537,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
  */
   __pyx_v_norm = __pyx_f_7sklearn_5utils_14enet_proj_fast__masked_enet_norm(__pyx_v_v, __pyx_v_mask, __pyx_v_n, __pyx_e_7sklearn_5utils_14enet_proj_fast_UNMASKED, __pyx_v_gamma);
 
-  /* "sklearn/utils/enet_proj_fast.pyx":151
+  /* "sklearn/utils/enet_proj_fast.pyx":152
  *         mask[i] = UNMASKED
  *     norm = _masked_enet_norm(v, mask, n, UNMASKED, gamma)
  *     radius /= l1_gamma             # <<<<<<<<<<<<<<
@@ -2552,11 +2552,11 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
     #ifdef WITH_THREAD
     PyGILState_Release(__pyx_gilstate_save);
     #endif
-    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 151; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 152; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
   __pyx_v_radius = (__pyx_v_radius / __pyx_v_l1_gamma);
 
-  /* "sklearn/utils/enet_proj_fast.pyx":154
+  /* "sklearn/utils/enet_proj_fast.pyx":155
  * 
  *     # Return res if it is already in the elastic-net ball
  *     if norm <= radius:             # <<<<<<<<<<<<<<
@@ -2566,7 +2566,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_10, 1, 1, 0) < 0)
   __pyx_t_5 = ((__pyx_v_norm <= __pyx_v_radius) != 0);
   if (__pyx_t_5) {
 
-    /* "sklearn/utils/enet_proj_fast.pyx":155
+    /* "sklearn/utils/enet_proj_fast.pyx":156
  *     # Return res if it is already in the elastic-net ball
  *     if norm <= radius:
  *         res[:] = v[:]             # <<<<<<<<<<<<<<
@@ -2587,11 +2587,11 @@ __pyx_t_18.data = __pyx_v_res.data;
 __pyx_t_18.strides[0] = __pyx_v_res.strides[0];
     __pyx_t_18.suboffsets[0] = -1;
 
-if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 155; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __PYX_XDEC_MEMVIEW(&__pyx_t_18, 1);
     __PYX_XDEC_MEMVIEW(&__pyx_t_4, 1);
 
-    /* "sklearn/utils/enet_proj_fast.pyx":156
+    /* "sklearn/utils/enet_proj_fast.pyx":157
  *     if norm <= radius:
  *         res[:] = v[:]
  *         return res             # <<<<<<<<<<<<<<
@@ -2599,14 +2599,14 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  *     # Main loop for finding norm
  */
     __Pyx_XDECREF(__pyx_r);
-    __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_res, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, 0);; if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_res, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, 0);; if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_3);
     __pyx_r = __pyx_t_3;
     __pyx_t_3 = 0;
     goto __pyx_L0;
   }
 
-  /* "sklearn/utils/enet_proj_fast.pyx":159
+  /* "sklearn/utils/enet_proj_fast.pyx":160
  * 
  *     # Main loop for finding norm
  *     s = 0             # <<<<<<<<<<<<<<
@@ -2615,7 +2615,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
   __pyx_v_s = 0.0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":160
+  /* "sklearn/utils/enet_proj_fast.pyx":161
  *     # Main loop for finding norm
  *     s = 0
  *     rho = 0             # <<<<<<<<<<<<<<
@@ -2624,7 +2624,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
   __pyx_v_rho = 0.0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":161
+  /* "sklearn/utils/enet_proj_fast.pyx":162
  *     s = 0
  *     rho = 0
  *     true_size = n             # <<<<<<<<<<<<<<
@@ -2633,7 +2633,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
   __pyx_v_true_size = __pyx_v_n;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":162
+  /* "sklearn/utils/enet_proj_fast.pyx":163
  *     rho = 0
  *     true_size = n
  *     while true_size:             # <<<<<<<<<<<<<<
@@ -2644,7 +2644,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     __pyx_t_5 = (__pyx_v_true_size != 0);
     if (!__pyx_t_5) break;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":163
+    /* "sklearn/utils/enet_proj_fast.pyx":164
  *     true_size = n
  *     while true_size:
  *         idx = _choose_index_in_mask(mask, n, &random_state)             # <<<<<<<<<<<<<<
@@ -2653,7 +2653,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
     __pyx_v_idx = __pyx_f_7sklearn_5utils_14enet_proj_fast__choose_index_in_mask(__pyx_v_mask, __pyx_v_n, (&__pyx_v_random_state));
 
-    /* "sklearn/utils/enet_proj_fast.pyx":164
+    /* "sklearn/utils/enet_proj_fast.pyx":165
  *     while true_size:
  *         idx = _choose_index_in_mask(mask, n, &random_state)
  *         G_true_size = 0             # <<<<<<<<<<<<<<
@@ -2662,7 +2662,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
     __pyx_v_G_true_size = 0;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":165
+    /* "sklearn/utils/enet_proj_fast.pyx":166
  *         idx = _choose_index_in_mask(mask, n, &random_state)
  *         G_true_size = 0
  *         L_true_size = 0             # <<<<<<<<<<<<<<
@@ -2671,7 +2671,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
     __pyx_v_L_true_size = 0;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":166
+    /* "sklearn/utils/enet_proj_fast.pyx":167
  *         G_true_size = 0
  *         L_true_size = 0
  *         for i in range(n):             # <<<<<<<<<<<<<<
@@ -2682,7 +2682,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
       __pyx_v_i = __pyx_t_7;
 
-      /* "sklearn/utils/enet_proj_fast.pyx":167
+      /* "sklearn/utils/enet_proj_fast.pyx":168
  *         L_true_size = 0
  *         for i in range(n):
  *             if mask[i]:             # <<<<<<<<<<<<<<
@@ -2692,7 +2692,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
       __pyx_t_5 = ((__pyx_v_mask[__pyx_v_i]) != 0);
       if (__pyx_t_5) {
 
-        /* "sklearn/utils/enet_proj_fast.pyx":168
+        /* "sklearn/utils/enet_proj_fast.pyx":169
  *         for i in range(n):
  *             if mask[i]:
  *                 if v[i] >= v[idx]:             # <<<<<<<<<<<<<<
@@ -2704,7 +2704,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
         __pyx_t_5 = (((*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_19 * __pyx_v_v.strides[0]) ))) >= (*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_20 * __pyx_v_v.strides[0]) )))) != 0);
         if (__pyx_t_5) {
 
-          /* "sklearn/utils/enet_proj_fast.pyx":169
+          /* "sklearn/utils/enet_proj_fast.pyx":170
  *             if mask[i]:
  *                 if v[i] >= v[idx]:
  *                     mask[i] = GREATER             # <<<<<<<<<<<<<<
@@ -2713,7 +2713,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
           (__pyx_v_mask[__pyx_v_i]) = __pyx_e_7sklearn_5utils_14enet_proj_fast_GREATER;
 
-          /* "sklearn/utils/enet_proj_fast.pyx":170
+          /* "sklearn/utils/enet_proj_fast.pyx":171
  *                 if v[i] >= v[idx]:
  *                     mask[i] = GREATER
  *                     G_true_size += 1             # <<<<<<<<<<<<<<
@@ -2725,7 +2725,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
         }
         /*else*/ {
 
-          /* "sklearn/utils/enet_proj_fast.pyx":172
+          /* "sklearn/utils/enet_proj_fast.pyx":173
  *                     G_true_size += 1
  *                 else:
  *                     mask[i] = LOWER             # <<<<<<<<<<<<<<
@@ -2734,7 +2734,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
           (__pyx_v_mask[__pyx_v_i]) = __pyx_e_7sklearn_5utils_14enet_proj_fast_LOWER;
 
-          /* "sklearn/utils/enet_proj_fast.pyx":173
+          /* "sklearn/utils/enet_proj_fast.pyx":174
  *                 else:
  *                     mask[i] = LOWER
  *                     L_true_size += 1             # <<<<<<<<<<<<<<
@@ -2749,7 +2749,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
       __pyx_L17:;
     }
 
-    /* "sklearn/utils/enet_proj_fast.pyx":174
+    /* "sklearn/utils/enet_proj_fast.pyx":175
  *                     mask[i] = LOWER
  *                     L_true_size += 1
  *         d_s = _masked_enet_norm(v, mask, n, GREATER, gamma)             # <<<<<<<<<<<<<<
@@ -2758,7 +2758,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
     __pyx_v_d_s = __pyx_f_7sklearn_5utils_14enet_proj_fast__masked_enet_norm(__pyx_v_v, __pyx_v_mask, __pyx_v_n, __pyx_e_7sklearn_5utils_14enet_proj_fast_GREATER, __pyx_v_gamma);
 
-    /* "sklearn/utils/enet_proj_fast.pyx":175
+    /* "sklearn/utils/enet_proj_fast.pyx":176
  *                     L_true_size += 1
  *         d_s = _masked_enet_norm(v, mask, n, GREATER, gamma)
  *         if s + d_s - (rho + G_true_size) * (1. + gamma / 2. * v[idx]) * v[idx]\             # <<<<<<<<<<<<<<
@@ -2768,7 +2768,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     __pyx_t_6 = __pyx_v_idx;
     __pyx_t_7 = __pyx_v_idx;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":176
+    /* "sklearn/utils/enet_proj_fast.pyx":177
  *         d_s = _masked_enet_norm(v, mask, n, GREATER, gamma)
  *         if s + d_s - (rho + G_true_size) * (1. + gamma / 2. * v[idx]) * v[idx]\
  *                 < radius * (1. + gamma * v[idx]) ** 2:             # <<<<<<<<<<<<<<
@@ -2779,7 +2779,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     __pyx_t_5 = ((((__pyx_v_s + __pyx_v_d_s) - (((__pyx_v_rho + __pyx_v_G_true_size) * (1. + ((__pyx_v_gamma / 2.) * (*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_6 * __pyx_v_v.strides[0]) )))))) * (*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_7 * __pyx_v_v.strides[0]) ))))) < (__pyx_v_radius * pow((1. + (__pyx_v_gamma * (*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_21 * __pyx_v_v.strides[0]) ))))), 2.0))) != 0);
     if (__pyx_t_5) {
 
-      /* "sklearn/utils/enet_proj_fast.pyx":177
+      /* "sklearn/utils/enet_proj_fast.pyx":178
  *         if s + d_s - (rho + G_true_size) * (1. + gamma / 2. * v[idx]) * v[idx]\
  *                 < radius * (1. + gamma * v[idx]) ** 2:
  *             s += d_s             # <<<<<<<<<<<<<<
@@ -2788,7 +2788,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
       __pyx_v_s = (__pyx_v_s + __pyx_v_d_s);
 
-      /* "sklearn/utils/enet_proj_fast.pyx":178
+      /* "sklearn/utils/enet_proj_fast.pyx":179
  *                 < radius * (1. + gamma * v[idx]) ** 2:
  *             s += d_s
  *             rho += G_true_size             # <<<<<<<<<<<<<<
@@ -2797,7 +2797,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
       __pyx_v_rho = (__pyx_v_rho + __pyx_v_G_true_size);
 
-      /* "sklearn/utils/enet_proj_fast.pyx":179
+      /* "sklearn/utils/enet_proj_fast.pyx":180
  *             s += d_s
  *             rho += G_true_size
  *             for i in range(n):             # <<<<<<<<<<<<<<
@@ -2808,7 +2808,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
       for (__pyx_t_23 = 0; __pyx_t_23 < __pyx_t_22; __pyx_t_23+=1) {
         __pyx_v_i = __pyx_t_23;
 
-        /* "sklearn/utils/enet_proj_fast.pyx":180
+        /* "sklearn/utils/enet_proj_fast.pyx":181
  *             rho += G_true_size
  *             for i in range(n):
  *                 if mask[i] == GREATER:             # <<<<<<<<<<<<<<
@@ -2818,7 +2818,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
         __pyx_t_5 = (((__pyx_v_mask[__pyx_v_i]) == __pyx_e_7sklearn_5utils_14enet_proj_fast_GREATER) != 0);
         if (__pyx_t_5) {
 
-          /* "sklearn/utils/enet_proj_fast.pyx":181
+          /* "sklearn/utils/enet_proj_fast.pyx":182
  *             for i in range(n):
  *                 if mask[i] == GREATER:
  *                     mask[i] = MASKED             # <<<<<<<<<<<<<<
@@ -2831,7 +2831,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
         __pyx_L22:;
       }
 
-      /* "sklearn/utils/enet_proj_fast.pyx":182
+      /* "sklearn/utils/enet_proj_fast.pyx":183
  *                 if mask[i] == GREATER:
  *                     mask[i] = MASKED
  *             true_size = L_true_size             # <<<<<<<<<<<<<<
@@ -2843,7 +2843,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     }
     /*else*/ {
 
-      /* "sklearn/utils/enet_proj_fast.pyx":184
+      /* "sklearn/utils/enet_proj_fast.pyx":185
  *             true_size = L_true_size
  *         else:
  *             for i in range(n):             # <<<<<<<<<<<<<<
@@ -2854,7 +2854,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
       for (__pyx_t_23 = 0; __pyx_t_23 < __pyx_t_22; __pyx_t_23+=1) {
         __pyx_v_i = __pyx_t_23;
 
-        /* "sklearn/utils/enet_proj_fast.pyx":185
+        /* "sklearn/utils/enet_proj_fast.pyx":186
  *         else:
  *             for i in range(n):
  *                 if mask[i] == LOWER:             # <<<<<<<<<<<<<<
@@ -2864,7 +2864,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
         __pyx_t_5 = (((__pyx_v_mask[__pyx_v_i]) == __pyx_e_7sklearn_5utils_14enet_proj_fast_LOWER) != 0);
         if (__pyx_t_5) {
 
-          /* "sklearn/utils/enet_proj_fast.pyx":186
+          /* "sklearn/utils/enet_proj_fast.pyx":187
  *             for i in range(n):
  *                 if mask[i] == LOWER:
  *                     mask[i] = MASKED             # <<<<<<<<<<<<<<
@@ -2877,7 +2877,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
         __pyx_L25:;
       }
 
-      /* "sklearn/utils/enet_proj_fast.pyx":187
+      /* "sklearn/utils/enet_proj_fast.pyx":188
  *                 if mask[i] == LOWER:
  *                     mask[i] = MASKED
  *             mask[idx] = MASKED             # <<<<<<<<<<<<<<
@@ -2886,7 +2886,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
       (__pyx_v_mask[__pyx_v_idx]) = __pyx_e_7sklearn_5utils_14enet_proj_fast_MASKED;
 
-      /* "sklearn/utils/enet_proj_fast.pyx":188
+      /* "sklearn/utils/enet_proj_fast.pyx":189
  *                     mask[i] = MASKED
  *             mask[idx] = MASKED
  *             true_size = G_true_size - 1             # <<<<<<<<<<<<<<
@@ -2898,7 +2898,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     __pyx_L19:;
   }
 
-  /* "sklearn/utils/enet_proj_fast.pyx":190
+  /* "sklearn/utils/enet_proj_fast.pyx":191
  *             true_size = G_true_size - 1
  *     # if l1_gamma = np.inf
  *     if gamma != 0.:             # <<<<<<<<<<<<<<
@@ -2908,7 +2908,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
   __pyx_t_5 = ((__pyx_v_gamma != 0.) != 0);
   if (__pyx_t_5) {
 
-    /* "sklearn/utils/enet_proj_fast.pyx":191
+    /* "sklearn/utils/enet_proj_fast.pyx":192
  *     # if l1_gamma = np.inf
  *     if gamma != 0.:
  *         a = gamma ** 2 * radius + gamma * rho * 0.5             # <<<<<<<<<<<<<<
@@ -2917,7 +2917,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
     __pyx_v_a = ((pow(__pyx_v_gamma, 2.0) * __pyx_v_radius) + ((__pyx_v_gamma * __pyx_v_rho) * 0.5));
 
-    /* "sklearn/utils/enet_proj_fast.pyx":192
+    /* "sklearn/utils/enet_proj_fast.pyx":193
  *     if gamma != 0.:
  *         a = gamma ** 2 * radius + gamma * rho * 0.5
  *         b_ = 2 * radius * gamma + rho             # <<<<<<<<<<<<<<
@@ -2926,7 +2926,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
     __pyx_v_b_ = (((2.0 * __pyx_v_radius) * __pyx_v_gamma) + __pyx_v_rho);
 
-    /* "sklearn/utils/enet_proj_fast.pyx":193
+    /* "sklearn/utils/enet_proj_fast.pyx":194
  *         a = gamma ** 2 * radius + gamma * rho * 0.5
  *         b_ = 2 * radius * gamma + rho
  *         c = radius - s             # <<<<<<<<<<<<<<
@@ -2935,7 +2935,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
     __pyx_v_c = (__pyx_v_radius - __pyx_v_s);
 
-    /* "sklearn/utils/enet_proj_fast.pyx":194
+    /* "sklearn/utils/enet_proj_fast.pyx":195
  *         b_ = 2 * radius * gamma + rho
  *         c = radius - s
  *         l = (-b_ + sqrt(b_ ** 2 - 4 * a * c)) / (2*a)             # <<<<<<<<<<<<<<
@@ -2952,14 +2952,14 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
       #ifdef WITH_THREAD
       PyGILState_Release(__pyx_gilstate_save);
       #endif
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 194; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 195; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_v_l = (__pyx_t_9 / __pyx_t_24);
     goto __pyx_L26;
   }
   /*else*/ {
 
-    /* "sklearn/utils/enet_proj_fast.pyx":196
+    /* "sklearn/utils/enet_proj_fast.pyx":197
  *         l = (-b_ + sqrt(b_ ** 2 - 4 * a * c)) / (2*a)
  *     else:
  *         l = (s - radius) / rho             # <<<<<<<<<<<<<<
@@ -2975,13 +2975,13 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
       #ifdef WITH_THREAD
       PyGILState_Release(__pyx_gilstate_save);
       #endif
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 196; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 197; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_v_l = (__pyx_t_24 / __pyx_v_rho);
   }
   __pyx_L26:;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":197
+  /* "sklearn/utils/enet_proj_fast.pyx":198
  *     else:
  *         l = (s - radius) / rho
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -2992,7 +2992,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
   for (__pyx_t_23 = 0; __pyx_t_23 < __pyx_t_22; __pyx_t_23+=1) {
     __pyx_v_i = __pyx_t_23;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":198
+    /* "sklearn/utils/enet_proj_fast.pyx":199
  *         l = (s - radius) / rho
  *     for i in range(n):
  *         sign = res[i]             # <<<<<<<<<<<<<<
@@ -3002,7 +3002,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     __pyx_t_25 = __pyx_v_i;
     __pyx_v_sign = (*((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_res.data + __pyx_t_25 * __pyx_v_res.strides[0]) )));
 
-    /* "sklearn/utils/enet_proj_fast.pyx":199
+    /* "sklearn/utils/enet_proj_fast.pyx":200
  *     for i in range(n):
  *         sign = res[i]
  *         res[i] *= _positive(v[i] - l) / ( 1 + l * gamma)             # <<<<<<<<<<<<<<
@@ -3020,12 +3020,12 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
       #ifdef WITH_THREAD
       PyGILState_Release(__pyx_gilstate_save);
       #endif
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 199; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 200; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_t_27 = __pyx_v_i;
     *((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_res.data + __pyx_t_27 * __pyx_v_res.strides[0]) )) *= (__pyx_t_24 / __pyx_t_9);
 
-    /* "sklearn/utils/enet_proj_fast.pyx":200
+    /* "sklearn/utils/enet_proj_fast.pyx":201
  *         sign = res[i]
  *         res[i] *= _positive(v[i] - l) / ( 1 + l * gamma)
  *         v[i] *= sign             # <<<<<<<<<<<<<<
@@ -3036,7 +3036,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
     *((__pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_28 * __pyx_v_v.strides[0]) )) *= __pyx_v_sign;
   }
 
-  /* "sklearn/utils/enet_proj_fast.pyx":201
+  /* "sklearn/utils/enet_proj_fast.pyx":202
  *         res[i] *= _positive(v[i] - l) / ( 1 + l * gamma)
  *         v[i] *= sign
  *     free(mask)             # <<<<<<<<<<<<<<
@@ -3045,7 +3045,7 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  */
   free(__pyx_v_mask);
 
-  /* "sklearn/utils/enet_proj_fast.pyx":203
+  /* "sklearn/utils/enet_proj_fast.pyx":204
  *     free(mask)
  * 
  *     return res             # <<<<<<<<<<<<<<
@@ -3053,13 +3053,13 @@ if (unlikely(__pyx_memoryview_copy_contents(__pyx_t_4, __pyx_t_18, 1, 1, 0) < 0)
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_res, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, 0);; if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 203; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_v_res, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE, 0);; if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_r = __pyx_t_3;
   __pyx_t_3 = 0;
   goto __pyx_L0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":90
+  /* "sklearn/utils/enet_proj_fast.pyx":91
  * @cython.initializedcheck(False)
  * @cython.nonecheck(False)
  * cpdef enet_projection(DOUBLE[:] v, double radius, double l1_gamma):             # <<<<<<<<<<<<<<
@@ -3118,16 +3118,16 @@ static PyObject *__pyx_pw_7sklearn_5utils_14enet_proj_fast_1enet_projection(PyOb
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_radius)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("enet_projection", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("enet_projection", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_l1_gamma)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("enet_projection", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("enet_projection", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "enet_projection") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "enet_projection") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -3136,13 +3136,13 @@ static PyObject *__pyx_pw_7sklearn_5utils_14enet_proj_fast_1enet_projection(PyOb
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
     }
-    __pyx_v_v = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE(values[0]); if (unlikely(!__pyx_v_v.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_radius = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_radius == (double)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_l1_gamma = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_l1_gamma == (double)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_v = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE(values[0]); if (unlikely(!__pyx_v_v.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_radius = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_radius == (double)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_l1_gamma = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_l1_gamma == (double)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("enet_projection", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("enet_projection", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("sklearn.utils.enet_proj_fast.enet_projection", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -3164,7 +3164,7 @@ static PyObject *__pyx_pf_7sklearn_5utils_14enet_proj_fast_enet_projection(CYTHO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("enet_projection", 0);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__pyx_v_v, __pyx_v_radius, __pyx_v_l1_gamma, 0); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_projection(__pyx_v_v, __pyx_v_radius, __pyx_v_l1_gamma, 0); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
@@ -3182,7 +3182,7 @@ static PyObject *__pyx_pf_7sklearn_5utils_14enet_proj_fast_enet_projection(CYTHO
   return __pyx_r;
 }
 
-/* "sklearn/utils/enet_proj_fast.pyx":209
+/* "sklearn/utils/enet_proj_fast.pyx":210
  * @cython.wraparound(False)
  * @cython.initializedcheck(False)
  * cpdef double enet_norm(DOUBLE[:] v, double l1_gamma=0.1) nogil:             # <<<<<<<<<<<<<<
@@ -3210,7 +3210,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
     }
   }
 
-  /* "sklearn/utils/enet_proj_fast.pyx":225
+  /* "sklearn/utils/enet_proj_fast.pyx":226
  *         Elastic-net norm
  *     """
  *     cdef int n = v.shape[0]             # <<<<<<<<<<<<<<
@@ -3219,7 +3219,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
  */
   __pyx_v_n = (__pyx_v_v.shape[0]);
 
-  /* "sklearn/utils/enet_proj_fast.pyx":226
+  /* "sklearn/utils/enet_proj_fast.pyx":227
  *     """
  *     cdef int n = v.shape[0]
  *     cdef double res = 0             # <<<<<<<<<<<<<<
@@ -3228,7 +3228,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
  */
   __pyx_v_res = 0.0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":227
+  /* "sklearn/utils/enet_proj_fast.pyx":228
  *     cdef int n = v.shape[0]
  *     cdef double res = 0
  *     cdef double b_ = 0             # <<<<<<<<<<<<<<
@@ -3237,7 +3237,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
  */
   __pyx_v_b_ = 0.0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":229
+  /* "sklearn/utils/enet_proj_fast.pyx":230
  *     cdef double b_ = 0
  *     cdef int i
  *     for i in range(n):             # <<<<<<<<<<<<<<
@@ -3248,7 +3248,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
   for (__pyx_t_2 = 0; __pyx_t_2 < __pyx_t_1; __pyx_t_2+=1) {
     __pyx_v_i = __pyx_t_2;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":230
+    /* "sklearn/utils/enet_proj_fast.pyx":231
  *     cdef int i
  *     for i in range(n):
  *         b_ = v[i] if v[i] > 0. else - v[i]             # <<<<<<<<<<<<<<
@@ -3265,7 +3265,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
     }
     __pyx_v_b_ = __pyx_t_3;
 
-    /* "sklearn/utils/enet_proj_fast.pyx":231
+    /* "sklearn/utils/enet_proj_fast.pyx":232
  *     for i in range(n):
  *         b_ = v[i] if v[i] > 0. else - v[i]
  *         res += b_ * (l1_gamma + b_)             # <<<<<<<<<<<<<<
@@ -3274,7 +3274,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
     __pyx_v_res = (__pyx_v_res + (__pyx_v_b_ * (__pyx_v_l1_gamma + __pyx_v_b_)));
   }
 
-  /* "sklearn/utils/enet_proj_fast.pyx":232
+  /* "sklearn/utils/enet_proj_fast.pyx":233
  *         b_ = v[i] if v[i] > 0. else - v[i]
  *         res += b_ * (l1_gamma + b_)
  *     return res             # <<<<<<<<<<<<<<
@@ -3282,7 +3282,7 @@ static double __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__Pyx_memviewsl
   __pyx_r = __pyx_v_res;
   goto __pyx_L0;
 
-  /* "sklearn/utils/enet_proj_fast.pyx":209
+  /* "sklearn/utils/enet_proj_fast.pyx":210
  * @cython.wraparound(False)
  * @cython.initializedcheck(False)
  * cpdef double enet_norm(DOUBLE[:] v, double l1_gamma=0.1) nogil:             # <<<<<<<<<<<<<<
@@ -3331,7 +3331,7 @@ static PyObject *__pyx_pw_7sklearn_5utils_14enet_proj_fast_3enet_norm(PyObject *
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "enet_norm") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 209; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "enet_norm") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
@@ -3341,16 +3341,16 @@ static PyObject *__pyx_pw_7sklearn_5utils_14enet_proj_fast_3enet_norm(PyObject *
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_v = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE(values[0]); if (unlikely(!__pyx_v_v.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 209; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_v = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_7sklearn_5utils_14enet_proj_fast_DOUBLE(values[0]); if (unlikely(!__pyx_v_v.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
     if (values[1]) {
-      __pyx_v_l1_gamma = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_l1_gamma == (double)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 209; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+      __pyx_v_l1_gamma = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_l1_gamma == (double)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
     } else {
       __pyx_v_l1_gamma = ((double)0.1);
     }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("enet_norm", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 209; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("enet_norm", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("sklearn.utils.enet_proj_fast.enet_norm", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -3377,7 +3377,7 @@ static PyObject *__pyx_pf_7sklearn_5utils_14enet_proj_fast_2enet_norm(CYTHON_UNU
   __pyx_t_2.__pyx_n = 1;
   __pyx_t_2.l1_gamma = __pyx_v_l1_gamma;
   __pyx_t_1 = __pyx_f_7sklearn_5utils_14enet_proj_fast_enet_norm(__pyx_v_v, 0, &__pyx_t_2); 
-  __pyx_t_3 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 209; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyFloat_FromDouble(__pyx_t_1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 210; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_r = __pyx_t_3;
   __pyx_t_3 = 0;

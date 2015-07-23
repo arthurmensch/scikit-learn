@@ -170,6 +170,7 @@ def test_dict_learning_online():
                            0))
     assert_array_almost_equal(dict1.components_, dict2.components_, decimal=6)
 
+
 def test_dict_learning_online_partial_fit_new():
     for l1_gamma, algorithm in zip([0.1], ['ridge']):
         n_components = 12
@@ -179,7 +180,7 @@ def test_dict_learning_online_partial_fit_new():
         dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
                                             batch_size=1,
                                             fit_algorithm=algorithm,
-                                            verbose=1,
+                                            verbose=10,
                                             alpha=1, shuffle=False,
                                             dict_init=V,
                                             l1_gamma=l1_gamma,
@@ -189,7 +190,7 @@ def test_dict_learning_online_partial_fit_new():
                                             batch_size=1,
                                             fit_algorithm=algorithm,
                                             shuffle=False,
-                                            verbose=1,
+                                            verbose=10,
                                             l1_gamma=l1_gamma,
                                             random_state=0)
         for i in range(10):

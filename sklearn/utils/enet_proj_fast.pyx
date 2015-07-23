@@ -83,6 +83,7 @@ cdef int _choose_index_in_mask(UINT8_t * mask, int size,
             rand_i -= 1
 
 
+# XXX: Implementation should be faster
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)

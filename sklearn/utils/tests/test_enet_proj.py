@@ -51,7 +51,8 @@ def enet_projection_slow(v, radius=1, l1_gamma=0.1):
             G = U[~sel * mask]
             d_rho = G.shape[0]
             d_s = _enet_norm_for_projection(b_abs[G], gamma)
-            if s + d_s - (rho + d_rho) * (1 + gamma / 2 * b_abs[k]) * b_abs[k] < radius * (1 + gamma * b_abs[k]) ** 2:
+            if s + d_s - (rho + d_rho) * (1 + gamma / 2 * b_abs[k]) * b_abs[k]\
+                    < radius * (1 + gamma * b_abs[k]) ** 2:
                 s += d_s
                 rho += d_rho
                 mask *= sel
@@ -68,7 +69,8 @@ def enet_projection_slow(v, radius=1, l1_gamma=0.1):
             l = (s - radius) / rho
         b_sign = np.sign(v)
         b_sign[b_sign == 0] = 1
-        return b_sign * np.maximum(np.zeros_like(b_abs), b_abs - l) / (1 + l * gamma)
+        return b_sign * np.maximum(np.zeros_like(b_abs), b_abs - l)\
+               / (1 + l * gamma)
 
 
 def test_slow_enet_norm():

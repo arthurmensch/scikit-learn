@@ -26,7 +26,6 @@ from ..utils.enet_proj_fast import enet_projection, enet_norm
 
 import warnings
 
-
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
                    init=None, max_iter=1000,
@@ -143,8 +142,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                                       copy_Xy=copy_cov).T
 
     elif algorithm == 'ridge':
-        alpha = float(regularization) / n_features  # account for scaling
-        lr = Ridge(alpha=2*alpha, fit_intercept=False, normalize=False)
+        alpha = 2 * float(regularization) / n_features  # account for scaling
+        lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
         new_code = lr.coef_
 
@@ -364,23 +363,26 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                 else:
                     dictionary[:, k] = 0
         # Scale k'th atom
-        atom_norm_square = enet_norm(dictionary[:, k], l1_gamma=l1_gamma)
+        atom_norm_square = np.sum(dictionary[:, k] ** 2)
+        # Cleaning small atoms
         if atom_norm_square < threshold:
             if verbose == 1:
                 sys.stdout.write("+")
                 sys.stdout.flush()
             elif verbose:
                 print("Adding new random atom")
-            dictionary[:, k] = 10 * random_state.randn(n_features)
+            dictionary[:, k] = random_state.randn(n_features)
+            atom_norm_square = np.sum(dictionary[:, k] ** 2)
             # Setting corresponding coefs to 0
             code[k, :] = 0.0
-            dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
-                                               l1_gamma=l1_gamma)
+
+        if l1_gamma == 0.0:
+            dictionary[:, k] /= sqrt(atom_norm_square)
         else:
             dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
                                                l1_gamma=l1_gamma)
-            # R <- -1.0 * U_k * V_k^T + R
-            R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        # R <- -1.0 * U_k * V_k^T + R
+        R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
 
     if return_r2:
         if online:
@@ -755,14 +757,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         A = np.zeros((n_components, n_components))
         # The data approximation
         B = np.zeros((n_features, n_components))
+        penalty = 0
     else:
         A = inner_stats[0].copy()
         B = inner_stats[1].copy()
+        penalty = inner_stats[2]
 
     # Residual variable for tolerance computation
     last_residual = np.iinfo(np.int32).max
     this_residual = 0
-    penalty = 0
     patience = max(1, n_samples / batch_size)
     this_patience = 0
 
@@ -793,10 +796,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         # Update the auxiliary variables
         # This trick raise the learning rate of a factor batch_size
         #  during the first batch_size iterations
-        if ii < batch_size - 1:
-            theta = float((ii + 1) * batch_size)
-        else:
-            theta = float(batch_size ** 2 + ii + 1 - batch_size)
+        # if ii < batch_size - 1:
+        theta = float((ii + 1) * batch_size)
+        # else:
+        #     theta = float(batch_size ** 2 + ii + 1 - batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
         A *= beta
         A += np.dot(this_code, this_code.T) / (theta + 1)
