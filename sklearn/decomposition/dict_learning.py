@@ -786,7 +786,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
 
     l1_gamma_ = l1_gamma
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
-        l1_gamma = l1_gamma_ - l1_gamma_ * exp(-(float(ii-iter_offset))/10000)
+        l1_gamma = l1_gamma_ - l1_gamma_ * exp(-(float(ii-iter_offset))/1000)
         # print(l1_gamma)
         if return_debug_info:
             residuals[ii-iter_offset] = this_residual
@@ -803,6 +803,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
             sys.stdout.flush()
         elif verbose:
             if verbose > 10 or ii % ceil(100. / verbose) == 0:
+                print(l1_gamma)
                 print ("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                        % (ii, dt, dt / 60))
 
