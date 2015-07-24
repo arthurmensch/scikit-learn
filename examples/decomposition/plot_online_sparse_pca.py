@@ -71,14 +71,14 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
                                             alpha=0.1,
                                             n_iter=400, batch_size=10,
-                                            fit_algorithm='lars',
-                                            transform_algorithm='lasso_lars',
+                                            fit_algorithm='ridge',
+                                            transform_algorithm='ridge',
                                             transform_alpha=0.1,
-                                            tol=1e-4,
+                                            tol=0,
                                             verbose=10,
-                                            l1_gamma=0,
+                                            l1_gamma=10,
                                             random_state=rng,
-                                            n_jobs=3,
+                                            n_jobs=1,
                                             debug_info=True)
 
 ###############################################################################

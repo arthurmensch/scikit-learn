@@ -8,7 +8,7 @@ import time
 import sys
 import itertools
 
-from math import sqrt, ceil
+from math import sqrt, ceil,exp
 
 import numpy as np
 from scipy import linalg
@@ -784,7 +784,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         values = np.zeros((n_iter, 100))
         recorded_features = random_state.permutation(n_features)[:100]
 
+    l1_gamma_ = l1_gamma
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
+        l1_gamma = l1_gamma_ - l1_gamma_ * exp(-(float(ii-iter_offset))/10000)
+        # print(l1_gamma)
         if return_debug_info:
             residuals[ii-iter_offset] = this_residual
             values[ii-iter_offset] = dictionary[recorded_features, 0]\
