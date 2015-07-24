@@ -740,6 +740,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
                            np.zeros((n_components - r, dictionary.shape[1]))]
     dictionary = np.ascontiguousarray(dictionary.T)
 
+    # for dict_element in dictionary:
+    #     if l1_gamma != 0:
+    #         dict_element = enet_projection(dict_element, l1_gamma=l1_gamma,
+    #                                        radius=1.)
+    #     else:
+    #         dict_element /= np.sqrt(dict_element ** 2)
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
@@ -779,7 +785,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         recorded_features = random_state.permutation(n_features)[:100]
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
+        if return_debug_info:
+            residuals[ii-iter_offset] = this_residual
+            values[ii-iter_offset] = dictionary[recorded_features, 0]\
+                                     / sqrt(np.sum(dictionary[:, 0] ** 2))
+            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
+                                          / np.size(dictionary)
+
         this_X = X_train[batch]
+
         dt = (time.time() - t0)
         if verbose == 1:
             sys.stdout.write(".")
@@ -834,13 +848,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         if this_patience >= patience:
             break
         last_residual = this_residual
-
-        if return_debug_info:
-            residuals[ii-iter_offset] = this_residual
-            values[ii-iter_offset] = dictionary[recorded_features, 0]\
-                                     / sqrt(np.sum(dictionary[:, 0] ** 2))
-            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
-                                          / np.size(dictionary)
 
         # Maybe we need a stopping criteria based on the amount of
         # modification in the dictionary
