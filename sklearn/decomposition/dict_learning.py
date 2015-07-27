@@ -26,10 +26,11 @@ from ..utils.enet_proj_fast import enet_projection, enet_norm
 
 import warnings
 
+
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
                    init=None, max_iter=1000,
-                   random_state=None):
+                   random_state=None, bypass_checks=False):
     """Generic sparse coding
 
     Each column of the result is the solution to a Lasso problem.
@@ -90,6 +91,10 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
+    if bypass_checks:
+        # We perform checks here
+        X = check_array(X, order='F', copy=False)
+
     if X.ndim == 1:
         X = X[:, np.newaxis]
     n_samples, n_features = X.shape
@@ -116,7 +121,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
                     max_iter=max_iter, selection='random',
-                    random_state=random_state, warm_start=True)
+                    random_state=random_state, warm_start=True,
+                    bypass_checks=bypass_checks)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T)
         new_code = clf.coef_
@@ -159,7 +165,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
                   max_iter=1000, n_jobs=1,
-                  random_state=None):
+                  random_state=None, bypass_checks=False, pool=None):
     """Sparse coding
 
     Each row of the result is the solution to a sparse coding problem.
@@ -237,13 +243,15 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
-    dictionary = check_array(dictionary)
-    X = check_array(X)
+    if not bypass_checks:
+        dictionary = check_array(dictionary)
+        X = check_array(X)
     n_samples, n_features = X.shape
     n_components = dictionary.shape[0]
 
     if gram is None and algorithm != 'threshold':
-        gram = np.dot(dictionary, dictionary.T)
+        gram = np.dot(dictionary, dictionary.T).T
+        # gram if Fortran ordered
     if cov is None:
         copy_cov = False
         cov = np.dot(dictionary, X.T)
@@ -257,28 +265,37 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         if regularization is None:
             regularization = 1.
 
-    if n_jobs == 1 or algorithm == 'threshold':
-        code = _sparse_encode(X, dictionary, gram, cov=cov,
+    if (pool is None and n_jobs == 1) or algorithm == 'threshold':
+        code = _sparse_encode(X,
+                              dictionary, gram, cov=cov,
                               algorithm=algorithm,
                               regularization=regularization, copy_cov=copy_cov,
-                              init=init, max_iter=max_iter,
-                              random_state=random_state)
+                              init=init,
+                              max_iter=max_iter,
+                              random_state=random_state,
+                              bypass_checks=bypass_checks)
         if code.ndim == 1:
             code = code[np.newaxis, :]
         return code
+    elif pool is None:
+        pool = Parallel(n_jobs=n_jobs)
+    else:  # pool is not None
+        n_jobs = pool.n_jobs
 
     # Enter parallel code block
     code = np.empty((n_samples, n_components))
 
     slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
-    code_views = Parallel(n_jobs=n_jobs,
-                          backend='threading' if
-                          algorithm == 'lasso_cd' else 'multiprocessing')(
+
+    code_views = pool(
         delayed(_sparse_encode)(
-            X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
+            X[this_slice], dictionary,
+            gram, cov[:, this_slice], algorithm,
             regularization=regularization, copy_cov=copy_cov,
-            init=init[this_slice] if init is not None else None,
-            max_iter=max_iter)
+            init=init[this_slice]
+            if init is not None else None,
+            max_iter=max_iter, bypass_checks=bypass_checks,
+            random_state=random_state)
         for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
             code[this_slice] = this_view
@@ -352,7 +369,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                 if code[k, k] > 1e-20:
                     dictionary[:, k] /= code[k, k]
                 else:
-                    dictionary[:, k] = 0
+                    dictionary[:, k] = 0.
         else:
             dictionary[:, k] = np.dot(R, code[k, :].T)
             # L2-ball scaling if we use an elastic net ball
@@ -361,7 +378,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                 if s > 1e-20:
                     dictionary[:, k] /= s
                 else:
-                    dictionary[:, k] = 0
+                    dictionary[:, k] = 0.
         # Scale k'th atom
         atom_norm_square = np.sum(dictionary[:, k] ** 2)
         # Cleaning small atoms
@@ -374,9 +391,9 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             dictionary[:, k] = random_state.randn(n_features)
             atom_norm_square = np.sum(dictionary[:, k] ** 2)
             # Setting corresponding coefs to 0
-            code[k, :] = 0.0
+            code[k, :] = 0.
 
-        if l1_gamma == 0.0:
+        if l1_gamma == 0.:
             dictionary[:, k] /= sqrt(atom_norm_square)
         else:
             dictionary[:, k] = enet_projection(dictionary[:, k], radius=radius,
@@ -751,10 +768,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         print('[dict_learning]', end=' ')
 
     if shuffle:
-        X_train = X.copy()
+        X_train = check_array(X, dtype=np.float64, order='C', copy=True)
         random_state.shuffle(X_train)
+
     else:
-        X_train = X
+        X_train = check_array(X, dtype=np.float64, order='C', copy=False)
 
     batches = gen_batches(n_samples, batch_size)
     batches = itertools.cycle(batches)
@@ -785,76 +803,79 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         values = np.zeros((n_iter, min(n_features, 100)))
         recorded_features = random_state.permutation(n_features)[:min(
             n_features, 100)]
+    backend = 'threading' if method == 'cd' else 'multiprocessing'
+    with Parallel(n_jobs=n_jobs, backend=backend) as parallel:
+        for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
+            if return_debug_info:
+                residuals[ii-iter_offset] = this_residual
+                values[ii-iter_offset] = dictionary[recorded_features, 0]\
+                                         / sqrt(np.sum(dictionary[:, 0] ** 2))
+                density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
+                                              / np.size(dictionary)
+            this_X = X_train[batch]
 
-    for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
-        if return_debug_info:
-            residuals[ii-iter_offset] = this_residual
-            values[ii-iter_offset] = dictionary[recorded_features, 0]\
-                                     / sqrt(np.sum(dictionary[:, 0] ** 2))
-            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
-                                          / np.size(dictionary)
+            dt = (time.time() - t0)
+            if verbose == 1:
+                sys.stdout.write(".")
+                sys.stdout.flush()
+            elif verbose:
+                if verbose > 10 or ii % ceil(100. / verbose) == 0:
+                    print ("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
+                           % (ii, dt, dt / 60))
 
-        this_X = X_train[batch]
-
-        dt = (time.time() - t0)
-        if verbose == 1:
-            sys.stdout.write(".")
-            sys.stdout.flush()
-        elif verbose:
-            if verbose > 10 or ii % ceil(100. / verbose) == 0:
-                print ("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
-                       % (ii, dt, dt / 60))
-
-        # Setting n_jobs > 1 does not improve performance
-        this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                  alpha=alpha, n_jobs=1,
-                                  random_state=random_state).T
-        # Update the auxiliary variables
-        # This trick raise the learning rate of a factor batch_size
-        #  during the first batch_size iterations
-        # if ii < batch_size - 1:
-        theta = float((ii + 1) * batch_size)
-        # else:
-        #     theta = float(batch_size ** 2 + ii + 1 - batch_size)
-        beta = (theta + 1 - batch_size) / (theta + 1)
-        A *= beta
-        A += np.dot(this_code, this_code.T) / (theta + 1)
-        B *= beta
-        B += np.dot(this_X.T, this_code.T) / (theta + 1)
-
-        # Update dictionary
-        dictionary, this_residual = _update_dict(dictionary, B, A,
-                                                 verbose=verbose,
-                                                 l1_gamma=l1_gamma,
-                                                 random_state=random_state,
-                                                 return_r2=True,
-                                                 radius=1,
-                                                 online=True, shuffle=shuffle)
-        #Residual computation
-        this_residual /= 2
-        penalty += np.sum(this_X ** 2) / 2
-        if method in ('lars', 'cd'):
-            penalty += alpha * np.sum(this_code)
-        this_residual += penalty
-        this_residual /= (ii + 1) * batch_size
-
-        # Stopping criterion
-        change_ratio = abs(this_residual / last_residual - 1)
-        if last_residual == 0:
-            this_patience = patience
-        else:
-            if change_ratio < tol:
-                this_patience += 1
+            # Setting n_jobs > 1 does not improve performance
+            this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
+                                      alpha=alpha,
+                                      random_state=random_state,
+                                      bypass_checks=True,
+                                      pool=parallel).T
+            # Update the auxiliary variables
+            # This trick raise the learning rate of a factor batch_size
+            #  during the first batch_size iterations
+            if ii < batch_size - 1:
+                theta = float((ii + 1) * batch_size)
             else:
-                this_patience = 0
-        if this_patience >= patience:
-            break
-        last_residual = this_residual
+                theta = float(batch_size ** 2 + ii + 1 - batch_size)
+            beta = (theta + 1 - batch_size) / (theta + 1)
+            A *= beta
+            A += np.dot(this_code, this_code.T) / (theta + 1)
+            B *= beta
+            B += np.dot(this_X.T, this_code.T) / (theta + 1)
 
-        # Maybe we need a stopping criteria based on the amount of
-        # modification in the dictionary
-        if callback is not None:
-            callback(locals())
+            # Update dictionary
+            dictionary, this_residual = _update_dict(dictionary, B, A,
+                                                     verbose=verbose,
+                                                     l1_gamma=l1_gamma,
+                                                     random_state=random_state,
+                                                     return_r2=True,
+                                                     radius=1,
+                                                     online=True,
+                                                     shuffle=shuffle)
+            #Residual computation
+            this_residual /= 2
+            penalty += np.sum(this_X ** 2) / 2
+            if method in ('lars', 'cd'):
+                penalty += alpha * np.sum(this_code)
+            this_residual += penalty
+            this_residual /= (ii + 1) * batch_size
+
+            # Stopping criterion
+            change_ratio = abs(this_residual / last_residual - 1)
+            if last_residual == 0:
+                this_patience = patience
+            else:
+                if change_ratio < tol:
+                    this_patience += 1
+                else:
+                    this_patience = 0
+            if this_patience >= patience:
+                break
+            last_residual = this_residual
+
+            # Maybe we need a stopping criteria based on the amount of
+            # modification in the dictionary
+            if callback is not None:
+                callback(locals())
 
     if return_debug_info:
         debug_info = (residuals, density, values)
@@ -870,7 +891,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         elif verbose == 1:
             print('|', end=' ')
         code = sparse_encode(X, dictionary.T, algorithm=method, alpha=alpha,
-                             n_jobs=1)
+                             pool=parallel)
         if verbose > 1:
             dt = (time.time() - t0)
             print('done (total time: % 3is, % 4.1fmn)' % (dt, dt / 60))
