@@ -24,6 +24,8 @@ from ..utils.validation import check_is_fitted
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge
 from ..utils.enet_proj_fast import enet_projection, enet_norm
 
+from numpy.testing import assert_array_almost_equal, assert_equal
+
 import warnings
 
 
@@ -91,6 +93,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
+    print(X.flags)
+    print(X.strides)
     if bypass_checks:
         # We perform checks here
         X = check_array(X, order='F', copy=False)
@@ -253,7 +257,10 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         gram = np.dot(dictionary, dictionary.T).T
     if cov is None:
         copy_cov = False
-        cov = np.dot(dictionary, X.T)
+        if isinstance(X, list):
+            cov = [np.dot(dictionary, this_X.T) for this_X in X]
+        else:
+            cov = np.dot(dictionary, X.T)
 
     if algorithm in ('lars', 'omp'):
         regularization = n_nonzero_coefs
@@ -286,16 +293,38 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
     slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
 
-    code_views = pool(
-        delayed(_sparse_encode)(
-            X[this_slice], dictionary,
-            gram, cov[:, this_slice], algorithm,
-            regularization=regularization, copy_cov=copy_cov,
-            init=init[this_slice]
-            if init is not None else None,
-            max_iter=max_iter, bypass_checks=bypass_checks,
-            random_state=random_state)
-        for this_slice in slices)
+    if isinstance(X, list):
+        assert_isinstance(cov, list)
+        if init != None:
+            assert_isinstance(init, list)
+        else:
+            init = [None] * len(X)
+        assert_equal(len(X), len(slices))
+        code_views = pool(
+            delayed(_sparse_encode)(
+                as_strided(this_X, dictionary,
+                gram, this_cov, algorithm,
+                regularization=regularization, copy_cov=copy_cov,
+                init=this_init,
+                max_iter=max_iter, bypass_checks=bypass_checks,
+                random_state=random_state)
+            for this_X, this_cov, this_init in zip(X, cov, init))
+    else:
+        code_views = pool(
+            delayed(_sparse_encode)(
+                as_strided(X[this_slice.start:],
+                           shape=(this_slice.stop-this_slice.start, n_features),
+                           strides=X.strides), dictionary,
+                gram, cov[:, this_slice], algorithm,
+                regularization=regularization, copy_cov=copy_cov,
+                init=as_strided(init[this_slice.start:],
+                                shape=(this_slice.stop-this_slice.start,
+                                       n_features),
+                                strides=X.strides)
+                if init is not None else None,
+                max_iter=max_iter, bypass_checks=bypass_checks,
+                random_state=random_state)
+            for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
             code[this_slice] = this_view
 
@@ -767,11 +796,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         print('[dict_learning]', end=' ')
 
     if shuffle:
-        X_train = check_array(X, dtype=np.float64, copy=True)
+        X_train = check_array(X, dtype=np.float64, order='C', copy=True)
         random_state.shuffle(X_train)
+        X_train = check_array(X_train, order='F', copy=False)
     else:
-        X_train = check_array(X, dtype=np.float64, order='C', copy=False)
-
+        X_train = check_array(X, dtype=np.float64, order='F', copy=False)
     batches = gen_batches(n_samples, batch_size)
     batches = itertools.cycle(batches)
 
@@ -801,16 +830,24 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         values = np.zeros((n_iter, min(n_features, 100)))
         recorded_features = random_state.permutation(n_features)[:min(
             n_features, 100)]
-    backend = 'threading' if method == 'cd' else 'multiprocessing'
+    if method == 'lasso_cd':
+        bypass_checks = True
+        backend = 'threading'
+    else:
+        backend = 'multiprocessing'
+        bypass_checks = False
     with Parallel(n_jobs=n_jobs, backend=backend) as parallel:
-        for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
+        for ii, batch in zip(range(iter_offset, iter_offset + n_iter),
+                             batches):
             if return_debug_info:
                 residuals[ii-iter_offset] = this_residual
                 values[ii-iter_offset] = dictionary[recorded_features, 0]\
                                          / sqrt(np.sum(dictionary[:, 0] ** 2))
                 density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
                                               / np.size(dictionary)
-            this_X = X_train[batch]
+            this_X = as_strided(X_train[batch.start:],
+                                shape=(batch.stop - batch.start, n_features),
+                                strides=X_train.strides)
 
             dt = (time.time() - t0)
             if verbose == 1:
@@ -825,7 +862,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
             this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                       alpha=alpha,
                                       random_state=random_state,
-                                      bypass_checks=True,
+                                      bypass_checks=bypass_checks,
                                       pool=parallel).T
             # Update the auxiliary variables
             # This trick raise the learning rate of a factor batch_size
