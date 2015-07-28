@@ -24,7 +24,8 @@ from ..utils.validation import check_is_fitted
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge
 from ..utils.enet_proj_fast import enet_projection, enet_norm
 
-from numpy.testing import assert_array_almost_equal, assert_equal
+from numpy.testing import assert_array_almost_equal
+from nose.tools import assert_is_instance, assert_equal
 
 import warnings
 
@@ -247,20 +248,26 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
-    if not bypass_checks:
-        dictionary = check_array(dictionary)
-        X = check_array(X)
-    n_samples, n_features = X.shape
-    n_components = dictionary.shape[0]
-
-    if gram is None and algorithm != 'threshold':
-        gram = np.dot(dictionary, dictionary.T).T
-    if cov is None:
-        copy_cov = False
-        if isinstance(X, list):
+    if isinstance(X, list):
+        if cov is None:
+            copy_cov = False
             cov = [np.dot(dictionary, this_X.T) for this_X in X]
-        else:
+        if init is None:
+                init = [None] * len(X)
+        n_features = X[0].shape[1]
+        n_samples = sum(this_X.shape[0] for this_X in X)
+    else:
+        if not bypass_checks:
+            dictionary = check_array(dictionary)
+            X = check_array(X)
+        n_samples, n_features = X.shape
+
+        if gram is None and algorithm != 'threshold':
+            gram = np.dot(dictionary, dictionary.T).T
+        if cov is None:
+            copy_cov = False
             cov = np.dot(dictionary, X.T)
+    n_components = dictionary.shape[0]
 
     if algorithm in ('lars', 'omp'):
         regularization = n_nonzero_coefs
@@ -294,15 +301,12 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
 
     if isinstance(X, list):
-        assert_isinstance(cov, list)
-        if init != None:
-            assert_isinstance(init, list)
-        else:
-            init = [None] * len(X)
+        assert_is_instance(cov, list)
+        assert_is_instance(init, list)
         assert_equal(len(X), len(slices))
         code_views = pool(
             delayed(_sparse_encode)(
-                as_strided(this_X, dictionary,
+                this_X, dictionary,
                 gram, this_cov, algorithm,
                 regularization=regularization, copy_cov=copy_cov,
                 init=this_init,
@@ -801,8 +805,18 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         X_train = check_array(X_train, order='F', copy=False)
     else:
         X_train = check_array(X, dtype=np.float64, order='F', copy=False)
+
     batches = gen_batches(n_samples, batch_size)
-    batches = itertools.cycle(batches)
+    X_batches = []
+    for batch in batches:
+        slices = list(gen_even_slices(batch.stop
+                                      - batch.start, _get_n_jobs(n_jobs)))
+        this_X_batch = []
+        for this_slice in slices:
+            this_X_batch.append(check_array(X_train[batch][this_slice],
+                                            order='F'))
+        X_batches.append(this_X_batch)
+    X_batches = itertools.cycle(X_batches)
 
     # The covariance of the dictionary
     if inner_stats is None:
@@ -836,18 +850,19 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
     else:
         backend = 'multiprocessing'
         bypass_checks = False
+
     with Parallel(n_jobs=n_jobs, backend=backend) as parallel:
-        for ii, batch in zip(range(iter_offset, iter_offset + n_iter),
-                             batches):
+        for ii, X_batch in zip(range(iter_offset, iter_offset + n_iter),
+                             X_batches):
             if return_debug_info:
                 residuals[ii-iter_offset] = this_residual
                 values[ii-iter_offset] = dictionary[recorded_features, 0]\
                                          / sqrt(np.sum(dictionary[:, 0] ** 2))
                 density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
                                               / np.size(dictionary)
-            this_X = as_strided(X_train[batch.start:],
-                                shape=(batch.stop - batch.start, n_features),
-                                strides=X_train.strides)
+            # this_X = as_strided(X_train[batch.start:],
+            #                     shape=(batch.stop - batch.start, n_features),
+            #                     strides=X_train.strides)
 
             dt = (time.time() - t0)
             if verbose == 1:
@@ -859,7 +874,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
                            % (ii, dt, dt / 60))
 
             # Setting n_jobs > 1 does not improve performance
-            this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
+            this_code = sparse_encode(X_batch, dictionary.T, algorithm=method,
                                       alpha=alpha,
                                       random_state=random_state,
                                       bypass_checks=bypass_checks,
@@ -875,7 +890,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
             A *= beta
             A += np.dot(this_code, this_code.T) / (theta + 1)
             B *= beta
-            B += np.dot(this_X.T, this_code.T) / (theta + 1)
+            B += np.dot(X_batch.T, this_code.T) / (theta + 1)
 
             # Update dictionary
             dictionary, this_residual = _update_dict(dictionary, B, A,
