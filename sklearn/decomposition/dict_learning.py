@@ -94,8 +94,6 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
-    print(X.flags)
-    print(X.strides)
     if bypass_checks:
         # We perform checks here
         X = check_array(X, order='F', copy=False)
@@ -255,18 +253,18 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         if init is None:
                 init = [None] * len(X)
         n_features = X[0].shape[1]
-        n_samples = sum(this_X.shape[0] for this_X in X)
     else:
         if not bypass_checks:
             dictionary = check_array(dictionary)
             X = check_array(X)
         n_samples, n_features = X.shape
 
-        if gram is None and algorithm != 'threshold':
-            gram = np.dot(dictionary, dictionary.T).T
         if cov is None:
             copy_cov = False
             cov = np.dot(dictionary, X.T)
+
+    if gram is None and algorithm != 'threshold':
+        gram = np.dot(dictionary, dictionary.T).T
     n_components = dictionary.shape[0]
 
     if algorithm in ('lars', 'omp'):
@@ -295,25 +293,26 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     else:  # pool is not None
         n_jobs = pool.n_jobs
 
-    # Enter parallel code block
-    code = np.empty((n_samples, n_components))
-
-    slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
-
     if isinstance(X, list):
-        assert_is_instance(cov, list)
-        assert_is_instance(init, list)
-        assert_equal(len(X), len(slices))
+        # assert_is_instance(cov, list)
+        # assert_is_instance(init, list)
         code_views = pool(
             delayed(_sparse_encode)(
                 this_X, dictionary,
-                gram, this_cov, algorithm,
+                gram, cov=this_cov, algorithm=algorithm,
                 regularization=regularization, copy_cov=copy_cov,
                 init=this_init,
                 max_iter=max_iter, bypass_checks=bypass_checks,
                 random_state=random_state)
             for this_X, this_cov, this_init in zip(X, cov, init))
+        for i, code in enumerate(code_views):
+            if code.ndim == 1:
+                code_views[i] = code[np.newaxis, :]
+        return code_views
     else:
+        code = np.empty((n_samples, n_components))
+
+        slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
         code_views = pool(
             delayed(_sparse_encode)(
                 as_strided(X[this_slice.start:],
@@ -806,6 +805,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
     else:
         X_train = check_array(X, dtype=np.float64, order='F', copy=False)
 
+    # Splitting
     batches = gen_batches(n_samples, batch_size)
     X_batches = []
     for batch in batches:
@@ -874,11 +874,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
                            % (ii, dt, dt / 60))
 
             # Setting n_jobs > 1 does not improve performance
-            this_code = sparse_encode(X_batch, dictionary.T, algorithm=method,
+            code_batch = sparse_encode(X_batch, dictionary.T, algorithm=method,
                                       alpha=alpha,
                                       random_state=random_state,
                                       bypass_checks=bypass_checks,
-                                      pool=parallel).T
+                                      pool=parallel)
             # Update the auxiliary variables
             # This trick raise the learning rate of a factor batch_size
             #  during the first batch_size iterations
@@ -888,9 +888,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
             #     theta = float(batch_size ** 2 + ii + 1 - batch_size)
             beta = (theta + 1 - batch_size) / (theta + 1)
             A *= beta
-            A += np.dot(this_code, this_code.T) / (theta + 1)
             B *= beta
-            B += np.dot(X_batch.T, this_code.T) / (theta + 1)
+            for this_X, this_code in zip(X_batch, code_batch):
+                this_code = this_code.T
+                A += np.dot(this_code, this_code.T) / (theta + 1)
+                B += np.dot(this_X.T, this_code.T) / (theta + 1)
+                penalty += np.sum(this_X ** 2) / 2
+                if method in ('lars', 'cd'):
+                    penalty += alpha * np.sum(this_code)
 
             # Update dictionary
             dictionary, this_residual = _update_dict(dictionary, B, A,
@@ -903,9 +908,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
                                                      shuffle=shuffle)
             #Residual computation
             this_residual /= 2
-            penalty += np.sum(this_X ** 2) / 2
-            if method in ('lars', 'cd'):
-                penalty += alpha * np.sum(this_code)
             this_residual += penalty
             this_residual /= (ii + 1) * batch_size
 
