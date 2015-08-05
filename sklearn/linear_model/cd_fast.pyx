@@ -4,6 +4,7 @@
 #         Alexis Mignon <alexis.mignon@gmail.com>
 #         Manoj Kumar <manojkumarsivaraj334@gmail.com>
 #         Olivier Fercoq <olivier.fercoq@telecom-paristech.fr>
+#         Joseph Salmon <joseph.salmon@telecom-paristech.fr>
 #
 # Licence: BSD 3 clause
 
