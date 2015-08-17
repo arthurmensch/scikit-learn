@@ -91,9 +91,6 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
-    if bypass_checks:
-        # We perform checks here
-        X = check_array(X, order='F', copy=False)
 
     if X.ndim == 1:
         X = X[:, np.newaxis]
@@ -122,10 +119,14 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
                     max_iter=max_iter, selection='random',
                     random_state=random_state, warm_start=True,
-                    bypass_checks=bypass_checks)
+                    bypass_checks=False)
         clf.coef_ = init
         # print(dictionary.T.flags)
         # print(X.T.flags)
+        # if bypass_checks:
+        #     # We perform checks here
+        #     X = check_array(X, order='C', copy=False)
+        #     dictionary = check_array(dictionary, order='C', copy=False)
         clf.fit(dictionary.T, X.T)
         new_code = clf.coef_
 
