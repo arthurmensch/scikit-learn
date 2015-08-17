@@ -147,6 +147,12 @@ def enet_coordinate_descent(np.ndarray[DOUBLE, ndim=1] w,
     # get the number of tasks indirectly, using strides
     cdef unsigned int n_tasks = y.strides[0] / sizeof(DOUBLE)
 
+    # get the number of samples from the array which X is a view of,
+    # using strides
+    cdef unsigned int n_samples_full = X.strides[1] / sizeof(DOUBLE)
+    print(n_samples_full)
+    print(n_samples)
+
     # compute norms of the columns of X
     cdef np.ndarray[DOUBLE, ndim=1] norm_cols_X = (X**2).sum(axis=0)
 
@@ -205,12 +211,12 @@ def enet_coordinate_descent(np.ndarray[DOUBLE, ndim=1] w,
                 if w_ii != 0.0:
                     # R += w_ii * X[:,ii]
                     daxpy(n_samples, w_ii,
-                          <DOUBLE*>(X.data + ii * n_samples * sizeof(DOUBLE)),
+                          <DOUBLE*>(X.data + ii * n_samples_full * sizeof(DOUBLE)),
                           1, <DOUBLE*>R.data, 1)
 
                 # tmp = (X[:,ii]*R).sum()
                 tmp = ddot(n_samples,
-                           <DOUBLE*>(X.data + ii * n_samples * sizeof(DOUBLE)),
+                           <DOUBLE*>(X.data + ii * n_samples_full * sizeof(DOUBLE)),
                            1, <DOUBLE*>R.data, 1)
 
                 if positive and tmp < 0:
@@ -222,7 +228,7 @@ def enet_coordinate_descent(np.ndarray[DOUBLE, ndim=1] w,
                 if w[ii] != 0.0:
                     # R -=  w[ii] * X[:,ii] # Update residual
                     daxpy(n_samples, -w[ii],
-                          <DOUBLE*>(X.data + ii * n_samples * sizeof(DOUBLE)),
+                          <DOUBLE*>(X.data + ii * n_samples_full * sizeof(DOUBLE)),
                           1, <DOUBLE*>R.data, 1)
 
                 # update the maximum absolute coefficient update
@@ -244,7 +250,7 @@ def enet_coordinate_descent(np.ndarray[DOUBLE, ndim=1] w,
                 for i in range(n_features):
                     XtA[i] = ddot(
                         n_samples,
-                        <DOUBLE*>(X.data + i * n_samples *sizeof(DOUBLE)),
+                        <DOUBLE*>(X.data + i * n_samples_full * sizeof(DOUBLE)),
                         1, <DOUBLE*>R.data, 1) - beta * w[i]
 
                 if positive:

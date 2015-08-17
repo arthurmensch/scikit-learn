@@ -124,6 +124,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                     random_state=random_state, warm_start=True,
                     bypass_checks=bypass_checks)
         clf.coef_ = init
+        # print(dictionary.T.flags)
+        # print(X.T.flags)
         clf.fit(dictionary.T, X.T)
         new_code = clf.coef_
 
@@ -755,7 +757,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
     else:
         dictionary = np.r_[dictionary,
                            np.zeros((n_components - r, dictionary.shape[1]))]
-    dictionary = np.ascontiguousarray(dictionary.T)
+    dictionary = np.asfortranarray(dictionary.T)
 
     # for dict_element in dictionary:
     #     if l1_gamma != 0:
