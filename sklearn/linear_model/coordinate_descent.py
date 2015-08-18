@@ -403,7 +403,7 @@ def enet_path(X, y, l1_ratio=0.5, eps=1e-3, n_alphas=100, alphas=None,
         alphas = np.sort(alphas)[::-1]  # make sure alphas are properly ordered
 
     n_alphas = len(alphas)
-    tol = params.get('tol', 1e-4)
+    tol = params.get('tol', 1e-12)
     max_iter = params.get('max_iter', 1000)
     dual_gaps = np.empty(n_alphas)
     n_iters = []
@@ -636,6 +636,7 @@ class ElasticNet(LinearModel, RegressorMixin):
         To avoid memory re-allocation it is advised to allocate the
         initial data in memory directly using that format.
         """
+
         if self.alpha == 0:
             warnings.warn("With alpha=0, this algorithm does not converge "
                           "well. You are advised to use the LinearRegression "
