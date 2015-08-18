@@ -248,8 +248,6 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                               max_iter=max_iter)
         if code.ndim == 1:
             code = code[np.newaxis, :]
-
-        print('sparse_encode time : ' + str(time.time() - t0))
         return code
     elif pool is None:
         pool = Parallel(n_jobs=n_jobs)
