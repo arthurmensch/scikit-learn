@@ -398,7 +398,8 @@ class LinearRegression(LinearModel, RegressorMixin):
         return self
 
 
-def _pre_fit(X, y, Xy, precompute, normalize, fit_intercept, copy):
+def _pre_fit(X, y, Xy, precompute, normalize, fit_intercept, copy,
+             aux_order=None):
     """Aux function used at beginning of fit in linear models"""
     n_samples, n_features = X.shape
     if sparse.isspmatrix(X):
@@ -409,7 +410,6 @@ def _pre_fit(X, y, Xy, precompute, normalize, fit_intercept, copy):
         # copy was done in fit if necessary
         X, y, X_mean, y_mean, X_std = center_data(
             X, y, fit_intercept, normalize, copy=copy)
-    # print(X_mean)
     if hasattr(precompute, '__array__') and (
             fit_intercept and not np.allclose(X_mean, np.zeros(n_features))
             or normalize and not np.allclose(X_std, np.ones(n_features))):
@@ -427,11 +427,16 @@ def _pre_fit(X, y, Xy, precompute, normalize, fit_intercept, copy):
 
     if precompute is True:
         precompute = np.dot(X.T, X).T
+        if aux_order == 'F':
+            precompute = np.dot(X.T, X).T
 
     if not hasattr(precompute, '__array__'):
         Xy = None  # cannot use Xy if precompute is not Gram
 
     if hasattr(precompute, '__array__') and Xy is None:
-        Xy = np.dot(y.T, X).T
+        if aux_order == 'F':
+            Xy = np.dot(y.T, X).T
+        else:
+            Xy = np.dot(X.T, y)
 
     return X, y, X_mean, y_mean, X_std, precompute, Xy

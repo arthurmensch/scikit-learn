@@ -388,11 +388,10 @@ def enet_path(X, y, l1_ratio=0.5, eps=1e-3, n_alphas=100, alphas=None,
 
     # X should be normalized and fit already if function is called
     # from ElasticNet.fit
-    if check_input:
-        X, y, X_mean, y_mean, X_std, precompute, Xy = \
-            _pre_fit(X, y, Xy, precompute, normalize=False,
-                     fit_intercept=False,
-                     copy=False)
+    X, y, X_mean, y_mean, X_std, precompute, Xy = \
+        _pre_fit(X, y, Xy, precompute, normalize=False,
+                 fit_intercept=False,
+                 copy=False, aux_order='F')
     if alphas is None:
         # No need to normalize of fit_intercept: it has been done
         # above
@@ -656,7 +655,7 @@ class ElasticNet(LinearModel, RegressorMixin):
                              multi_output=True, y_numeric=True)
         X, y, X_mean, y_mean, X_std, precompute, Xy = \
             _pre_fit(X, y, None, self.precompute, self.normalize,
-                     self.fit_intercept, copy=False)
+                     self.fit_intercept, copy=False, aux_order='F')
 
         if y.ndim == 1:
             y = y[:, np.newaxis]

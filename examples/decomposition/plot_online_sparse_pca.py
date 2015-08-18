@@ -72,7 +72,7 @@ if __name__ == '__main__':
     # XXX: This should be mentionned in the documentation
     dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
                                                 alpha=0.1,
-                                                n_iter=20, batch_size=400,
+                                                n_iter=400, batch_size=50,
                                                 fit_algorithm='cd',
                                                 transform_algorithm='lasso_cd',
                                                 transform_alpha=0.1,
