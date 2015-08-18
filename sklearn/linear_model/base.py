@@ -15,6 +15,7 @@ Generalized Linear models.
 from __future__ import division
 from abc import ABCMeta, abstractmethod
 import numbers
+import warnings
 
 import numpy as np
 import scipy.sparse as sp
@@ -408,10 +409,14 @@ def _pre_fit(X, y, Xy, precompute, normalize, fit_intercept, copy):
         # copy was done in fit if necessary
         X, y, X_mean, y_mean, X_std = center_data(
             X, y, fit_intercept, normalize, copy=copy)
-
-    if hasattr(precompute, '__array__') \
-            and not np.allclose(X_mean, np.zeros(n_features)) \
-            and not np.allclose(X_std, np.ones(n_features)):
+    # print(X_mean)
+    if hasattr(precompute, '__array__') and (
+            fit_intercept and not np.allclose(X_mean, np.zeros(n_features))
+            or normalize and not np.allclose(X_std, np.ones(n_features))):
+        warnings.warn("Gram matrix was provided but X was centered"
+                      " to fit intercept,"
+                      "or X was normalized : recomputing Gram matrix.",
+                      UserWarning)
         # recompute Gram
         precompute = 'auto'
         Xy = None
@@ -421,12 +426,12 @@ def _pre_fit(X, y, Xy, precompute, normalize, fit_intercept, copy):
         precompute = (n_samples > n_features)
 
     if precompute is True:
-        precompute = np.dot(X.T, X)
+        precompute = np.dot(X.T, X).T
 
     if not hasattr(precompute, '__array__'):
         Xy = None  # cannot use Xy if precompute is not Gram
 
     if hasattr(precompute, '__array__') and Xy is None:
-        Xy = np.dot(X.T, y)
+        Xy = np.dot(y.T, X).T
 
     return X, y, X_mean, y_mean, X_std, precompute, Xy

@@ -104,11 +104,10 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
             new_code = lasso_lars.coef_
         finally:
             np.seterr(**err_mgt)
-
     elif algorithm == 'lasso_cd':
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
-                    max_iter=max_iter, warm_start=True)
+                    max_iter=max_iter, warm_start=True, check_input=False)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T)
         new_code = clf.coef_
@@ -142,7 +141,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 # XXX : could be moved to the linear_model module
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
-                  max_iter=1000, n_jobs=1):
+                  max_iter=1000, n_jobs=1, check_input=True):
     """Sparse coding
 
     Each row of the result is the solution to a sparse coding problem.
@@ -218,14 +217,16 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
-    dictionary = check_array(dictionary)
-    X = check_array(X)
+    if check_input:
+        dictionary = check_array(dictionary)
+        X = check_array(X)
     n_samples, n_features = X.shape
     n_components = dictionary.shape[0]
 
     if gram is None and algorithm != 'threshold':
-        gram = np.dot(dictionary, dictionary.T)
-    if cov is None:
+        gram = np.dot(dictionary, dictionary.T).T
+
+    if cov is None and algorithm != 'lasso_cd':
         copy_cov = False
         cov = np.dot(dictionary, X.T)
 
@@ -247,10 +248,11 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     # Enter parallel code block
     code = np.empty((n_samples, n_components))
     slices = list(gen_even_slices(n_samples, _get_n_jobs(n_jobs)))
-
     code_views = Parallel(n_jobs=n_jobs)(
         delayed(_sparse_encode)(
-            X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
+            X[this_slice], dictionary, gram,
+            cov[:, this_slice] if cov is not None else None,
+            algorithm,
             regularization=regularization, copy_cov=copy_cov,
             init=init[this_slice] if init is not None else None,
             max_iter=max_iter)
@@ -650,6 +652,10 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     else:
         X_train = X
 
+    dictionary = check_array(dictionary, order='F', dtype=np.float64,
+                             copy=False)
+    X_train = check_array(X_train, order='C', dtype=np.float64, copy=False)
+
     batches = gen_batches(n_samples, batch_size)
     batches = itertools.cycle(batches)
 
@@ -677,7 +683,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                        % (ii, dt, dt / 60))
 
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                  alpha=alpha, n_jobs=n_jobs).T
+                                  alpha=alpha, n_jobs=n_jobs, check_input=False).T
 
         # Update the auxiliary variables
         if ii < batch_size - 1:
