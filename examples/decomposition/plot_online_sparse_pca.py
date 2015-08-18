@@ -77,7 +77,7 @@ dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
                                             transform_alpha=0.1,
                                             verbose=10,
                                             random_state=rng,
-                                            n_jobs=1)
+                                            n_jobs=2)
 ###############################################################################
 # Plot a sample of the input data
 

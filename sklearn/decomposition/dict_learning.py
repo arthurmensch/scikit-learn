@@ -106,8 +106,10 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
             np.seterr(**err_mgt)
     elif algorithm == 'lasso_cd':
         alpha = float(regularization) / n_features  # account for scaling
-        clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
-                    max_iter=max_iter, warm_start=True, check_input=False)
+        clf = Lasso(alpha=alpha, fit_intercept=False, normalize=False,
+                    precompute=gram,
+                    max_iter=max_iter, warm_start=True, check_input=False,
+                    copy_X=False)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T)
         new_code = clf.coef_
