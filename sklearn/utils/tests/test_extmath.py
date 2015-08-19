@@ -31,6 +31,7 @@ from sklearn.utils.extmath import _batch_mean_variance_update
 from sklearn.utils.extmath import _deterministic_vector_sign_flip
 from sklearn.utils.extmath import softmax
 from sklearn.datasets.samples_generator import make_low_rank_matrix
+from sklearn.datasets import fetch_olivetti_faces
 
 
 def test_density():
@@ -108,25 +109,26 @@ def test_randomized_svd_low_rank():
     # compute the singular values of X using the slow exact method
     U, s, V = linalg.svd(X, full_matrices=False)
 
-    # compute the singular values of X using the fast approximate method
-    Ua, sa, Va = randomized_svd(X, k)
-    assert_equal(Ua.shape, (n_samples, k))
-    assert_equal(sa.shape, (k,))
-    assert_equal(Va.shape, (k, n_features))
+    for p in ['auto', 'none', 'LU', 'QR']:
+        # compute the singular values of X using the fast approximate method
+        Ua, sa, Va = randomized_svd(X, k, power_iteration_normalizer=p)
+        assert_equal(Ua.shape, (n_samples, k))
+        assert_equal(sa.shape, (k,))
+        assert_equal(Va.shape, (k, n_features))
 
-    # ensure that the singular values of both methods are equal up to the real
-    # rank of the matrix
-    assert_almost_equal(s[:k], sa)
+        # ensure that the singular values of both methods are equal up to the
+        # real rank of the matrix
+        assert_almost_equal(s[:k], sa)
 
-    # check the singular vectors too (while not checking the sign)
-    assert_almost_equal(np.dot(U[:, :k], V[:k, :]), np.dot(Ua, Va))
+        # check the singular vectors too (while not checking the sign)
+        assert_almost_equal(np.dot(U[:, :k], V[:k, :]), np.dot(Ua, Va))
 
-    # check the sparse matrix representation
-    X = sparse.csr_matrix(X)
+        # check the sparse matrix representation
+        X = sparse.csr_matrix(X)
 
-    # compute the singular values of X using the fast approximate method
-    Ua, sa, Va = randomized_svd(X, k)
-    assert_almost_equal(s[:rank], sa[:rank])
+        # compute the singular values of X using the fast approximate method
+        Ua, sa, Va = randomized_svd(X, k, power_iteration_normalizer=p)
+        assert_almost_equal(s[:rank], sa[:rank])
 
 
 def test_norm_squared_norm():
@@ -161,26 +163,27 @@ def test_randomized_svd_low_rank_with_noise():
     # generate a matrix X wity structure approximate rank `rank` and an
     # important noisy component
     X = make_low_rank_matrix(n_samples=n_samples, n_features=n_features,
-                             effective_rank=rank, tail_strength=0.5,
+                             effective_rank=rank, tail_strength=0.1,
                              random_state=0)
     assert_equal(X.shape, (n_samples, n_features))
 
     # compute the singular values of X using the slow exact method
     _, s, _ = linalg.svd(X, full_matrices=False)
 
-    # compute the singular values of X using the fast approximate method
-    # without the iterated power method
-    _, sa, _ = randomized_svd(X, k, n_iter=0)
+    for p in ['auto', 'none', 'LU', 'QR']:
+        # compute the singular values of X using the fast approximate
+        # method without the iterated power method
+        _, sa, _ = randomized_svd(X, k, n_iter=0, power_iteration_normalizer=p)
 
-    # the approximation does not tolerate the noise:
-    assert_greater(np.abs(s[:k] - sa).max(), 0.05)
+        # the approximation does not tolerate the noise:
+        assert_greater(np.abs(s[:k] - sa).max(), 0.01)
 
-    # compute the singular values of X using the fast approximate method with
-    # iterated power method
-    _, sap, _ = randomized_svd(X, k, n_iter=5)
+        # compute the singular values of X using the fast approximate
+        # method with iterated power method
+        _, sap, _ = randomized_svd(X, k, power_iteration_normalizer=p)
 
-    # the iterated power method is helping getting rid of the noise:
-    assert_almost_equal(s[:k], sap, decimal=3)
+        # the iterated power method is helping getting rid of the noise:
+        assert_almost_equal(s[:k], sap, decimal=3)
 
 
 def test_randomized_svd_infinite_rank():
@@ -199,21 +202,22 @@ def test_randomized_svd_infinite_rank():
 
     # compute the singular values of X using the slow exact method
     _, s, _ = linalg.svd(X, full_matrices=False)
+    for p in ['auto', 'none', 'LU', 'QR']:
+        # compute the singular values of X using the fast approximate method
+        # without the iterated power method
+        _, sa, _ = randomized_svd(X, k, n_iter=0, power_iteration_normalizer=p)
 
-    # compute the singular values of X using the fast approximate method
-    # without the iterated power method
-    _, sa, _ = randomized_svd(X, k, n_iter=0)
+        # the approximation does not tolerate the noise:
+        assert_greater(np.abs(s[:k] - sa).max(), 0.1)
 
-    # the approximation does not tolerate the noise:
-    assert_greater(np.abs(s[:k] - sa).max(), 0.1)
+        # compute the singular values of X using the fast approximate method
+        # with iterated power method
+        _, sap, _ = randomized_svd(X, k, n_iter=5,
+                                   power_iteration_normalizer=p)
 
-    # compute the singular values of X using the fast approximate method with
-    # iterated power method
-    _, sap, _ = randomized_svd(X, k, n_iter=5)
-
-    # the iterated power method is still managing to get most of the structure
-    # at the requested rank
-    assert_almost_equal(s[:k], sap, decimal=3)
+        # the iterated power method is still managing to get most of the
+        # structure at the requested rank
+        assert_almost_equal(s[:k], sap, decimal=3)
 
 
 def test_randomized_svd_transpose_consistency():
@@ -247,6 +251,37 @@ def test_randomized_svd_transpose_consistency():
 
     # in this case 'auto' is equivalent to transpose
     assert_almost_equal(s2, s3)
+
+
+def test_randomized_svd_power_iteration_normalizer():
+    # randomized_svd with power_iteration_normalized='none' diverges for
+    # large number of power iterations on this dataset
+    X = fetch_olivetti_faces().data[:, :2000]
+    n_components = 5
+
+    # Check that is breaks
+    U, s, V = randomized_svd(X, n_components, n_iter=2,
+                             power_iteration_normalizer='none')
+    A = X - U.dot(np.diag(s).dot(V))
+    error_2 = linalg.norm(A, ord='fro')
+    U, s, V = randomized_svd(X, n_components, n_iter=20,
+                             power_iteration_normalizer='none')
+    A = X - U.dot(np.diag(s).dot(V))
+    error_10 = linalg.norm(A, ord='fro')
+    assert_greater(np.abs(error_2 - error_10), 20)
+
+    for p in ['LU', 'QR', 'auto']:
+        U, s, V = randomized_svd(X, n_components, n_iter=2,
+                                 power_iteration_normalizer=p)
+        A = X - U.dot(np.diag(s).dot(V))
+        error_2 = linalg.norm(A, ord='fro')
+
+        for i in [5, 10, 50]:
+            U, s, V = randomized_svd(X, n_components, n_iter=i,
+                                     power_iteration_normalizer=p)
+            A = X - U.dot(np.diag(s).dot(V))
+            error = linalg.norm(A, ord='fro')
+            assert_almost_equal(error_2, error, 2)
 
 
 def test_svd_flip():
@@ -349,17 +384,17 @@ def test_fast_dot():
 
         # Malformed data.
 
-        ## ndim == 0
+        # ndim == 0
         E = np.empty(0)
         assert_raises(ValueError, _fast_dot, E, E)
 
-        ## ndim == 1
+        # ndim == 1
         assert_raises(ValueError, _fast_dot, A, A[0])
 
-        ## ndim > 2
+        # ndim > 2
         assert_raises(ValueError, _fast_dot, A.T, np.array([A, A]))
 
-        ## min(shape) == 1
+        # min(shape) == 1
         assert_raises(ValueError, _fast_dot, A, A[0, :][None, :])
 
         # test for matrix mismatch error

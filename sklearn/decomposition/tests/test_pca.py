@@ -102,10 +102,8 @@ def test_explained_variance():
 
     pca = PCA(n_components=2).fit(X)
     rpca = RandomizedPCA(n_components=2, random_state=42).fit(X)
-    assert_array_almost_equal(pca.explained_variance_,
-                              rpca.explained_variance_, 1)
     assert_array_almost_equal(pca.explained_variance_ratio_,
-                              rpca.explained_variance_ratio_, 3)
+                              rpca.explained_variance_ratio_, 1)
 
     # compare to empirical variances
     X_pca = pca.transform(X)
