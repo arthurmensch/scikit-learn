@@ -182,7 +182,7 @@ def test_dict_learning_online():
 
 
 def test_dict_learning_online_partial_fit_new():
-    for l1_gamma, algorithm in zip([0.1], ['ridge']):
+    for l1_ratio, algorithm in zip([0.1], ['ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
@@ -193,7 +193,7 @@ def test_dict_learning_online_partial_fit_new():
                                             verbose=10,
                                             alpha=1, shuffle=False,
                                             dict_init=V,
-                                            l1_gamma=l1_gamma,
+                                            l1_ratio=l1_ratio,
                                             random_state=0).fit(X)
         dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
                                             n_iter=1, dict_init=V,
@@ -201,7 +201,7 @@ def test_dict_learning_online_partial_fit_new():
                                             fit_algorithm=algorithm,
                                             shuffle=False,
                                             verbose=10,
-                                            l1_gamma=l1_gamma,
+                                            l1_ratio=l1_ratio,
                                             random_state=0)
         for i in range(1):
             for sample in X:
@@ -213,7 +213,7 @@ def test_dict_learning_online_partial_fit_new():
 
 
 def test_dict_learning_online_fit_convergence():
-    for l1_gamma, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
+    for l1_ratio, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
@@ -225,14 +225,14 @@ def test_dict_learning_online_fit_convergence():
                                             tol=1e-2,
                                             alpha=1, shuffle=False,
                                             dict_init=V,
-                                            l1_gamma=l1_gamma,
+                                            l1_ratio=l1_ratio,
                                             random_state=0)
         dict1.fit(X)
         assert_true(dict1.n_iter_ < 100 * len(X) - 1)
 
 
 def test_dict_learning_online_deterministic():
-    for l1_gamma, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
+    for l1_ratio, algorithm in zip([0.0, 0.1], ['cd', 'ridge']):
         n_components = 12
         rng = np.random.RandomState(0)
         V = rng.randn(n_components, n_features)  # random init
@@ -243,7 +243,7 @@ def test_dict_learning_online_deterministic():
                                             verbose=1,
                                             alpha=1, shuffle=False,
                                             dict_init=V,
-                                            l1_gamma=l1_gamma,
+                                            l1_ratio=l1_ratio,
                                             random_state=0).fit(X)
         dict2 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
                                             batch_size=1,
@@ -251,7 +251,7 @@ def test_dict_learning_online_deterministic():
                                             verbose=1,
                                             alpha=1, shuffle=False,
                                             dict_init=V,
-                                            l1_gamma=l1_gamma,
+                                            l1_ratio=l1_ratio,
                                             random_state=0).fit(X)
         assert_array_almost_equal(dict1.components_, dict2.components_,
                                   decimal=6)

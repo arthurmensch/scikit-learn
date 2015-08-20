@@ -114,11 +114,11 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     elif algorithm == 'lasso_cd':
         # XXX: should be sqrt(n_features)
         alpha = float(regularization) / n_features  # account for scaling
-        clf = Lasso(alpha=alpha, fit_intercept=False, precompute=gram,
-                    max_iter=max_iter, selection='random',
+        clf = Lasso(alpha=alpha, fit_intercept=False, normalize='False',
+                    precompute=gram, max_iter=max_iter, selection='random',
                     random_state=random_state, warm_start=True)
         clf.coef_ = init
-        clf.fit(dictionary.T, X.T)
+        clf.fit(dictionary.T, X.T, check_input=False)
         new_code = clf.coef_
 
     elif algorithm == 'lars':
@@ -243,8 +243,10 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     n_components = dictionary.shape[0]
 
     if gram is None and algorithm != 'threshold':
-        gram = np.dot(dictionary, dictionary.T)
-    if cov is None:
+        # Transposing product to ensure Fortran ordering
+        gram = np.dot(dictionary, dictionary.T).T
+
+    if cov is None and algorithm != 'lasso_cd':
         copy_cov = False
         cov = np.dot(dictionary, X.T)
 
@@ -263,6 +265,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                               regularization=regularization, copy_cov=copy_cov,
                               init=init, max_iter=max_iter,
                               random_state=random_state)
+        # This ensure that dimensionality of code is always 2,
+        # consistant with the case n_jobs > 1
         if code.ndim == 1:
             code = code[np.newaxis, :]
         return code
@@ -275,7 +279,9 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                           backend='threading' if
                           algorithm == 'lasso_cd' else 'multiprocessing')(
         delayed(_sparse_encode)(
-            X[this_slice], dictionary, gram, cov[:, this_slice], algorithm,
+            X[this_slice], dictionary, gram,
+            cov[:, this_slice] if cov is not None else None,
+            algorithm,
             regularization=regularization, copy_cov=copy_cov,
             init=init[this_slice] if init is not None else None,
             max_iter=max_iter)
@@ -287,7 +293,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
 
 def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
-                 l1_gamma=1., radius=1., online=False, shuffle=False,
+                 l1_ratio=1., radius=1., online=False, shuffle=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
     component to have a unit l2 norm.
@@ -349,7 +355,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             if online:
                 dictionary[:, k] = R[:, k]
                 # L2-ball scaling if we use an elastic net ball
-                if l1_gamma != 0.:
+                if l1_ratio != 0.:
                     if code[k, k] > 1e-20:
                         dictionary[:, k] /= code[k, k]
                     else:
@@ -358,7 +364,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             else:
                 dictionary[:, k] = np.dot(R, code[k, :].T)
                 # L2-ball scaling if we use an elastic net ball
-                if l1_gamma != 0.:
+                if l1_ratio != 0.:
                     s = np.sum(code[k, :] ** 2)
                     if s > 1e-20:
                         dictionary[:, k] /= s
@@ -378,10 +384,11 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                 # Setting corresponding coefs to 0
                 code[k, :] = 0.0
 
-            if l1_gamma != 0.:
+            if l1_ratio != 0.:
                 dictionary[:, k] = enet_projection(dictionary[:, k],
                                                    radius=radius,
-                                                   l1_gamma=l1_gamma)
+                                                   l1_ratio=l1_ratio,
+                                                   check_input=False)
             else:
                 dictionary[:, k] /= sqrt(atom_norm_square)
             # R <- -1.0 * U_k * V_k^T + R
@@ -558,7 +565,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
                                              online=False,
                                              shuffle=False,
                                              random_state=random_state,
-                                             l1_gamma=0.)
+                                             l1_ratio=0.)
         dictionary = dictionary.T
 
         # Cost function
@@ -584,7 +591,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         return code, dictionary, errors
 
 
-def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
+def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          method='lars',
@@ -654,7 +661,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         the estimated components are sparse.
         ridge: compute code using an ordinary least square method.
 
-    l1_gamma: float,
+    l1_ratio: float,
         Sparsity controlling parameter for dictionary projection.
         The higher it is, the sparser the dictionary component will be.
 
@@ -729,7 +736,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
     # Avoid integer division problems
     alpha = float(alpha)
 
-    l1_gamma = float(l1_gamma)
+    l1_ratio = float(l1_ratio)
 
     random_state = check_random_state(random_state)
 
@@ -749,7 +756,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
     else:
         dictionary = np.r_[dictionary,
                            np.zeros((n_components - r, dictionary.shape[1]))]
-    dictionary = np.ascontiguousarray(dictionary.T)
 
     if verbose == 1:
         print('[dict_learning]', end=' ')
@@ -759,6 +765,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         random_state.shuffle(X_train)
     else:
         X_train = X
+
+    dictionary = check_array(dictionary.T, order='F', dtype=np.float64,
+                             copy=False)
+    X_train = check_array(X_train, order='C', dtype=np.float64, copy=False)
 
     batches = gen_batches(n_samples, batch_size)
     batches = itertools.cycle(batches)
@@ -799,11 +809,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         dictionary /= S[np.newaxis, :]
         # XXX: Distrub dictionary before projection to
         # avoid worst case complexity
-        for k in range(n_components):
-            print('projection')
-            dictionary[:, k] = enet_projection(dictionary[:, k],
-                                               l1_gamma=l1_gamma,
-                                               radius=radius)
+        dictionary = enet_projection(dictionary.T,
+                                     l1_ratio=l1_ratio,
+                                     radius=radius).T
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         if return_debug_info:
@@ -846,7 +854,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_gamma=0.0, n_iter=100,
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A,
                                                  verbose=verbose,
-                                                 l1_gamma=l1_gamma,
+                                                 l1_ratio=l1_ratio,
                                                  random_state=random_state,
                                                  return_r2=True,
                                                  radius=radius,
@@ -1235,7 +1243,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     alpha : float,
         sparsity controlling parameter
 
-    l1_gamma: float,
+    l1_ratio: float,
         sparsity controlling parameter for dictionary component
 
     tol: float,
@@ -1335,7 +1343,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     MiniBatchSparsePCA
 
     """
-    def __init__(self, n_components=None, alpha=1, l1_gamma=0.0, n_iter=1000,
+    def __init__(self, n_components=None, alpha=1, l1_ratio=0.0, n_iter=1000,
                  fit_algorithm='lars', n_jobs=1, batch_size=3,
                  shuffle=True, dict_init=None, transform_algorithm='omp',
                  tol=0., transform_n_nonzero_coefs=None, transform_alpha=None,
@@ -1354,7 +1362,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.batch_size = batch_size
         self.split_sign = split_sign
         self.random_state = random_state
-        self.l1_gamma = l1_gamma
+        self.l1_ratio = l1_ratio
         self.tol = tol
         # XXX: To remove
         self.debug_info = debug_info
@@ -1383,7 +1391,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=random_state,
-            l1_gamma=self.l1_gamma,
+            l1_ratio=self.l1_ratio,
             tol=self.tol,
             return_inner_stats=True,
             return_n_iter=True,
@@ -1443,7 +1451,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             iter_offset = getattr(self, 'iter_offset_', 0)
         res = dict_learning_online(
             X, self.n_components, self.alpha,
-            l1_gamma=self.l1_gamma,
+            l1_ratio=self.l1_ratio,
             n_iter=self.n_iter, method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
             batch_size=len(X), shuffle=False,
@@ -1518,7 +1526,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         res = dict_learning_online(
             X, self.n_components, self.alpha,
             n_iter=n_iter,
-            l1_gamma=self.l1_gamma,
+            l1_ratio=self.l1_ratio,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
             batch_size=self.batch_size,
