@@ -337,7 +337,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
     # Residuals, computed 'in-place' for efficiency
-    R = -np.dot(dictionary, code)
+    R = -np.dot(code.T, dictionary.T).T
     R += Y
 
     threshold = 1e-20
@@ -594,6 +594,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
 def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
+                         slowing=0.0,
                          method='lars',
                          iter_offset=0, tol=0.,
                          random_state=None,
@@ -775,9 +776,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
     # The covariance of the dictionary
     if inner_stats is None:
-        A = np.zeros((n_components, n_components))
+        A = slowing * np.eye(n_components)  # np.zeros((n_components, n_components))
         # The data approximation
-        B = np.zeros((n_features, n_components))
+        B = dictionary * slowing  # np.zeros((n_features, n_components), order='F')
         penalty = 0
     else:
         A = inner_stats[0].copy()
@@ -796,10 +797,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     if return_debug_info:
         residuals = np.zeros(n_iter)
         density = np.zeros(n_iter)
-        values = np.zeros((n_iter, min(n_features, 100)))
-        recorded_features = random_state.permutation(n_features)[:min(
-            n_features, 100)]
-
+        size_values = min(n_features, 100)
+        values = np.zeros((n_iter, size_values))
+        recorded_features = np.arange(0, n_features,
+                                      n_features // size_values + 1)
     radius = sqrt(n_features)
 
     # Initial projection if project_dict is set
@@ -807,8 +808,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
         S[S == 0] = 1
         dictionary /= S[np.newaxis, :]
-        # XXX: Distrub dictionary before projection to
-        # avoid worst case complexity
+
+        # Perturbation to avoid enet_projection worst case complexity
+        dictionary += random_state.normal(scale=1e-6 / sqrt(n_features),
+                                          size=dictionary.shape)
+
+        S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
+        S[S == 0] = 1
+        dictionary /= S[np.newaxis, :]
+
         dictionary = enet_projection(dictionary.T,
                                      l1_ratio=l1_ratio,
                                      radius=radius).T
@@ -837,21 +845,30 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         S[S == 0] = 1
         dictionary /= S[np.newaxis, :]
         # Setting n_jobs > 1 does not improve performance
+        # # REMOVE
+        # t1 = time.time()
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=1,
                                   random_state=0).T
+        # # REMOVE
+        # print('Time spent in `sparse_encode`: {}'.format(time.time() - t1))
         # Restoring dictionary
         dictionary *= S[np.newaxis, :]
 
         # Update the inner statistics
+        # # REMOVE
+        # t1 = time.time()
         theta = float((ii + 1) * batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
         A *= beta
         A += np.dot(this_code, this_code.T) / (theta + 1)
         B *= beta
-        B += np.dot(this_X.T, this_code.T) / (theta + 1)
+        B += np.dot(this_code, this_X).T / (theta + 1)
+        # REMOVE
+        # print('Time spent in `inner_stat`: {}'.format(time.time() - t1))
 
         # Update dictionary
+        # t1 = time.time()
         dictionary, this_residual = _update_dict(dictionary, B, A,
                                                  verbose=verbose,
                                                  l1_ratio=l1_ratio,
@@ -859,6 +876,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                                                  return_r2=True,
                                                  radius=radius,
                                                  online=True, shuffle=shuffle)
+
+        # # REMOVE
+        # print('Time spent in `_update_dict`: {}'.format(time.time() - t1))
         #Residual computation
         this_residual /= 2
         penalty += np.sum(this_X ** 2) / 2
