@@ -110,7 +110,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         clf = Lasso(alpha=alpha, fit_intercept=False, normalize=False,
                     precompute=gram, max_iter=max_iter, warm_start=True)
         clf.coef_ = init
-        clf.fit(dictionary.T, X.T, check_input=False)
+        clf.fit(check_array(dictionary.T, order='F'), X.T, check_input=False)
         new_code = clf.coef_
 
     elif algorithm == 'lars':
@@ -218,8 +218,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
-    dictionary = check_array(dictionary)
-    X = check_array(X)
+    dictionary = check_array(dictionary, order='C', dtype='float64')
+    X = check_array(X, order='C', dtype='float64')
     n_samples, n_features = X.shape
     n_components = dictionary.shape[0]
 
