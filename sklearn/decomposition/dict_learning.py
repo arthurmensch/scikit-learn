@@ -598,7 +598,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                          random_state=None,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False,
-                         project_dict=True,
+                         project_dict=False,
                          return_debug_info=False):
     """Solves a dictionary learning matrix factorization problem online.
 
