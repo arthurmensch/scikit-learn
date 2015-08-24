@@ -774,9 +774,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
     # The covariance of the dictionary
     if inner_stats is None:
-        A = slowing * np.eye(n_components)  # np.zeros((n_components, n_components))
+        A = slowing * np.eye(n_components)
         # The data approximation
-        B = dictionary * slowing  # np.zeros((n_features, n_components), order='F')
+        B = dictionary * slowing
         penalty = 0
     else:
         A = inner_stats[0].copy()
@@ -796,9 +796,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         residuals = np.zeros(n_iter)
         density = np.zeros(n_iter)
         size_values = min(n_features, 100)
-        values = np.zeros((n_iter, size_values))
-        recorded_features = np.arange(0, n_features,
-                                      n_features // size_values + 1)
+        recorded_features = np.floor(np.linspace(0, n_features - 1,
+                                                 size_values)).astype('int')
+        values = np.zeros((n_iter, recorded_features.shape[0]))
     radius = sqrt(n_features)
 
     # Initial projection if project_dict is set
@@ -822,10 +822,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         if return_debug_info:
             residuals[ii-iter_offset] = this_residual
-            values[ii-iter_offset] = dictionary[recorded_features, 0]\
-                                     / sqrt(np.sum(dictionary[:, 0] ** 2))
+            values[ii-iter_offset] = (dictionary[:, 0] / sqrt(np.sum(
+                dictionary[:, 0] ** 2)))[recorded_features]
             density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
-                                          / np.size(dictionary)
+                / np.size(dictionary)
 
         this_X = X_train[batch]
 
