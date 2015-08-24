@@ -99,7 +99,6 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         cov = np.dot(dictionary, X.T)
 
     if algorithm == 'lasso_lars':
-        # XXX: should be sqrt(n_features)
         alpha = float(regularization) / n_features  # account for scaling
         try:
             err_mgt = np.seterr(all='ignore')
@@ -112,7 +111,6 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
             np.seterr(**err_mgt)
 
     elif algorithm == 'lasso_cd':
-        # XXX: should be sqrt(n_features)
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, normalize='False',
                     precompute=gram, max_iter=max_iter, selection='random',
