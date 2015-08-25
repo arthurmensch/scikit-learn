@@ -331,69 +331,63 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         Updated dictionary.
 
     """
+    threshold = 1e-20
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
-
-    threshold = 1e-20
     R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
+
     if shuffle:
         component_range = random_state.permutation(n_components)
     else:
         component_range = np.arange(n_components)
 
-    for _ in range(1):
-        for k in component_range:
-            # R <- 1.0 * U_k * V_k^T + R
-            R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-            if online:
-                dictionary[:, k] = R[:, k]
-                # L2-ball scaling if we use an elastic net ball
-                if l1_ratio != 0.:
-                    if code[k, k] > 1e-20:
-                        dictionary[:, k] /= code[k, k]
-                    else:
-                        # Clean atom
-                        dictionary[:, k] = 0
-            else:
-                dictionary[:, k] = np.dot(R, code[k, :].T)
-                # L2-ball scaling if we use an elastic net ball
-                if l1_ratio != 0.:
-                    s = np.sum(code[k, :] ** 2)
-                    if s > 1e-20:
-                        dictionary[:, k] /= s
-                    else:
-                        # Clean atom
-                        dictionary[:, k] = 0
-            # Cleaning small atoms
-            atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
-            if atom_norm_square < threshold:
-                if verbose == 1:
-                    sys.stdout.write("+")
-                    sys.stdout.flush()
-                elif verbose:
-                    print("Adding new random atom")
-                dictionary[:, k] = random_state.randn(n_features)
-                atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
-                # Setting corresponding coefs to 0
-                code[k, :] = 0.0
-
+    for k in component_range:
+        # R <- 1.0 * U_k * V_k^T + R
+        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        if online:
+            dictionary[:, k] = R[:, k]
+            # L2-ball scaling if we use an elastic net ball
             if l1_ratio != 0.:
-                dictionary[:, k] = enet_projection(dictionary[:, k],
-                                                   radius=radius,
-                                                   l1_ratio=l1_ratio,
-                                                   check_input=False)
-            else:
-                dictionary[:, k] /= sqrt(atom_norm_square)
-            # R <- -1.0 * U_k * V_k^T + R
-            R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+                if code[k, k] < threshold:
+                    dictionary[:, k] = 0
+                else:
+                    dictionary[:, k] /= code[k, k]
+        else:
+            dictionary[:, k] = np.dot(R, code[k, :].T)
+            # L2-ball scaling if we use an elastic net ball
+            if l1_ratio != 0.:
+                s = np.sum(code[k, :] ** 2)
+                if code[k, k] < threshold:
+                    dictionary[:, k] = 0
+                else:
+                    dictionary[:, k] /= s
+        # Cleaning small atoms
+        atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
+        if atom_norm_square < threshold:
+            if verbose == 1:
+                sys.stdout.write("+")
+                sys.stdout.flush()
+            elif verbose:
+                print("Adding new random atom")
+            dictionary[:, k] = random_state.randn(n_features)
+            atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
+            # Setting corresponding coefs to 0
+            code[k, :] = 0.0
 
-        # S = np.sqrt(np.sum(dictionary ** 2, axis=0))
-        # dictionary /= S[np.newaxis, :]
+        if l1_ratio != 0.:
+            dictionary[:, k] = enet_projection(dictionary[:, k],
+                                               rpadius=radius,
+                                               l1_ratio=l1_ratio,
+                                               check_input=False)
+        else:
+            dictionary[:, k] /= sqrt(atom_norm_square)
+        # R <- -1.0 * U_k * V_k^T + R
+        R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
 
     if return_r2:
         if online:
