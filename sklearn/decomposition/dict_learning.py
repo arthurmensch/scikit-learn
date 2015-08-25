@@ -830,31 +830,21 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
         S[S == 0] = 1
         dictionary /= S[np.newaxis, :]
-        # Setting n_jobs > 1 does not improve performance
-        # # REMOVE
-        # t1 = time.time()
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=1,
                                   random_state=0).T
-        # # REMOVE
-        # print('Time spent in `sparse_encode`: {}'.format(time.time() - t1))
         # Restoring dictionary
         dictionary *= S[np.newaxis, :]
 
         # Update the inner statistics
-        # # REMOVE
-        # t1 = time.time()
         theta = float((ii + 1) * batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
         A *= beta
         A += np.dot(this_code, this_code.T) / (theta + 1)
         B *= beta
         B += np.dot(this_code, this_X).T / (theta + 1)
-        # REMOVE
-        # print('Time spent in `inner_stat`: {}'.format(time.time() - t1))
 
         # Update dictionary
-        # t1 = time.time()
         dictionary, this_residual = _update_dict(dictionary, B, A,
                                                  verbose=verbose,
                                                  l1_ratio=l1_ratio,
@@ -863,9 +853,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                                                  radius=radius,
                                                  online=True, shuffle=shuffle)
 
-        # # REMOVE
-        # print('Time spent in `_update_dict`: {}'.format(time.time() - t1))
-        #Residual computation
+        # Residual computation
         this_residual /= 2
         penalty += np.sum(this_X ** 2) / 2
         if method in ('lars', 'cd'):
@@ -886,8 +874,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
             break
         last_residual = this_residual
 
-        # Maybe we need a stopping criteria based on the amount of
-        # modification in the dictionary
         if callback is not None:
             callback(locals())
 
