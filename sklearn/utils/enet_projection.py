@@ -34,25 +34,27 @@ def enet_norm(v, l1_ratio=0.1):
     return norms
 
 
-def l2_scale(v, radius=1)
-
 def enet_scale(v, l1_ratio=0.1, radius=1, inplace=False):
+    if not inplace:
+        v = v.copy()
     l1_dictionary = np.sum(np.abs(v), axis=1) * l1_ratio
     l2_dictionary = np.sum(v ** 2, axis=1) * (1 - l1_ratio)
     S = - l1_dictionary + np.sqrt(l1_dictionary ** 2 + 4 *
                                   radius * l2_dictionary)
     S /= 2 * l2_dictionary
     S[S == 0] = 1
-    if inplace:
-        v /= S[:, np.newaxis]
+    v *= S[:, np.newaxis]
+    return v
 
 
 def enet_threshold(v, l1_ratio=0.1, radius=1, inplace=False):
+    if not inplace:
+        v = v.copy()
     Sv = np.sqrt(np.sum(v ** 2, axis=1)) / radius
     Sv[Sv == 0] = 1
-    b = enet_projection(v / Sv[:, np.newaxis], l1_ratio=l1_ratio,
+    v[:] = enet_projection(v / Sv[:, np.newaxis], l1_ratio=l1_ratio,
                         radius=radius)
-    Sb = np.sqrt(np.sum(b ** 2, axis=1)) / radius
+    Sb = np.sqrt(np.sum(v ** 2, axis=1)) / radius
     Sb[Sb == 0] = 1
-    b /= (Sb / Sv)[:, np.newaxis]
-    return b
+    v /= (Sb / Sv)[:, np.newaxis]
+    return v

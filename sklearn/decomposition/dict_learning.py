@@ -339,8 +339,8 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
 
     # Putting dictionary onto elastic net ball
     if l1_ratio != 0:
-        dictionary = enet_scale(dictionary.T, l1_ratio=l1_ratio,
-                                radius=radius).T
+        enet_scale(dictionary.T, l1_ratio=l1_ratio,
+                   radius=radius, inplace=True)
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -809,8 +809,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         S[S == 0] = 1
         dictionary /= S[np.newaxis, :]
         if inner_stats is None and l1_ratio != 0.:
-            dictionary = enet_threshold(dictionary.T, l1_ratio=l1_ratio,
-                                        radius=radius).T
+            enet_threshold(dictionary.T, l1_ratio=l1_ratio,
+                           radius=radius, inplace=True)
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         if return_debug_info:
@@ -869,8 +869,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         if callback is not None:
             callback(locals())
 
-    # if n_iter != 0:
-    #     dictionary /= radius
+    if n_iter != 0:
+        dictionary /= radius
+
     if return_inner_stats:
         if return_n_iter:
             res = dictionary.T, (A, B, penalty), ii - iter_offset + 1
