@@ -62,7 +62,7 @@ dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
                                             transform_alpha=0.0,
                                             tol=0,
                                             verbose=10,
-                                            l1_ratio=0.8,
+                                            l1_ratio=0.9,
                                             random_state=rng,
                                             n_jobs=1,
                                             debug_info=True)

@@ -741,12 +741,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         n_jobs = cpu_count()
 
     # Scaling dictionary to mkae l1_ratio less scale dependant
-    # if l1_ratio != 0:
-    #     radius = sqrt(n_features)
-    #     alpha *= sqrt(n_features)
-    # else:
-    #     radius = 1
-    radius = 1
+    if l1_ratio != 0:
+        radius = sqrt(n_features)
+        alpha *= sqrt(n_features)
+    else:
+        radius = 1
+    # radius = 1
 
     if return_debug_info:
         residuals = np.zeros(n_iter)
