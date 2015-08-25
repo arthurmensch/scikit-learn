@@ -56,13 +56,13 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 # XXX: This should be mentionned in the documentation
 dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
                                             alpha=0.,
-                                            n_iter=40, batch_size=10,
+                                            n_iter=800, batch_size=10,
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
                                             transform_alpha=0.0,
-                                            tol=1e-4,
+                                            tol=0,
                                             verbose=10,
-                                            l1_gamma=0.3,
+                                            l1_ratio=0.8,
                                             random_state=rng,
                                             n_jobs=1,
                                             debug_info=True)

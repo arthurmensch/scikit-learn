@@ -22,7 +22,8 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
 from ..utils.extmath import randomized_svd, row_norms
 from ..utils.validation import check_is_fitted
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge
-from ..utils.enet_projection import enet_projection
+from ..utils.enet_projection import enet_projection, enet_norm, enet_scale, \
+    enet_threshold
 import warnings
 
 
@@ -335,6 +336,12 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
+
+    # Putting dictionary onto elastic net ball
+    if l1_ratio != 0:
+        dictionary = enet_scale(dictionary.T, l1_ratio=l1_ratio,
+                                radius=radius).T
+
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
@@ -397,8 +404,16 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             # striding
             R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
             residual = np.sum(R)
+
+    if l1_ratio != 0.:
+        S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
+        S[S == 0] = 1
+        dictionary /= S[np.newaxis, :]
+
+    if return_r2:
         return dictionary, residual
-    return dictionary
+    else:
+        return dictionary
 
 
 def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
@@ -586,7 +601,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                          random_state=None,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False,
-                         project_dict=True,
                          return_debug_info=False):
     """Solves a dictionary learning matrix factorization problem online.
 
@@ -682,10 +696,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     return_n_iter : bool
         Whether or not to return the number of iterations.
 
-    project_dict : bool,
-        Whether to project initial dictionary on the elastic-net before
-        starting the algorithm
-
     Returns
     -------
     code : array of shape (n_samples, n_components),
@@ -729,6 +739,22 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
     if n_jobs == -1:
         n_jobs = cpu_count()
+
+    # Scaling dictionary to mkae l1_ratio less scale dependant
+    # if l1_ratio != 0:
+    #     radius = sqrt(n_features)
+    #     alpha *= sqrt(n_features)
+    # else:
+    #     radius = 1
+    radius = 1
+
+    if return_debug_info:
+        residuals = np.zeros(n_iter)
+        density = np.zeros(n_iter)
+        size_values = min(n_features, 100)
+        recorded_features = np.floor(np.linspace(0, n_features - 1,
+                                                 size_values)).astype('int')
+        values = np.zeros((n_iter, recorded_features.shape[0]))
 
     # Init V with SVD of X
     if dict_init is not None:
@@ -774,39 +800,17 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     # Residual variable for tolerance computation
     last_residual = np.iinfo(np.int32).max
     this_residual = 0
-    patience = max(1, n_samples / batch_size)
-    this_patience = 0
 
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
 
-    if return_debug_info:
-        residuals = np.zeros(n_iter)
-        density = np.zeros(n_iter)
-        size_values = min(n_features, 100)
-        recorded_features = np.floor(np.linspace(0, n_features - 1,
-                                                 size_values)).astype('int')
-        values = np.zeros((n_iter, recorded_features.shape[0]))
-    radius = sqrt(n_features)
-
-    # Initial projection if project_dict is set
-    if n_iter > 0 and project_dict:
+    if n_iter != 0:
         S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
         S[S == 0] = 1
         dictionary /= S[np.newaxis, :]
-
-        # Perturbation to avoid enet_projection worst case complexity
-        dictionary += random_state.normal(scale=1e-6 / sqrt(n_features),
-                                          size=dictionary.shape)
-
-        S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
-        S[S == 0] = 1
-        dictionary /= S[np.newaxis, :]
-
-        if l1_ratio != 0.:
-            dictionary = enet_projection(dictionary.T,
-                                         l1_ratio=l1_ratio,
-                                         radius=radius).T
+        if inner_stats is None and l1_ratio != 0.:
+            dictionary = enet_threshold(dictionary.T, l1_ratio=l1_ratio,
+                                        radius=radius).T
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         if return_debug_info:
@@ -827,15 +831,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                 print ("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                        % (ii, dt, dt / 60))
 
-        # Normalizing dictionary before sparse encoding
-        S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
-        S[S == 0] = 1
-        dictionary /= S[np.newaxis, :]
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=1,
                                   random_state=0).T
-        # Restoring dictionary
-        dictionary *= S[np.newaxis, :]
 
         # Update the inner statistics
         theta = float((ii + 1) * batch_size)
@@ -864,25 +862,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
         # Stopping criterion
         change_ratio = abs(this_residual / last_residual - 1)
-        if last_residual == 0:
-            this_patience = patience
-        else:
-            if change_ratio < tol:
-                this_patience += 1
-            else:
-                this_patience = 0
-        if this_patience >= patience:
+        if change_ratio <= tol:
             break
         last_residual = this_residual
 
         if callback is not None:
             callback(locals())
 
-    if return_debug_info:
-        if len(residuals) > 1:
-            residuals[0] = residuals[1]
-        debug_info = (residuals, density, values)
-
+    # if n_iter != 0:
+    #     dictionary /= radius
     if return_inner_stats:
         if return_n_iter:
             res = dictionary.T, (A, B, penalty), ii - iter_offset + 1
@@ -907,6 +895,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         res = dictionary.T, ii - iter_offset + 1
     else:
         res = dictionary.T
+
+    if return_debug_info:
+        if len(residuals) > 1:
+            residuals[0] = residuals[1]
+        debug_info = (residuals, density, values)
 
     if return_debug_info:
         return res, debug_info
@@ -1388,7 +1381,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             tol=self.tol,
             return_inner_stats=True,
             return_n_iter=True,
-            project_dict=True,
             return_debug_info=self.debug_info)
         if self.debug_info:
             (U, (A, B, penalty), self.n_iter_), debug_info = res
@@ -1433,12 +1425,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         X = check_array(X)
         if hasattr(self, 'components_'):
             dict_init = self.components_
-            # Prevent projection of dictionary (already in elastic-net ball)
-            # Necessary because projection is not identity on elastic-net ball
-            project_dict = False
         else:
             dict_init = self.dict_init
-            project_dict = True
         inner_stats = getattr(self, 'inner_stats_', None)
         if iter_offset is None:
             iter_offset = getattr(self, 'iter_offset_', 0)
@@ -1451,7 +1439,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             verbose=self.verbose, return_code=False,
             iter_offset=iter_offset, random_state=self.random_state_,
             return_inner_stats=True, inner_stats=inner_stats,
-            project_dict=project_dict,
             return_debug_info=self.debug_info)
 
         if self.debug_info:
@@ -1527,7 +1514,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             verbose=self.verbose, return_code=False,
             iter_offset=iter_offset, random_state=self.random_state_,
             return_inner_stats=True, inner_stats=inner_stats,
-            project_dict=project_dict,
             return_debug_info=self.debug_info)
         # XXX: To remove
         if self.debug_info:
@@ -1541,7 +1527,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                 for this_array, new_array in zip(('residuals_', 'density_',
                                                   'values_'), debug_info):
                     cat_array = np.concatenate((getattr(self, this_array),
-                                           new_array), axis=0)
+                                               new_array), axis=0)
                     setattr(self, this_array, cat_array)
         self.components_ = U
 
