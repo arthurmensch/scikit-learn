@@ -349,23 +349,17 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        # Coordinate update
         if online:
             dictionary[:, k] = R[:, k]
-            # L2-ball scaling if we use an elastic net ball
-            if l1_ratio != 0.:
-                if code[k, k] < threshold:
-                    dictionary[:, k] = 0
-                else:
-                    dictionary[:, k] /= code[k, k]
+            scale = code[k, k]
         else:
             dictionary[:, k] = np.dot(R, code[k, :].T)
-            # L2-ball scaling if we use an elastic net ball
-            if l1_ratio != 0.:
-                s = np.sum(code[k, :] ** 2)
-                if code[k, k] < threshold:
-                    dictionary[:, k] = 0
-                else:
-                    dictionary[:, k] /= s
+            scale = np.sum(code[k, :] ** 2)
+        if scale < threshold:
+            dictionary[:, k] = 0
+        else:
+            dictionary[:, k] /= scale
         # Cleaning small atoms
         atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
         if atom_norm_square < threshold:
@@ -378,10 +372,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
             # Setting corresponding coefs to 0
             code[k, :] = 0.0
-
+        # Projecting onto the norm ball
         if l1_ratio != 0.:
             dictionary[:, k] = enet_projection(dictionary[:, k],
-                                               rpadius=radius,
+                                               radius=radius,
                                                l1_ratio=l1_ratio,
                                                check_input=False)
         else:
