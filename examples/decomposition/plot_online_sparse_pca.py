@@ -1,19 +1,3 @@
-"""
-============================
-Faces dataset decompositions
-============================
-
-This example applies to :ref:`olivetti_faces` online sparse PCA
-(a dictionary learning enforcing dictionary atom sparsity),
-from the module :py:mod:`sklearn.decomposition` (see the documentation chapter
-:ref:`decompositions`), and display some convergence curve.
-
-"""
-print(__doc__)
-
-# Authors: Vlad Niculae, Alexandre Gramfort
-# License: BSD 3 clause
-
 import logging
 from time import time
 

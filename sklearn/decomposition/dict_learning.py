@@ -586,7 +586,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                          random_state=None,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False,
-                         project_dict=False,
+                         project_dict=True,
                          return_debug_info=False):
     """Solves a dictionary learning matrix factorization problem online.
 
@@ -803,9 +803,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         S[S == 0] = 1
         dictionary /= S[np.newaxis, :]
 
-        dictionary = enet_projection(dictionary.T,
-                                     l1_ratio=l1_ratio,
-                                     radius=radius).T
+        if l1_ratio != 0.:
+            dictionary = enet_projection(dictionary.T,
+                                         l1_ratio=l1_ratio,
+                                         radius=radius).T
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         if return_debug_info:
