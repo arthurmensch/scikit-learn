@@ -110,8 +110,6 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         clf = Lasso(alpha=alpha, fit_intercept=False, normalize=False,
                     precompute=gram, max_iter=max_iter, warm_start=True)
         clf.coef_ = init
-        print(dictionary.flags['C_CONTIGUOUS'])
-        print(X.flags['C_CONTIGUOUS'])
         clf.fit(dictionary.T, X.T, check_input=check_input)
         new_code = clf.coef_
 
