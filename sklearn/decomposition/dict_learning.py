@@ -26,7 +26,7 @@ from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
-                   init=None, max_iter=1000):
+                   init=None, max_iter=1000, screening=0):
     """Generic sparse coding
 
     Each column of the result is the solution to a Lasso problem.
@@ -108,7 +108,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     elif algorithm == 'lasso_cd':
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, normalize=False,
-                    precompute=gram, max_iter=max_iter, warm_start=True)
+                    precompute=gram, max_iter=max_iter, warm_start=True,
+                    screening=screening)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T, check_input=False)
         new_code = clf.coef_
@@ -142,7 +143,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 # XXX : could be moved to the linear_model module
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
-                  max_iter=1000, n_jobs=1):
+                  max_iter=1000, n_jobs=1, screening=0):
     """Sparse coding
 
     Each row of the result is the solution to a sparse coding problem.
@@ -218,6 +219,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
+    t0 = time.time()
     dictionary = check_array(dictionary)
     X = check_array(X)
     n_samples, n_features = X.shape
@@ -246,7 +248,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                               algorithm=algorithm,
                               regularization=regularization, copy_cov=copy_cov,
                               init=init,
-                              max_iter=max_iter)
+                              max_iter=max_iter, screening=screening)
         # This ensure that dimensionality of code is always 2,
         # consistant with the case n_jobs > 1
         if code.ndim == 1:
@@ -264,7 +266,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
             algorithm,
             regularization=regularization, copy_cov=copy_cov,
             init=init[this_slice] if init is not None else None,
-            max_iter=max_iter)
+            max_iter=max_iter, screening=screening)
         for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
         code[this_slice] = this_view
@@ -519,7 +521,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          method='lars', iter_offset=0, random_state=None,
                          return_inner_stats=False, inner_stats=None,
-                         return_n_iter=False):
+                         return_n_iter=False, screening=0):
     """Solves a dictionary learning matrix factorization problem online.
 
     Finds the best dictionary and the corresponding sparse code for
@@ -691,7 +693,8 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                        % (ii, dt, dt / 60))
 
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                  alpha=alpha, n_jobs=n_jobs).T
+                                  alpha=alpha, n_jobs=n_jobs,
+                                  screening=screening).T
 
         # Update the auxiliary variables
         if ii < batch_size - 1:
@@ -748,13 +751,15 @@ class SparseCodingMixin(TransformerMixin):
                                   transform_algorithm='omp',
                                   transform_n_nonzero_coefs=None,
                                   transform_alpha=None, split_sign=False,
-                                  n_jobs=1):
+                                  n_jobs=1,
+                                  screening=0):
         self.n_components = n_components
         self.transform_algorithm = transform_algorithm
         self.transform_n_nonzero_coefs = transform_n_nonzero_coefs
         self.transform_alpha = transform_alpha
         self.split_sign = split_sign
         self.n_jobs = n_jobs
+        self.screening = screening
 
     def transform(self, X, y=None):
         """Encode the data as a sparse combination of the dictionary atoms.
@@ -783,7 +788,8 @@ class SparseCodingMixin(TransformerMixin):
         code = sparse_encode(
             X, self.components_, algorithm=self.transform_algorithm,
             n_nonzero_coefs=self.transform_n_nonzero_coefs,
-            alpha=self.transform_alpha, n_jobs=self.n_jobs)
+            alpha=self.transform_alpha, n_jobs=self.n_jobs,
+            screening=self.screening)
 
         if self.split_sign:
             # feature vector is split into a positive and negative side
@@ -991,11 +997,12 @@ class DictionaryLearning(BaseEstimator, SparseCodingMixin):
                  fit_algorithm='lars', transform_algorithm='omp',
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  n_jobs=1, code_init=None, dict_init=None, verbose=False,
-                 split_sign=False, random_state=None):
+                 split_sign=False, random_state=None, screening=0):
 
         self._set_sparse_coding_params(n_components, transform_algorithm,
                                        transform_n_nonzero_coefs,
-                                       transform_alpha, split_sign, n_jobs)
+                                       transform_alpha, split_sign, n_jobs,
+                                       screening=screening)
         self.alpha = alpha
         self.max_iter = max_iter
         self.tol = tol
@@ -1035,7 +1042,8 @@ class DictionaryLearning(BaseEstimator, SparseCodingMixin):
             dict_init=self.dict_init,
             verbose=self.verbose,
             random_state=random_state,
-            return_n_iter=True)
+            return_n_iter=True,
+            screening=self.screening)
         self.components_ = U
         self.error_ = E
         return self
@@ -1157,11 +1165,13 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                  fit_algorithm='lars', n_jobs=1, batch_size=3,
                  shuffle=True, dict_init=None, transform_algorithm='omp',
                  transform_n_nonzero_coefs=None, transform_alpha=None,
-                 verbose=False, split_sign=False, random_state=None):
+                 verbose=False, split_sign=False, random_state=None,
+                 screening=0):
 
         self._set_sparse_coding_params(n_components, transform_algorithm,
                                        transform_n_nonzero_coefs,
-                                       transform_alpha, split_sign, n_jobs)
+                                       transform_alpha, split_sign, n_jobs,
+                                       screening)
         self.alpha = alpha
         self.n_iter = n_iter
         self.fit_algorithm = fit_algorithm
@@ -1197,7 +1207,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=random_state,
             return_inner_stats=True,
-            return_n_iter=True)
+            return_n_iter=True,
+            screening=self.screening)
         self.components_ = U
         # Keep track of the state of the algorithm to be able to do
         # some online fitting (partial_fit)
