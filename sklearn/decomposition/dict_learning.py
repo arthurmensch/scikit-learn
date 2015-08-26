@@ -29,8 +29,8 @@ import warnings
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
-                   init=None, max_iter=1000,
-                   random_state=None):
+                   init=None, max_iter=1000, random_state=None,
+                   check_input=True):
     """Generic sparse coding
 
     Each column of the result is the solution to a Lasso problem.
@@ -117,7 +117,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                     precompute=gram, max_iter=max_iter, selection='random',
                     random_state=random_state, warm_start=True)
         clf.coef_ = init
-        clf.fit(dictionary.T, X.T, check_input=False)
+        clf.fit(dictionary.T, X.T, check_input=check_input)
         new_code = clf.coef_
 
     elif algorithm == 'lars':
@@ -157,8 +157,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 # XXX : could be moved to the linear_model module
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
-                  max_iter=1000, n_jobs=1,
-                  random_state=None):
+                  max_iter=1000, n_jobs=1, random_state=None,
+                  check_input=True):
     """Sparse coding
 
     Each row of the result is the solution to a sparse coding problem.
@@ -236,8 +236,14 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     sklearn.linear_model.Lasso
     SparseCoder
     """
-    dictionary = check_array(dictionary, order='C', dtype='float64')
-    X = check_array(X, order='C', dtype='float64')
+    if check_input:
+        if algorithm == 'lasso_cd':
+            dictionary = check_array(dictionary, order='C', dtype='float64')
+            X = check_array(X, order='C', dtype='float64')
+        else:
+            dictionary = check_array(dictionary)
+            X = check_array(X)
+
     n_samples, n_features = X.shape
     n_components = dictionary.shape[0]
 
@@ -262,7 +268,9 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
         code = _sparse_encode(X, dictionary, gram, cov=cov,
                               algorithm=algorithm,
                               regularization=regularization, copy_cov=copy_cov,
-                              init=init, max_iter=max_iter,
+                              init=init,
+                              max_iter=max_iter,
+                              check_input=check_input,
                               random_state=random_state)
         # This ensure that dimensionality of code is always 2,
         # consistant with the case n_jobs > 1
@@ -283,7 +291,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
             algorithm,
             regularization=regularization, copy_cov=copy_cov,
             init=init[this_slice] if init is not None else None,
-            max_iter=max_iter)
+            max_iter=max_iter, check_input=check_input,
+            random_state=random_state)
         for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
             code[this_slice] = this_view
@@ -833,7 +842,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=1,
-                                  random_state=0).T
+                                  check_input=False,
+                                  random_state=random_state).T
 
         # Update the inner statistics
         theta = float((ii + 1) * batch_size)
@@ -883,7 +893,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         elif verbose == 1:
             print('|', end=' ')
         code = sparse_encode(X, dictionary.T, algorithm=method, alpha=alpha,
-                             n_jobs=1)
+                             n_jobs=n_jobs, check_input=False)
         if verbose > 1:
             dt = (time.time() - t0)
             print('done (total time: % 3is, % 4.1fmn)' % (dt, dt / 60))
