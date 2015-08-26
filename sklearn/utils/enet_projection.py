@@ -37,13 +37,15 @@ def enet_norm(v, l1_ratio=0.1):
 def enet_scale(v, l1_ratio=0.1, radius=1, inplace=False):
     if not inplace:
         v = v.copy()
-    l1_dictionary = np.sum(np.abs(v), axis=1) * l1_ratio
-    l2_dictionary = np.sum(v ** 2, axis=1) * (1 - l1_ratio)
-    S = - l1_dictionary + np.sqrt(l1_dictionary ** 2 + 4 *
-                                  radius * l2_dictionary)
-    S /= 2 * l2_dictionary
-    S[S == 0] = 1
-    v *= S[:, np.newaxis]
+    l1_v = np.sum(np.abs(v), axis=1) * l1_ratio
+    if l1_ratio != 1:
+        l2_v = np.sum(v ** 2, axis=1) * (1 - l1_ratio)
+        S = (- l1_v + np.sqrt(l1_v ** 2 + 4 * radius * l2_v))
+        l2_v[l2_v == 0] = 1
+        S /= (2 * l2_v)
+        v *= S[:, np.newaxis]
+    else:
+        v /= l1_v[:, np.newaxis]
     return v
 
 
@@ -56,5 +58,14 @@ def enet_threshold(v, l1_ratio=0.1, radius=1, inplace=False):
                         radius=radius)
     Sb = np.sqrt(np.sum(v ** 2, axis=1)) / radius
     Sb[Sb == 0] = 1
-    v /= (Sb / Sv)[:, np.newaxis]
+    v *= (Sv / Sb)[:, np.newaxis]
+    return v
+
+
+def l2_sphere_projection(v, radius=1, inplace=False):
+    if not inplace:
+        v = v.copy()
+    Sv = np.sqrt(np.sum(v ** 2, axis=1)) / radius
+    Sv[Sv == 0] = 1
+    v /= Sv[:, np.newaxis]
     return v
