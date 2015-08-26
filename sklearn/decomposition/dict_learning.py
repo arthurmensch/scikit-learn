@@ -291,7 +291,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
             algorithm,
             regularization=regularization, copy_cov=copy_cov,
             init=init[this_slice] if init is not None else None,
-            max_iter=max_iter, check_input=check_input,
+            max_iter=max_iter,
+            check_input=check_input,
             random_state=random_state)
         for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
@@ -752,7 +753,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     # Scaling dictionary to mkae l1_ratio less scale dependant
     if l1_ratio != 0:
         radius = sqrt(n_features)
-        alpha *= sqrt(n_features)
+        alpha *= n_features
     else:
         radius = 1
     # radius = 1
