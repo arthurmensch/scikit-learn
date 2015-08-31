@@ -823,13 +823,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                            radius=radius, inplace=True)
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
-        if return_debug_info:
-            residuals[ii-iter_offset] = this_residual
-            values[ii-iter_offset] = (dictionary[:, 0] / sqrt(np.sum(
-                dictionary[:, 0] ** 2)))[recorded_features]
-            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
-                / np.size(dictionary)
-
         this_X = X_train[batch]
 
         dt = (time.time() - t0)
@@ -877,6 +870,13 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
             break
         last_residual = this_residual
 
+        if return_debug_info:
+            residuals[ii-iter_offset] = this_residual
+            values[ii-iter_offset] = (dictionary[:, 0] / sqrt(np.sum(
+                dictionary[:, 0] ** 2)))[recorded_features]
+            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
+                / np.size(dictionary)
+
         if callback is not None:
             callback(locals())
 
@@ -909,8 +909,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         res = dictionary.T
 
     if return_debug_info:
-        if len(residuals) > 1:
-            residuals[0] = residuals[1]
         debug_info = (residuals, density, values)
 
     if return_debug_info:
