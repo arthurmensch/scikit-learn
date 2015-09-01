@@ -505,9 +505,16 @@ class MemorizedFunc(Logger):
     #-------------------------------------------------------------------------
 
     def _get_argument_hash(self, *args, **kwargs):
-        return hashing.hash(filter_args(self.func, self.ignore,
-                                         args, kwargs),
+        arguments = filter_args(self.func, self.ignore,
+                                         args, kwargs)
+        for argument in arguments:
+            print('[Joblib] Argument %s hash : %s' % (argument, hashing.hash(arguments[argument])))
+        print(self.mmap_mode is not None)
+        final_hash = hashing.hash(arguments,
                              coerce_mmap=(self.mmap_mode is not None))
+        print('[Joblib] Final hash %s' % final_hash)
+        return final_hash
+
 
     def _get_output_dir(self, *args, **kwargs):
         """ Return the directory in which are persisted the result
