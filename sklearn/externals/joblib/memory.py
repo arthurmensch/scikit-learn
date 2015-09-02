@@ -508,7 +508,9 @@ class MemorizedFunc(Logger):
         arguments = filter_args(self.func, self.ignore,
                                          args, kwargs)
         for argument in arguments:
-            print('[Joblib] Argument %s hash : %s' % (argument, hashing.hash(arguments[argument])))
+            print('[Joblib] Argument %s hash : %s, %s' %
+                  (argument, hashing.hash(arguments[argument]),
+                  id(arguments[argument])))
         print(self.mmap_mode is not None)
         final_hash = hashing.hash(arguments,
                              coerce_mmap=(self.mmap_mode is not None))
