@@ -55,14 +55,14 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 # It is necessary to add regularisation to sparse encoder (either l1 or l2).
 # XXX: This should be mentionned in the documentation
 dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
-                                            alpha=0.0001,
-                                            n_iter=800, batch_size=10,
-                                            fit_algorithm='cd',
-                                            transform_algorithm='lasso_cd',
-                                            transform_alpha=0.0001,
+                                            alpha=0.1,
+                                            n_iter=200, batch_size=10,
+                                            fit_algorithm='ridge',
+                                            transform_algorithm='ridge',
+                                            l1_ratio=1,
+                                            transform_alpha=1,
                                             tol=0,
                                             verbose=10,
-                                            l1_ratio=0.01,
                                             random_state=rng,
                                             n_jobs=1,
                                             debug_info=True)
