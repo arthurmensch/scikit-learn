@@ -45,7 +45,7 @@ def enet_scale(v, l1_ratio=0.1, radius=1, inplace=False):
         S /= (2 * l2_v)
         v *= S[:, np.newaxis]
     else:
-        v /= l1_v[:, np.newaxis]
+        v /= l1_v[:, np.newaxis] / radius
     return v
 
 

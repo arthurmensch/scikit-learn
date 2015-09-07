@@ -94,6 +94,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     if X.ndim == 1:
         X = X[:, np.newaxis]
     n_samples, n_features = X.shape
+    n_components = dictionary.shape[0]
     if cov is None and algorithm != 'lasso_cd':
         # overwriting cov is safe
         copy_cov = False
@@ -141,7 +142,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                                       copy_Xy=copy_cov).T
 
     elif algorithm == 'ridge':
-        alpha = 2 * float(regularization) / n_features  # account for scaling
+        alpha = 2 * float(regularization) * n_features
+         # account for scaling
         lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
         new_code = lr.coef_
@@ -399,6 +401,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        # print(enet_norm(dictionary.T, l1_ratio=l1_ratio) / radius)
 
     if return_r2:
         if online:
@@ -415,10 +418,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
             residual = np.sum(R)
 
-    if l1_ratio != 0.:
-        S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
-        S[S == 0] = 1
-        dictionary /= S[np.newaxis, :]
+    # if l1_ratio != 0.:
+    #     S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
+    #     S[S == 0] = 1
+    #     dictionary /= S[np.newaxis, :]
 
     if return_r2:
         return dictionary, residual
@@ -750,7 +753,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     if n_jobs == -1:
         n_jobs = cpu_count()
 
-    # Scaling dictionary to mkae l1_ratio less scale dependant
+    # Scaling dictionary to make l1_ratio less scale dependant
     if l1_ratio != 0:
         radius = sqrt(n_features)
         alpha *= n_features
@@ -815,14 +818,16 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     ii = iter_offset - 1
 
     if n_iter != 0:
-        S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
-        S[S == 0] = 1
-        dictionary /= S[np.newaxis, :]
+        # S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
+        # S[S == 0] = 1
+        # dictionary /= S[np.newaxis, :]
+        # # print(enet_norm(dictionary.T, l1_ratio=l1_ratio) / radius)
         if inner_stats is None and l1_ratio != 0.:
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
-                           radius=radius, inplace=True)
+                       radius=radius, inplace=True)
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
+        # print(enet_norm(dictionary.T, l1_ratio=l1_ratio) / radius)
         this_X = X_train[batch]
 
         dt = (time.time() - t0)
@@ -880,8 +885,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         if callback is not None:
             callback(locals())
 
-    if n_iter != 0:
-        dictionary /= radius
+    # if n_iter != 0:
+    #     S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
+    #     S[S == 0] = 1
+    #     dictionary /= S[np.newaxis, :]
 
     if return_inner_stats:
         if return_n_iter:

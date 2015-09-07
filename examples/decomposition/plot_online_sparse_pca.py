@@ -1,4 +1,5 @@
 import logging
+from math import sqrt
 from time import time
 
 from numpy.random import RandomState
@@ -55,12 +56,12 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 # It is necessary to add regularisation to sparse encoder (either l1 or l2).
 # XXX: This should be mentionned in the documentation
 dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
-                                            alpha=0.1,
+                                            alpha=0.0001,
                                             n_iter=200, batch_size=10,
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
                                             l1_ratio=1,
-                                            transform_alpha=1,
+                                            transform_alpha=0.0001,
                                             tol=0,
                                             verbose=10,
                                             random_state=rng,
@@ -79,8 +80,16 @@ plt.savefig('faces.pdf')
 name = "Online Dictionary learning"
 print("Extracting the top %d %s..." % (n_components, name))
 t0 = time()
-data = faces
-dict_learning.fit(faces_centered)
+sparsity = np.zeros(11)
+for tile in range(1, 10):
+    data = np.tile(faces_centered, (1, tile))
+    image_shape = (image_shape[0] * tile, image_shape[1])
+    dict_learning.set_params(alpha=dict_learning.alpha)
+    dict_learning.fit(data)
+    sparsity[tile] = 1 - np.sum(
+        dict_learning.components_ == 0) / float(
+        np.size(dict_learning.components_))
+np.save('sparsity', sparsity)
 train_time = (time() - t0)
 print("done in %0.3fs" % train_time)
 plot_gallery('%s - Train time %.1fs' % (name, train_time),
@@ -94,7 +103,7 @@ print("%s - Component density" % name)
 print(1 - np.sum(dict_learning.components_ == 0)\
           / float(np.size(dict_learning.components_)))
 print("Code density")
-code = dict_learning.transform(faces_centered)
+code = dict_learning.transform(data)
 print 1 - np.sum(code == 0) / float(np.size(code))
 plot_gallery('%s - Reconstruction' % name,
              code[:n_components].dot(dict_learning.components_))
