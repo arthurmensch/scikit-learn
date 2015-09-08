@@ -56,7 +56,7 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 # It is necessary to add regularisation to sparse encoder (either l1 or l2).
 # XXX: This should be mentionned in the documentation
 dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
-                                            alpha=0.0001,
+                                            alpha=0.1,
                                             n_iter=200, batch_size=10,
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
@@ -81,7 +81,7 @@ name = "Online Dictionary learning"
 print("Extracting the top %d %s..." % (n_components, name))
 t0 = time()
 sparsity = np.zeros(11)
-for tile in range(1, 10):
+for tile in range(1, 11):
     data = np.tile(faces_centered, (1, tile))
     image_shape = (image_shape[0] * tile, image_shape[1])
     dict_learning.set_params(alpha=dict_learning.alpha)

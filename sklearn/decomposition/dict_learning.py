@@ -146,6 +146,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     elif algorithm == 'ridge':
         # Lasso solves ||y - Xw||^2_2 + alpha * ||w||_2^2
         alpha = 2 * float(regularization)
+         # account for scaling
         lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
         new_code = lr.coef_
@@ -351,11 +352,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
 
-    # # Putting dictionary onto elastic net ball
-    # if l1_ratio != 0:
-    #     enet_scale(dictionary.T, l1_ratio=l1_ratio,
-    #                radius=radius, inplace=True)
-
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
@@ -419,11 +415,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             # striding
             R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
             residual = np.sum(R)
-
-    # if l1_ratio != 0.:
-    #     S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
-    #     S[S == 0] = 1
-    #     dictionary /= S[np.newaxis, :]
 
     if return_r2:
         return dictionary, residual
@@ -756,12 +747,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         n_jobs = cpu_count()
 
     # Scaling dictionary to make l1_ratio less scale dependant
-    if l1_ratio != 0:
-        radius = sqrt(n_features)
-        alpha *= n_features
-    else:
-        radius = 1
-    # radius = 1
+    # if l1_ratio != 0:
+    #     radius = sqrt(n_features)
+    #     alpha *= n_features
+    # else:
+    radius = 1
+    alpha /= sqrt(n_features)
 
     if return_debug_info:
         residuals = np.zeros(n_iter)
@@ -820,16 +811,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     ii = iter_offset - 1
 
     if n_iter != 0:
-        # S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
-        # S[S == 0] = 1
-        # dictionary /= S[np.newaxis, :]
-        # # print(enet_norm(dictionary.T, l1_ratio=l1_ratio) / radius)
+        # If first call (hack)
         if inner_stats is None and l1_ratio != 0.:
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
                        radius=radius, inplace=True)
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
-        # print(enet_norm(dictionary.T, l1_ratio=l1_ratio) / radius)
         this_X = X_train[batch]
 
         dt = (time.time() - t0)
@@ -886,11 +873,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
         if callback is not None:
             callback(locals())
-
-    # if n_iter != 0:
-    #     S = np.sqrt(np.sum(dictionary ** 2, axis=0)) / radius
-    #     S[S == 0] = 1
-    #     dictionary /= S[np.newaxis, :]
 
     if return_inner_stats:
         if return_n_iter:
