@@ -101,6 +101,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         cov = np.dot(dictionary, X.T)
 
     if algorithm == 'lasso_lars':
+        # Lars solves (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
         alpha = float(regularization) / n_features  # account for scaling
         try:
             err_mgt = np.seterr(all='ignore')
@@ -113,6 +114,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
             np.seterr(**err_mgt)
 
     elif algorithm == 'lasso_cd':
+        # Lasso solves (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, normalize='False',
                     precompute=gram, max_iter=max_iter, selection='random',
@@ -142,8 +144,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                                       copy_Xy=copy_cov).T
 
     elif algorithm == 'ridge':
-        alpha = 2 * float(regularization) * n_features
-         # account for scaling
+        # Lasso solves ||y - Xw||^2_2 + alpha * ||w||_2^2
+        alpha = 2 * float(regularization)
         lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
         new_code = lr.coef_
