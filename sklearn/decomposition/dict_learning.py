@@ -142,7 +142,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                                       copy_Xy=copy_cov).T
 
     elif algorithm == 'ridge':
-        alpha = 2 * float(regularization) * n_features
+        alpha = 2 * float(regularization) / sqrt(n_features)
          # account for scaling
         lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
