@@ -49,6 +49,18 @@ MIN_IDEAL_BATCH_DURATION = .2
 # on a single worker while other workers have no work to process any more.
 MAX_IDEAL_BATCH_DURATION = 2
 
+# Under Python 3.4+ use the 'forkserver' start method by default: this makes it
+# possible to avoid crashing 3rd party libraries that manage an internal thread
+# pool that does not tolerate forking
+if hasattr(mp, 'get_start_method'):
+    method = os.environ.get('JOBLIB_START_METHOD')
+    if (method is None and mp.get_start_method() == 'fork'
+            and 'forkserver' in mp.get_all_start_methods()):
+        method = 'forkserver'
+    DEFAULT_MP_CONTEXT = mp.get_context(method=method)
+else:
+    DEFAULT_MP_CONTEXT = None
+
 
 class BatchedCalls(object):
     """Wrap a sequence of (func, args, kwargs) tuples as a single callable"""
@@ -317,7 +329,7 @@ class Parallel(Logger):
         A simple example:
 
         >>> from math import sqrt
-        >>> from sklearn.externals.joblib import Parallel, delayed
+        >>> from joblib import Parallel, delayed
         >>> Parallel(n_jobs=1)(delayed(sqrt)(i**2) for i in range(10))
         [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
 
@@ -325,7 +337,7 @@ class Parallel(Logger):
         values:
 
         >>> from math import modf
-        >>> from sklearn.externals.joblib import Parallel, delayed
+        >>> from joblib import Parallel, delayed
         >>> r = Parallel(n_jobs=1)(delayed(modf)(i/2.) for i in range(10))
         >>> res, i = zip(*r)
         >>> res
@@ -337,7 +349,7 @@ class Parallel(Logger):
         messages::
 
             >>> from time import sleep
-            >>> from sklearn.externals.joblib import Parallel, delayed
+            >>> from joblib import Parallel, delayed
             >>> r = Parallel(n_jobs=2, verbose=5)(delayed(sleep)(.1) for _ in range(10)) #doctest: +SKIP
             [Parallel(n_jobs=2)]: Done   1 out of  10 | elapsed:    0.1s remaining:    0.9s
             [Parallel(n_jobs=2)]: Done   3 out of  10 | elapsed:    0.2s remaining:    0.5s
@@ -351,7 +363,7 @@ class Parallel(Logger):
         child process::
 
          >>> from heapq import nlargest
-         >>> from sklearn.externals.joblib import Parallel, delayed
+         >>> from joblib import Parallel, delayed
          >>> Parallel(n_jobs=2)(delayed(nlargest)(2, n) for n in (range(4), 'abcde', 3)) #doctest: +SKIP
          #...
          ---------------------------------------------------------------------------
@@ -383,7 +395,7 @@ class Parallel(Logger):
         number of iterations cannot be reported in the progress messages::
 
          >>> from math import sqrt
-         >>> from sklearn.externals.joblib import Parallel, delayed
+         >>> from joblib import Parallel, delayed
 
          >>> def producer():
          ...     for i in range(6):
@@ -406,10 +418,10 @@ class Parallel(Logger):
          [Parallel(n_jobs=2)]: Done   6 out of   6 | elapsed:    0.0s finished
     '''
     def __init__(self, n_jobs=1, backend='multiprocessing', verbose=0,
-                 pre_dispatch='2 * n_jobs', batch_size='auto', temp_folder=None,
-                 max_nbytes='1M', mmap_mode='r'):
+                 pre_dispatch='2 * n_jobs', batch_size='auto',
+                 temp_folder=None, max_nbytes='1M', mmap_mode='r'):
         self.verbose = verbose
-        self._mp_context = None
+        self._mp_context = DEFAULT_MP_CONTEXT
         if backend is None:
             # `backend=None` was supported in 0.8.2 with this effect
             backend = "multiprocessing"

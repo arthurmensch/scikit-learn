@@ -269,34 +269,38 @@ def check_estimator_sparse_data(name, Estimator):
     rng = np.random.RandomState(0)
     X = rng.rand(40, 10)
     X[X < .8] = 0
-    X = sparse.csr_matrix(X)
+    X_csr = sparse.csr_matrix(X)
     y = (4 * rng.rand(40)).astype(np.int)
-    # catch deprecation warnings
-    with warnings.catch_warnings():
-        if name in ['Scaler', 'StandardScaler']:
-            estimator = Estimator(with_mean=False)
-        else:
-            estimator = Estimator()
-    set_fast_parameters(estimator)
-    # fit and predict
-    try:
-        estimator.fit(X, y)
-        if hasattr(estimator, "predict"):
-            estimator.predict(X)
-        if hasattr(estimator, 'predict_proba'):
-            estimator.predict_proba(X)
-    except TypeError as e:
-        if 'sparse' not in repr(e):
+    for sparse_format in ['csr', 'csc', 'dok', 'lil', 'coo', 'dia', 'bsr']:
+        X = X_csr.asformat(sparse_format)
+        # catch deprecation warnings
+        with warnings.catch_warnings():
+            if name in ['Scaler', 'StandardScaler']:
+                estimator = Estimator(with_mean=False)
+            else:
+                estimator = Estimator()
+        set_fast_parameters(estimator)
+        # fit and predict
+        try:
+            estimator.fit(X, y)
+            if hasattr(estimator, "predict"):
+                pred = estimator.predict(X)
+                assert_equal(pred.shape, (X.shape[0],))
+            if hasattr(estimator, 'predict_proba'):
+                probs = estimator.predict_proba(X)
+                assert_equal(probs.shape, (X.shape[0], 4))
+        except TypeError as e:
+            if 'sparse' not in repr(e):
+                print("Estimator %s doesn't seem to fail gracefully on "
+                      "sparse data: error message state explicitly that "
+                      "sparse input is not supported if this is not the case."
+                      % name)
+                raise
+        except Exception:
             print("Estimator %s doesn't seem to fail gracefully on "
-                  "sparse data: error message state explicitly that "
-                  "sparse input is not supported if this is not the case."
-                  % name)
+                  "sparse data: it should raise a TypeError if sparse input "
+                  "is explicitly not supported." % name)
             raise
-    except Exception:
-        print("Estimator %s doesn't seem to fail gracefully on "
-              "sparse data: it should raise a TypeError if sparse input "
-              "is explicitly not supported." % name)
-        raise
 
 
 def check_dtype_object(name, Estimator):
@@ -387,6 +391,7 @@ def _check_transformer(name, Transformer, X, y):
         for x_pred in X_pred:
             assert_equal(x_pred.shape[0], n_samples)
     else:
+        # check for consistent n_samples
         assert_equal(X_pred.shape[0], n_samples)
 
     if hasattr(transformer, 'transform'):
@@ -415,6 +420,8 @@ def _check_transformer(name, Transformer, X, y):
                 X_pred, X_pred3, 2,
                 "consecutive fit_transform outcomes not consistent in %s"
                 % Transformer)
+            assert_equal(len(X_pred2), n_samples)
+            assert_equal(len(X_pred3), n_samples)
 
         # raises error on malformed input for transform
         if hasattr(X, 'T'):
