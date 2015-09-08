@@ -14,6 +14,7 @@ In both cases, only 10% of the features are informative.
 import gc
 from time import time
 import numpy as np
+from sklearn.utils import check_array
 
 from sklearn.datasets.samples_generator import make_regression
 
@@ -37,13 +38,15 @@ def compute_bench(alpha, n_samples, n_features, precompute):
                                           noise=0.1, coef=True)
 
             X /= np.sqrt(np.sum(X ** 2, axis=0))  # Normalize data
+            X = check_array(X, order='F')
+            Y = check_array(Y[:, np.newaxis], order='F', ensure_2d=True)
 
             gc.collect()
             print("- benchmarking Lasso")
             clf = Lasso(alpha=alpha, fit_intercept=False,
                         precompute=precompute)
             tstart = time()
-            clf.fit(X, Y)
+            clf.fit(X, Y, check_input=False)
             lasso_results.append(time() - tstart)
 
             gc.collect()
@@ -68,7 +71,7 @@ if __name__ == '__main__':
     lasso_results, lars_lasso_results = compute_bench(alpha, list_n_samples,
                                             [n_features], precompute=True)
 
-    pl.figure('scikit-learn LASSO benchmark results')
+    pl.figure('scikit-learn LASSO benchmark results', figsize=(6, 9))
     pl.subplot(211)
     pl.plot(list_n_samples, lasso_results, 'b-',
                             label='Lasso')
@@ -92,4 +95,5 @@ if __name__ == '__main__':
     pl.xlabel('number of features')
     pl.ylabel('Time (s)')
     pl.axis('tight')
+    pl.savefig('cd_lars.pdf')
     pl.show()
