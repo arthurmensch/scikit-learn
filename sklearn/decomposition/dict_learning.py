@@ -117,7 +117,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         # Lasso solves (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, normalize='False',
-                    precompute=gram, max_iter=max_iter, selection='random',
+                    precompute=gram, max_iter=max_iter, selection='cyclic',
                     random_state=random_state, warm_start=True)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T, check_input=check_input)
@@ -746,11 +746,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     if n_jobs == -1:
         n_jobs = cpu_count()
 
-    # Scaling dictionary to make l1_ratio less scale dependant
-    # if l1_ratio != 0:
-    #     radius = sqrt(n_features)
-    #     alpha *= n_features
-    # else:
     radius = 1
     alpha /= sqrt(n_features)
 
@@ -834,12 +829,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                                   random_state=random_state).T
 
         # Update the inner statistics
-        theta = float((ii + 1) * batch_size)
-        beta = (theta + 1 - batch_size) / (theta + 1)
+        theta = sqrt(float((ii + 1) * batch_size) + 1)
+        beta = 1 - batch_size / theta
         A *= beta
-        A += np.dot(this_code, this_code.T) / (theta + 1)
+        A += np.dot(this_code, this_code.T) / theta
         B *= beta
-        B += np.dot(this_code, this_X).T / (theta + 1)
+        B += np.dot(this_code, this_X).T / theta
 
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A,
