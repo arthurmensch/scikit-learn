@@ -275,7 +275,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                               regularization=regularization, copy_cov=copy_cov,
                               init=init,
                               max_iter=max_iter,
-                              check_input=check_input,
+                              check_input=False,
                               random_state=random_state)
         # This ensure that dimensionality of code is always 2,
         # consistant with the case n_jobs > 1
@@ -297,7 +297,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
             regularization=regularization, copy_cov=copy_cov,
             init=init[this_slice] if init is not None else None,
             max_iter=max_iter,
-            check_input=check_input,
+            check_input=False,
             random_state=random_state)
         for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):

@@ -6,8 +6,8 @@
 Release history
 ===============
 
-0.17
-====
+Version 0.17
+============
 
 
 Changelog
@@ -114,12 +114,17 @@ Enhancements
    - RCV1 dataset loader (:func:`sklearn.datasets.fetch_rcv1`).
      By `Tom Dupre la Tour`_.
 
-   - Upgraded to joblib 0.9.0b2 to benefit from the new automatic batching of
+   - Upgraded to joblib 0.9.0b4 to benefit from the new automatic batching of
      short tasks. This makes it possible for scikit-learn to benefit from
      parallelism when many very short tasks are executed in parallel, for
      instance by the :class:`grid_search.GridSearchCV` meta-estimator
      with ``n_jobs > 1`` used with a large grid of parameters on a small
      dataset. By `Vlad Niculae`_, `Olivier Grisel`_ and `Loic Esteve`_.
+
+   - Joblib 0.9.0b4 also enables the ``forkserver`` start method for
+     multiprocessing by default under non-Windows platforms for Python 3.4
+     and later in order to avoid possible crash with some version of BLAS such
+     as vecLib / Accelerate under OSX for instance. By `Olivier Grisel`_.
 
    - Improved speed (3 times per iteration) of
      :class:`decomposition.DictLearning` with coordinate descent method
@@ -192,10 +197,16 @@ API changes summary
       by setting ``decision_function_shape='ovr'``. This will be the default behavior
       starting in 0.19. By `Andreas Müller`_.
 
+    - Passing 1D data arrays as input to estimators is now deprecated as it
+      caused confusion in how the array elements should be interpreted
+      as features or as samples. All data arrays are now expected
+      to be explicitly shaped ``(n_samples, n_features)``.
+      By `Vighnesh Birodkar`_.
+
 .. _changes_0_1_16:
 
-0.16.1
-=======
+Version 0.16.1
+===============
 
 Changelog
 ---------
@@ -226,8 +237,8 @@ Bug fixes
 
 .. _changes_0_16:
 
-0.16
-====
+Version 0.16
+============
 
 Highlights
 -----------
@@ -689,8 +700,8 @@ API changes summary
 
 .. _changes_0_15_2:
 
-0.15.2
-======
+Version 0.15.2
+==============
 
 Bug fixes
 ---------
@@ -731,8 +742,8 @@ Bug fixes
 
 .. _changes_0_15_1:
 
-0.15.1
-======
+Version 0.15.1
+==============
 
 Bug fixes
 ---------
@@ -770,8 +781,8 @@ Bug fixes
 
 .. _changes_0_15:
 
-0.15
-====
+Version 0.15
+============
 
 Highlights
 -----------
@@ -1301,8 +1312,8 @@ List of contributors for release 0.15 by number of commits.
 
 .. _changes_0_14:
 
-0.14
-=======
+Version 0.14
+===============
 
 Changelog
 ---------
@@ -1684,8 +1695,8 @@ List of contributors for release 0.14 by number of commits.
 
 .. _changes_0_13_1:
 
-0.13.1
-======
+Version 0.13.1
+==============
 
 The 0.13.1 release only fixes some bugs and does not add any new functionality.
 
@@ -1730,8 +1741,8 @@ List of contributors for release 0.13.1 by number of commits.
 
 .. _changes_0_13:
 
-0.13
-====
+Version 0.13
+============
 
 New Estimator Classes
 ---------------------
@@ -2068,8 +2079,8 @@ List of contributors for release 0.13 by number of commits.
 
 .. _changes_0_12.1:
 
-0.12.1
-=======
+Version 0.12.1
+===============
 
 The 0.12.1 release is a bug-fix release with no additional features, but is
 instead a set of bug fixes
@@ -2113,8 +2124,8 @@ People
 
 .. _changes_0_12:
 
-0.12
-====
+Version 0.12
+============
 
 Changelog
 ---------
@@ -2306,8 +2317,8 @@ People
 
 .. _changes_0_11:
 
-0.11
-====
+Version 0.11
+============
 
 Changelog
 ---------
@@ -2541,8 +2552,8 @@ People
 
 .. _changes_0_10:
 
-0.10
-====
+Version 0.10
+============
 
 Changelog
 ---------
@@ -2726,8 +2737,8 @@ The following people contributed to scikit-learn since last release:
 
 .. _changes_0_9:
 
-0.9
-===
+Version 0.9
+===========
 
 scikit-learn 0.9 was released on September 2011, three months after the 0.8
 release and includes the new modules :ref:`manifold`, :ref:`dirichlet_process`
@@ -2963,8 +2974,8 @@ People
 
 .. _changes_0_8:
 
-0.8
-===
+Version 0.8
+===========
 
 scikit-learn 0.8 was released on May 2011, one month after the first
 "international" `scikit-learn coding sprint
@@ -3063,8 +3074,8 @@ People that made this release possible preceded by number of commits:
 
 .. _changes_0_7:
 
-0.7
-===
+Version 0.7
+===========
 
 scikit-learn 0.7 was released in March 2011, roughly three months
 after the 0.6 release. This release is marked by the speed
@@ -3154,8 +3165,8 @@ People that made this release possible preceded by number of commits:
 
 .. _changes_0_6:
 
-0.6
-===
+Version 0.6
+===========
 
 scikit-learn 0.6 was released on December 2010. It is marked by the
 inclusion of several new modules and a general renaming of old
@@ -3254,8 +3265,8 @@ People that made this release possible preceded by number of commits:
 .. _changes_0_5:
 
 
-0.5
-===
+Version 0.5
+===========
 
 Changelog
 ---------
@@ -3366,8 +3377,8 @@ number of commits:
      *   1  Ariel Rokem
      *   1  Matthieu Brucher
 
-0.4
-===
+Version 0.4
+===========
 
 Changelog
 ---------
@@ -3623,3 +3634,5 @@ David Huard, Dave Morrill, Ed Schofield, Travis Oliphant, Pearu Peterson.
 .. _Loic Esteve: https://github.com/lesteve
 
 .. _Brian McFee: https://bmcfee.github.io
+
+.. _Vighnesh Birodkar: https://github.com/vighneshbirodkar
