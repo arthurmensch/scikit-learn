@@ -829,7 +829,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                                   random_state=random_state).T
 
         # Update the inner statistics
-        theta = sqrt(float((ii + 1) * batch_size) + 1)
+        theta = pow((ii + 1) * batch_size + 1, 1)
         beta = 1 - batch_size / theta
         A *= beta
         A += np.dot(this_code, this_code.T) / theta
