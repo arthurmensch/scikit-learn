@@ -602,6 +602,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          slowing=0.0,
+                         learning_rate=1,
                          method='lars',
                          iter_offset=0, tol=0.,
                          random_state=None,
@@ -743,11 +744,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
 
     random_state = check_random_state(random_state)
 
-    if n_jobs == -1:
-        n_jobs = cpu_count()
-
     radius = 1
     alpha /= sqrt(n_features)
+
+    if learning_rate > 1 or learning_rate < 0.5:
+        raise ValueError('Learning rate should be between 0.5 and 1, got %s'
+                         % learning_rate)
+
+    if n_jobs == -1:
+        n_jobs = cpu_count()
 
     if return_debug_info:
         residuals = np.zeros(n_iter)
@@ -829,7 +834,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                                   random_state=random_state).T
 
         # Update the inner statistics
-        theta = pow((ii + 1) * batch_size + 1, 1)
+        theta = pow((ii + 1) * batch_size + 1, learning_rate)
         beta = 1 - batch_size / theta
         A *= beta
         A += np.dot(this_code, this_code.T) / theta
