@@ -26,7 +26,8 @@ from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    regularization=None, copy_cov=True,
-                   init=None, max_iter=1000, check_input=True, screening=False):
+                   init=None, max_iter=1000, check_input=True, screening=False,
+                   tol=1e-4):
     """Generic sparse coding
 
     Each column of the result is the solution to a Lasso problem.
@@ -109,6 +110,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
         alpha = float(regularization) / n_features  # account for scaling
         clf = Lasso(alpha=alpha, fit_intercept=False, normalize=False,
                     precompute=gram, max_iter=max_iter, warm_start=True,
+                    tol=tol,
                     screening=10 if screening else 0)
         clf.coef_ = init
         clf.fit(dictionary.T, X.T, check_input=check_input)
@@ -143,7 +145,8 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 # XXX : could be moved to the linear_model module
 def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                   n_nonzero_coefs=None, alpha=None, copy_cov=True, init=None,
-                  max_iter=1000, n_jobs=1, check_input=True, screening=False):
+                  max_iter=1000, n_jobs=1, check_input=True, screening=False,
+                  tol=1e-4):
     """Sparse coding
 
     Each row of the result is the solution to a sparse coding problem.
@@ -255,7 +258,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
                               init=init,
                               max_iter=max_iter,
                               check_input=False,
-                              screening=screening)
+                              screening=screening,
+                              tol=1e-4)
         # This ensure that dimensionality of code is always 2,
         # consistant with the case n_jobs > 1
         if code.ndim == 1:
@@ -275,7 +279,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
             init=init[this_slice] if init is not None else None,
             max_iter=max_iter,
             check_input=False,
-            screening=screening)
+            screening=screening,
+            tol=1e-4)
         for this_slice in slices)
     for this_slice, this_view in zip(slices, code_views):
         code[this_slice] = this_view
@@ -541,6 +546,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False,
                          tol=0,
+                         lasso_tol=1e-4,
                          screening=False):
     """Solves a dictionary learning matrix factorization problem online.
 
@@ -702,6 +708,10 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     ii = iter_offset - 1
 
     last_residual = 0
+    penalty = 0
+    residuals = []
+    times = []
+    patience = 0
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         this_X = X_train[batch]
         dt = (time.time() - t0)
@@ -715,7 +725,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
 
         this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
                                   alpha=alpha, n_jobs=n_jobs,
-                                  screening=screening).T
+                                  screening=screening, tol=lasso_tol).T
 
         # Update the auxiliary variables
         if ii < batch_size - 1:
@@ -738,19 +748,25 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         # XXX: Can the residuals be of any use?
 
         # Residual computation
-        this_residual += np.sum(this_X ** 2) / 2
+        penalty += np.sum(this_X ** 2) / 2
         if method in ('lars', 'cd'):
-            this_residual += alpha * np.sum(this_code)
+            penalty += alpha * np.sum(this_code)
+        this_residual += penalty
         this_residual /= (ii + 1) * batch_size
 
         # Stopping criterion
         change_ratio = abs(this_residual / last_residual - 1)
 
-        print(change_ratio)
+        # print(change_ratio)
         if change_ratio <= tol:
+            patience += 1
+        else:
+            patience = 0
+        if patience >= 10:
             break
         last_residual = this_residual
-
+        residuals.append(this_residual)
+        times.append(dt)
         # Maybe we need a stopping criteria based on the amount of
         # modification in the dictionary
         if callback is not None:
@@ -758,9 +774,9 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
 
     if return_inner_stats:
         if return_n_iter:
-            return dictionary.T, (A, B), ii - iter_offset + 1
+            return dictionary.T, (A, B, residuals, times), ii - iter_offset + 1
         else:
-            return dictionary.T, (A, B)
+            return dictionary.T, (A, B, residuals, times)
     if return_code:
         if verbose > 1:
             print('Learning code...', end=' ')
@@ -1199,7 +1215,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                  shuffle=True, dict_init=None, transform_algorithm='omp',
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False, random_state=None,
-                 screening=False):
+                 screening=False, tol=0, lasso_tol=1e-4):
 
         self._set_sparse_coding_params(n_components, transform_algorithm,
                                        transform_n_nonzero_coefs,
@@ -1214,6 +1230,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.split_sign = split_sign
         self.random_state = random_state
         self.screening = screening
+        self.tol = tol
+        self.lasso_tol = lasso_tol
 
     def fit(self, X, y=None):
         """Fit the model from data in X.
@@ -1232,7 +1250,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         random_state = check_random_state(self.random_state)
         X = check_array(X)
 
-        U, (A, B), self.n_iter_ = dict_learning_online(
+        U, (A, B, residuals, times), self.n_iter_ = dict_learning_online(
             X, self.n_components, self.alpha,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
@@ -1241,12 +1259,16 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             verbose=self.verbose, random_state=random_state,
             return_inner_stats=True,
             return_n_iter=True,
-            screening=self.screening)
+            tol=self.tol,
+            screening=self.screening,
+            lasso_tol=self.lasso_tol)
         self.components_ = U
         # Keep track of the state of the algorithm to be able to do
         # some online fitting (partial_fit)
         self.inner_stats_ = (A, B)
         self.iter_offset_ = self.n_iter
+        self.residuals = residuals
+        self.times = times
         return self
 
     def partial_fit(self, X, y=None, iter_offset=None):
