@@ -283,7 +283,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
 
 def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
-                 random_state=None):
+                 random_state=None, online=False):
     """Update the dense dictionary factor in place.
 
     Parameters
@@ -324,7 +324,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     for k in range(n_components):
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-        dictionary[:, k] = np.dot(R, code[k, :].T)
+        if online:
+            dictionary[:, k] = R[:, k]
+        else:
+            dictionary[:, k] = np.dot(R, code[k, :].T)
         # Scale k'th atom
         atom_norm_square = np.dot(dictionary[:, k], dictionary[:, k])
         if atom_norm_square < 1e-20:
@@ -343,16 +346,22 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             # R <- -1.0 * U_k * V_k^T + R
             R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
     if return_r2:
-        R **= 2
-        # R is fortran-ordered. For numpy version < 1.6, sum does not
-        # follow the quick striding first, and is thus inefficient on
-        # fortran ordered data. We take a flat view of the data with no
-        # striding
-        R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
-        R = np.sum(R)
-        return dictionary, R
-    return dictionary
-
+        if online:
+            # Y = B_t, code = A_t, dictionary = D in online setting
+            R += Y
+            # residual = 1 / 2 Tr(D^T D A_t) - Tr(D^T B_t)
+            residual = -np.sum(dictionary * R) / 2
+        else:
+            R **= 2
+            # R is fortran-ordered. For numpy version < 1.6, sum does not
+            # follow the quick striding first, and is thus inefficient on
+            # fortran ordered data. We take a flat view of the data with no
+            # striding
+            R = as_strided(R, shape=(R.size, ), strides=(R.dtype.itemsize,))
+            residual = np.sum(R)
+        return dictionary, residual
+    else:
+        return dictionary
 
 def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
                   method='lars', n_jobs=1, dict_init=None, code_init=None,
@@ -531,6 +540,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                          method='lars', iter_offset=0, random_state=None,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False,
+                         tol=0,
                          screening=False):
     """Solves a dictionary learning matrix factorization problem online.
 
@@ -691,6 +701,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
 
+    last_residual = 0
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         this_X = X_train[batch]
         dt = (time.time() - t0)
@@ -719,9 +730,26 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         B += np.dot(this_X.T, this_code.T)
 
         # Update dictionary
-        dictionary = _update_dict(dictionary, B, A, verbose=verbose,
-                                  random_state=random_state)
+        dictionary, this_residual = _update_dict(dictionary, B, A,
+                                                 verbose=verbose,
+                                                 random_state=random_state,
+                                                 online=True,
+                                                 return_r2=True)
         # XXX: Can the residuals be of any use?
+
+        # Residual computation
+        this_residual += np.sum(this_X ** 2) / 2
+        if method in ('lars', 'cd'):
+            this_residual += alpha * np.sum(this_code)
+        this_residual /= (ii + 1) * batch_size
+
+        # Stopping criterion
+        change_ratio = abs(this_residual / last_residual - 1)
+
+        print(change_ratio)
+        if change_ratio <= tol:
+            break
+        last_residual = this_residual
 
         # Maybe we need a stopping criteria based on the amount of
         # modification in the dictionary
