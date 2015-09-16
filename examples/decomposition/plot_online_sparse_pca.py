@@ -56,8 +56,9 @@ def plot_gallery(title, images, n_col=n_col, n_row=n_row):
 # It is necessary to add regularisation to sparse encoder (either l1 or l2).
 # XXX: This should be mentionned in the documentation
 dict_learning = MiniBatchDictionaryLearning(n_components=n_components,
-                                            alpha=1,
+                                            alpha=0.01,
                                             n_iter=200, batch_size=10,
+                                            update_scheme='exp_decay',
                                             fit_algorithm='ridge',
                                             transform_algorithm='ridge',
                                             l1_ratio=1,
@@ -80,25 +81,14 @@ plt.savefig('faces.pdf')
 name = "Online Dictionary learning"
 print("Extracting the top %d %s..." % (n_components, name))
 t0 = time()
-# sparsity = np.zeros(11)
-# for tile in range(1, 11):
 tile = 1
 data = np.tile(faces_centered, (1, tile))
 image_shape = (image_shape[0] * tile, image_shape[1])
-# dict_learning.set_params(alpha=dict_learning.alpha)
 dict_learning.fit(data)
-# sparsity[tile] = 1 - np.sum(
-#     dict_learning.components_ == 0) / float(
-#     np.size(dict_learning.components_))
-# np.save('sparsity', sparsity)
 train_time = (time() - t0)
 print("done in %0.3fs" % train_time)
 plot_gallery('%s - Train time %.1fs' % (name, train_time),
              dict_learning.components_[:n_components])
-
-np.save('values', dict_learning.values_)
-np.save('density', dict_learning.density_)
-np.save('residuals', dict_learning.residuals_, )
 
 print("%s - Component density" % name)
 print(1 - np.sum(dict_learning.components_ == 0)\
@@ -110,15 +100,15 @@ plot_gallery('%s - Reconstruction' % name,
              code[:n_components].dot(dict_learning.components_))
 
 fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(6, 9))
-ax1.plot(dict_learning.values_)
+ax1.plot(dict_learning.debug_info_['values'])
 ax1.set_xlabel("Iteration")
 ax1.set_ylabel("Dictionary pixel values")
 
-ax2.plot(dict_learning.residuals_)
+ax2.plot(dict_learning.debug_info_['residuals'])
 ax2.set_xlabel("Iteration")
 ax2.set_ylabel("Objective surrogate")
 
-ax3.plot(dict_learning.density_)
+ax3.plot(dict_learning.debug_info_['density'])
 ax3.set_xlabel("Iteration")
 ax3.set_ylabel("Dictionary density")
 

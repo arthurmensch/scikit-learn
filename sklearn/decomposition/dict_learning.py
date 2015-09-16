@@ -22,9 +22,7 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
 from ..utils.extmath import randomized_svd, row_norms
 from ..utils.validation import check_is_fitted
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge
-from ..utils.enet_projection import enet_projection, enet_norm, enet_scale, \
-    enet_threshold
-import warnings
+from ..utils.enet_projection import enet_projection, enet_scale
 
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
@@ -94,7 +92,6 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     if X.ndim == 1:
         X = X[:, np.newaxis]
     n_samples, n_features = X.shape
-    n_components = dictionary.shape[0]
     if cov is None and algorithm != 'lasso_cd':
         # overwriting cov is safe
         copy_cov = False
@@ -146,7 +143,6 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
     elif algorithm == 'ridge':
         # Lasso solves ||y - Xw||^2_2 + alpha * ||w||_2^2
         alpha = 2 * float(regularization)
-         # account for scaling
         lr = Ridge(alpha=alpha, fit_intercept=False, normalize=False)
         lr.fit(dictionary.T, X.T)
         new_code = lr.coef_
@@ -348,6 +344,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
 
     """
     threshold = 1e-20
+
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
@@ -374,9 +371,11 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             dictionary[:, k] = np.dot(R, code[k, :].T)
             scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
+            # Trigger cleaning
             dictionary[:, k] = 0
         else:
             dictionary[:, k] /= scale
+
         # Cleaning small atoms
         atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
         if atom_norm_square < threshold:
@@ -387,8 +386,12 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                 print("Adding new random atom")
             dictionary[:, k] = random_state.randn(n_features)
             atom_norm_square = np.sum(dictionary[:, k] ** 2) / radius ** 2
+            if l1_ratio != 0.:
+                # Normalizating new random atom before enet projection
+                dictionary[:, k] /= sqrt(atom_norm_square)
             # Setting corresponding coefs to 0
             code[k, :] = 0.0
+
         # Projecting onto the norm ball
         if l1_ratio != 0.:
             dictionary[:, k] = enet_projection(dictionary[:, k],
@@ -397,9 +400,9 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                                                check_input=False)
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
+
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-        # print(enet_norm(dictionary.T, l1_ratio=l1_ratio) / radius)
 
     if return_r2:
         if online:
@@ -422,7 +425,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         return dictionary
 
 
-def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
+def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
                   method='lars', n_jobs=1, dict_init=None, code_init=None,
                   callback=None, verbose=False, random_state=None,
                   return_n_iter=False):
@@ -507,10 +510,18 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
     SparsePCA
     MiniBatchSparsePCA
     """
-    if method not in ('lars', 'cd'):
-        raise ValueError('Coding method %r not supported as a fit algorithm.'
-                         % method)
-    method = 'lasso_' + method
+    if method not in ('lars', 'cd', 'ridge'):
+        raise ValueError('Coding method not supported as a fit algorithm.')
+    if method in ('lars', 'cd'):
+        method = 'lasso_' + method
+
+    t0 = time.time()
+    n_samples, n_features = X.shape
+
+    l1_ratio = float(l1_ratio)
+    # Alpha scaling
+    alpha = float(alpha) / sqrt(n_features)
+    radius = 1.
 
     t0 = time.time()
     # Avoid integer division problems
@@ -539,8 +550,7 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         dictionary = np.r_[dictionary,
                            np.zeros((n_components - r, dictionary.shape[1]))]
 
-    # Fortran-order dict, as we are going to access its row vectors
-    dictionary = np.array(dictionary, order='F')
+    dictionary = np.array(dictionary, order='C', dtype='float64', copy=False)
 
     residuals = 0
 
@@ -565,14 +575,16 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
 
         # Update code
         code = sparse_encode(X, dictionary, algorithm=method, alpha=alpha,
-                             init=code, n_jobs=n_jobs)
+                             init=code, n_jobs=n_jobs, check_input=False,
+                             random_state=random_state)
         # Update dictionary
         dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
                                              verbose=verbose, return_r2=True,
                                              online=False,
                                              shuffle=False,
                                              random_state=random_state,
-                                             l1_ratio=0.)
+                                             l1_ratio=0.,
+                                             radius=radius)
         dictionary = dictionary.T
 
         # Cost function
@@ -598,11 +610,12 @@ def dict_learning(X, n_components, alpha, max_iter=100, tol=1e-8,
         return code, dictionary, errors
 
 
-def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
+def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
+                         update_scheme='exp_decay',
+                         forget_rate=1., n_iter=100,
                          return_code=True, dict_init=None, callback=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
-                         slowing=0.0,
-                         learning_rate=1,
+                         slowing=0.,
                          method='lars',
                          iter_offset=0, tol=0.,
                          random_state=None,
@@ -735,32 +748,29 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
     if method in ('lars', 'cd'):
         method = 'lasso_' + method
 
+    if update_scheme not in ('exp_decay', 'mean'):
+        raise ValueError('Update scheme not supported')
+
     t0 = time.time()
     n_samples, n_features = X.shape
-    # Avoid integer division problems
-    alpha = float(alpha)
 
     l1_ratio = float(l1_ratio)
+    # Alpha scaling
+    alpha = float(alpha) / sqrt(n_features)
+    radius = 1.
 
     random_state = check_random_state(random_state)
-
-    radius = 1
-    alpha /= sqrt(n_features)
-
-    if learning_rate > 1 or learning_rate < 0.5:
-        raise ValueError('Learning rate should be between 0.5 and 1, got %s'
-                         % learning_rate)
 
     if n_jobs == -1:
         n_jobs = cpu_count()
 
     if return_debug_info:
-        residuals = np.zeros(n_iter)
-        density = np.zeros(n_iter)
+        debug_info = {'density': [],
+                      'values': [],
+                      'residuals': []}
         size_values = min(n_features, 100)
         recorded_features = np.floor(np.linspace(0, n_features - 1,
                                                  size_values)).astype('int')
-        values = np.zeros((n_iter, recorded_features.shape[0]))
 
     # Init V with SVD of X
     if dict_init is not None:
@@ -797,21 +807,22 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         A = slowing * np.eye(n_components)
         # The data approximation
         B = dictionary * slowing
-        penalty = 0
+        residuals = []
+        residuals_penalty = 0
+        residuals_normalization = 0
     else:
         A = inner_stats[0].copy()
         B = inner_stats[1].copy()
-        penalty = inner_stats[2]
-
-    # Residual variable for tolerance computation
-    last_residual = np.iinfo(np.int32).max
-    this_residual = 0
+        residuals = inner_stats[2][0]
+        residuals_penalty = inner_stats[2][1]
+        residuals_normalization = inner_stats[2][2]
+    # For tolerance computation
+    patience = 0
 
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
 
     if n_iter != 0:
-        # If first call (hack)
         if inner_stats is None and l1_ratio != 0.:
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
                        radius=radius, inplace=True)
@@ -834,12 +845,25 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                                   random_state=random_state).T
 
         # Update the inner statistics
-        theta = pow((ii + 1) * batch_size + 1, learning_rate)
-        beta = 1 - batch_size / theta
+        if update_scheme == 'exp_decay':
+            if ii < batch_size - 1:
+                theta = float((ii + 1) * batch_size)
+            else:
+                # Increase the learning rate for first iterations
+                theta = float(batch_size ** 2 + ii + 1 - batch_size)
+            beta = (theta + 1 - batch_size) / (theta + 1)
+            beta = pow(beta, forget_rate)
+            gamma = 1
+        elif update_scheme == 'mean':
+            theta = float((ii + 1) * batch_size + 1)
+            theta = pow(theta, forget_rate)
+            beta = 1 - batch_size / theta
+            gamma = 1 / theta
+
         A *= beta
-        A += np.dot(this_code, this_code.T) / theta
+        A += np.dot(this_code, this_code.T) * gamma
         B *= beta
-        B += np.dot(this_code, this_X).T / theta
+        B += np.dot(this_X.T, this_code.T) * gamma
 
         # Update dictionary
         dictionary, this_residual = _update_dict(dictionary, B, A,
@@ -851,34 +875,53 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
                                                  online=True, shuffle=shuffle)
 
         # Residual computation
-        this_residual /= 2
-        penalty += np.sum(this_X ** 2) / 2
+        residuals_normalization *= beta
+        residuals_normalization += gamma
+        residuals_penalty *= beta
+        this_residual_penalty = np.sum(this_X ** 2) / 2
         if method in ('lars', 'cd'):
-            penalty += alpha * np.sum(this_code)
-        this_residual += penalty
-        this_residual /= (ii + 1) * batch_size
-
-        # Stopping criterion
-        change_ratio = abs(this_residual / last_residual - 1)
-        if change_ratio <= tol:
-            break
-        last_residual = this_residual
+            this_residual_penalty += alpha * np.sum(np.abs(this_code))
+        else:
+            this_residual_penalty += alpha * np.sum(this_code ** 2)
+        this_residual_penalty *= gamma
+        residuals_penalty += this_residual_penalty
+        this_residual += residuals_penalty
+        this_residual /= residuals_normalization
+        # XXX: Should we only keep last element in memory ?
+        residuals.append(this_residual)
 
         if return_debug_info:
-            residuals[ii-iter_offset] = this_residual
-            values[ii-iter_offset] = (dictionary[:, 0] / sqrt(np.sum(
-                dictionary[:, 0] ** 2)))[recorded_features]
-            density[ii-iter_offset] = 1 - float(np.sum(dictionary == 0.))\
-                / np.size(dictionary)
+            debug_info['values'].append(
+                (dictionary[:, 0] / sqrt(np.sum(dictionary[:, 0] ** 2)))
+                [recorded_features])
+            debug_info['density'].append(
+                1 - float(np.sum(dictionary == 0.)) / np.size(dictionary))
+            debug_info['residuals'].append(this_residual)
+
+        if len(residuals) > 2 and abs(
+                        residuals[-2] - residuals[-1]) < tol * residuals[-1]:
+            patience += 1
+        else:
+            patience = 0
+
+        if patience >= 3:
+            if verbose == 1:
+                # A line return
+                print("")
+            elif verbose:
+                print("--- Convergence reached after %d iterations" % ii)
+            break
 
         if callback is not None:
             callback(locals())
 
+    residual_stat = (residuals, residuals_penalty, residuals_normalization)
+
     if return_inner_stats:
         if return_n_iter:
-            res = dictionary.T, (A, B, penalty), ii - iter_offset + 1
+            res = dictionary.T, (A, B, residual_stat), ii - iter_offset + 1
         else:
-            res = dictionary.T, (A, B, penalty)
+            res = dictionary.T, (A, B, residual_stat)
     elif return_code:
         if verbose > 1:
             print('Learning code...', end=' ')
@@ -898,9 +941,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0, n_iter=100,
         res = dictionary.T, ii - iter_offset + 1
     else:
         res = dictionary.T
-
-    if return_debug_info:
-        debug_info = (residuals, density, values)
 
     if return_debug_info:
         return res, debug_info
@@ -983,7 +1023,7 @@ class SparseCoder(BaseEstimator, SparseCodingMixin):
         normalized to unit norm.
 
     transform_algorithm : {'lasso_lars', 'lasso_cd', 'lars', 'omp', \
-    'threshold'}
+    'threshold', 'ridge'}
         Algorithm used to transform the data:
         lars: uses the least angle regression method (linear_model.lars_path)
         lasso_lars: uses Lars to compute the Lasso solution
@@ -1154,7 +1194,8 @@ class DictionaryLearning(BaseEstimator, SparseCodingMixin):
     SparsePCA
     MiniBatchSparsePCA
     """
-    def __init__(self, n_components=None, alpha=1, max_iter=1000, tol=1e-8,
+    def __init__(self, n_components=None, alpha=1, l1_ratio=0.0,
+                 max_iter=1000, tol=1e-8,
                  fit_algorithm='lars', transform_algorithm='omp',
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  n_jobs=1, code_init=None, dict_init=None, verbose=False,
@@ -1164,6 +1205,7 @@ class DictionaryLearning(BaseEstimator, SparseCodingMixin):
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
         self.alpha = alpha
+        self.l1_ratio = l1_ratio
         self.max_iter = max_iter
         self.tol = tol
         self.fit_algorithm = fit_algorithm
@@ -1195,6 +1237,7 @@ class DictionaryLearning(BaseEstimator, SparseCodingMixin):
 
         V, U, E, self.n_iter_ = dict_learning(
             X, n_components, self.alpha,
+            l1_ratio=self.l1_ratio,
             tol=self.tol, max_iter=self.max_iter,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs,
@@ -1245,8 +1288,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         cd: uses the coordinate descent method to compute the
         Lasso solution (linear_model.Lasso). Lars will be faster if
         the estimated components are sparse.
-        ridge: Perform gradient-descent with elastic net projection
-        to enforce dictionary sparsity, outputting non sparse code
+        ridge: use a ridge penalty on U : alpha * || U ||_2^2, yielding non
+        sparse code
 
     transform_algorithm : {'lasso_lars', 'lasso_cd', 'lars', 'omp', \
     'threshold', 'ridge'}
@@ -1259,8 +1302,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         omp: uses orthogonal matching pursuit to estimate the sparse solution
         threshold: squashes to zero all coefficients less than alpha from
         the projection dictionary * X'
-        ridge: uses a non-penalized least square fit (regularization parameter
-        is ignored)
+        ridge: uses a penalized least square fit
 
     transform_n_nonzero_coefs : int, ``0.1 * n_features`` by default
         Number of nonzero coefficients to target in each column of the
@@ -1304,13 +1346,16 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     components_ : array, [n_components, n_features]
         components extracted from the data
 
-    inner_stats_ : tuple of (A, B) ndarrays
+    inner_stats_ : tuple of (A, B, residuals_stat) ndarrays
         Internal sufficient statistics that are kept by the algorithm.
         Keeping them is useful in online settings, to avoid loosing the
         history of the evolution, but they shouldn't have any use for the
         end user.
         A (n_components, n_components) is the dictionary covariance matrix.
         B (n_features, n_components) is the data approximation matrix
+        residuals_stat tuple of (residuals, residuals_penalty,
+        residuals_normalization) keeps values necessary for residual
+        computation and convergence analysis
 
     n_iter_ : int
         Number of iterations run.
@@ -1330,10 +1375,12 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     MiniBatchSparsePCA
 
     """
-    def __init__(self, n_components=None, alpha=1, l1_ratio=0.0, n_iter=1000,
-                 fit_algorithm='lars', n_jobs=1, batch_size=3,
-                 shuffle=True, dict_init=None, transform_algorithm='omp',
-                 tol=0., transform_n_nonzero_coefs=None, transform_alpha=None,
+    def __init__(self, n_components=None, alpha=1, l1_ratio=0.0,
+                 update_scheme='exp_decay',
+                 forget_rate=1., n_iter=1000, fit_algorithm='lars', n_jobs=1,
+                 batch_size=3, tol=0., shuffle=True, dict_init=None,
+                 transform_algorithm='omp',
+                 transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
                  random_state=None,
                  debug_info=False):
@@ -1341,6 +1388,9 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
         self.alpha = alpha
+        self.l1_ratio = l1_ratio
+        self.update_scheme = update_scheme
+        self.forget_rate = forget_rate
         self.n_iter = n_iter
         self.fit_algorithm = fit_algorithm
         self.dict_init = dict_init
@@ -1349,9 +1399,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.batch_size = batch_size
         self.split_sign = split_sign
         self.random_state = random_state
-        self.l1_ratio = l1_ratio
         self.tol = tol
-        # XXX: To remove
         self.debug_info = debug_info
 
     def fit(self, X, y=None):
@@ -1373,98 +1421,32 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
         res = dict_learning_online(
             X, self.n_components, self.alpha,
+            l1_ratio=self.l1_ratio, update_scheme=self.update_scheme,
+            forget_rate=self.forget_rate,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=random_state,
-            l1_ratio=self.l1_ratio,
             tol=self.tol,
             return_inner_stats=True,
             return_n_iter=True,
             return_debug_info=self.debug_info)
-        if self.debug_info:
-            (U, (A, B, penalty), self.n_iter_), debug_info = res
-        else:
-            U, (A, B, penalty), self.n_iter_ = res
-        self.components_ = U
-        if self.debug_info:
-            self.residuals_, self.density_, self.values_ = debug_info
-        # Keep track of the state of the algorithm to be able to do
-        # some online fitting (partial_fit)
-        self.inner_stats_ = (A, B, penalty)
-        self.iter_offset_ = self.n_iter
-        # Preventing projection for future call of partial fit
-        return self
-
-    def _partial_fit_deprecated(self, X, y=None, iter_offset=None):
-        """Updates the model using the data in X as a mini-batch.
-
-        Parameters
-        ----------
-        X: array-like, shape (n_samples, n_features)
-            Training vector, where n_samples in the number of samples
-            and n_features is the number of features.
-
-        iter_offset: integer, optional
-            The number of iteration on data batches that has been
-            performed before this call to partial_fit. This is optional:
-            if no number is passed, the memory of the object is
-            used.
-
-        Returns
-        -------
-        self : object
-            Returns the instance itself.
-        """
-        warnings.warn("Partial fit will change its behaviour"
-                      "in the next release,"
-                      " and split the input data into batches "
-                      "of provided batch_size")
-        if not hasattr(self, 'random_state_'):
-            self.random_state_ = check_random_state(self.random_state)
-        X = check_array(X)
-        if hasattr(self, 'components_'):
-            dict_init = self.components_
-        else:
-            dict_init = self.dict_init
-        inner_stats = getattr(self, 'inner_stats_', None)
-        if iter_offset is None:
-            iter_offset = getattr(self, 'iter_offset_', 0)
-        res = dict_learning_online(
-            X, self.n_components, self.alpha,
-            l1_ratio=self.l1_ratio,
-            n_iter=self.n_iter, method=self.fit_algorithm,
-            n_jobs=self.n_jobs, dict_init=dict_init,
-            batch_size=len(X), shuffle=False,
-            verbose=self.verbose, return_code=False,
-            iter_offset=iter_offset, random_state=self.random_state_,
-            return_inner_stats=True, inner_stats=inner_stats,
-            return_debug_info=self.debug_info)
 
         if self.debug_info:
-            (U, (A, B, penalty)), debug_info = res
-        else:
-            U, (A, B, penalty) = res
-        if self.debug_info:
-            if not hasattr(self, 'values_'):
-                self.residuals_, self.density_, self.values_ = debug_info
+            (U, (A, B, self.inner_stats_), n_iter), debug_info = res
+            if not hasattr(self, 'debug_info_'):
+                self.debug_info_ = debug_info
             else:
-                for this_array, new_array in zip(('residuals_',
-                                                  'density_', 'values_'),
-                                                 debug_info):
-                    temp = np.concatenate((getattr(self, this_array),
-                                           new_array), axis=0)
-                    setattr(self, this_array, temp)
-        self.components_ = U
+                for key in self.debug_info_:
+                    self.debug_info_[key] += debug_info[key]
+        else:
+            U, (A, B, self.inner_stats_), n_iter = res
 
-        # Keep track of the state of the algorithm to be able to do
-        # some online fitting (partial_fit)
-        self.inner_stats_ = (A, B, penalty)
-        self.iter_offset_ = iter_offset + self.n_iter
+        self.n_iter_ = n_iter
+        self.components_ = U
         return self
 
-    # TODO: Ugly !
     def partial_fit(self, X, y=None, iter_offset=None, deprecated=True):
         """Updates the model using the data in X
 
@@ -1485,55 +1467,49 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self : object
             Returns the instance itself.
         """
-        if deprecated:
-            return self._partial_fit_deprecated(X, y=y,
-                                                iter_offset=iter_offset)
         if not hasattr(self, 'random_state_'):
             self.random_state_ = check_random_state(self.random_state)
         X = check_array(X)
         if hasattr(self, 'components_'):
             dict_init = self.components_
-            # Prevent projection of dictionary (already in elastic-net ball)
-            # Necessary because projection is not identity on elastic-net ball
-            project_dict = False
         else:
             dict_init = self.dict_init
-            project_dict = True
         inner_stats = getattr(self, 'inner_stats_', None)
         if iter_offset is None:
-            iter_offset = getattr(self, 'iter_offset_', 0)
-        data_size = len(X)
-        n_iter = (data_size - 1) // self.batch_size + 1
+            iter_offset = getattr(self, 'n_iter_', 0)
+
+        if not deprecated:
+            # Doing one pass on the data, ignoring self.n_iter
+            n_iter = (len(X) - 1) // self.batch_size + 1
+            batch_size = self.batch_size
+        else:
+            n_iter = self.n_iter
+            batch_size = len(X)
         res = dict_learning_online(
             X, self.n_components, self.alpha,
+            l1_ratio=self.l1_ratio, forget_rate=self.forget_rate,
             n_iter=n_iter,
-            l1_ratio=self.l1_ratio,
+            tol=0,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
-            batch_size=self.batch_size,
+            # Loading whole X in memory if deprecated
+            batch_size=batch_size,
             shuffle=self.shuffle,
             verbose=self.verbose, return_code=False,
             iter_offset=iter_offset, random_state=self.random_state_,
             return_inner_stats=True, inner_stats=inner_stats,
             return_debug_info=self.debug_info)
-        # XXX: To remove
-        if self.debug_info:
-            (U, (A, B, penalty)), debug_info = res
-        else:
-            U, (A, B, penalty) = res
-        if self.debug_info:
-            if not hasattr(self, 'values_'):
-                self.residuals_, self.density_, self.values_ = debug_info
-            else:
-                for this_array, new_array in zip(('residuals_', 'density_',
-                                                  'values_'), debug_info):
-                    cat_array = np.concatenate((getattr(self, this_array),
-                                               new_array), axis=0)
-                    setattr(self, this_array, cat_array)
-        self.components_ = U
 
-        # Keep track of the state of the algorithm to be able to do
-        # some online fitting (partial_fit)
-        self.inner_stats_ = (A, B, penalty)
-        self.iter_offset_ = iter_offset + n_iter
+        if self.debug_info:
+            (U, self.inner_stats_, n_iter), debug_info = res
+            if not hasattr(self, 'debug_info_'):
+                self.debug_info_ = debug_info
+            else:
+                for key in self.debug_info_:
+                    self.debug_info_[key] += debug_info[key]
+        else:
+            U, self.inner_stats_ = res
+
+        self.n_iter_ = iter_offset + n_iter
+        self.components_ = U
         return self
