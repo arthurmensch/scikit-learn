@@ -547,7 +547,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                          return_n_iter=False,
                          tol=0,
                          lasso_tol=1e-4,
-                         rho=0,
+                         rho=1,
                          screening=False):
     """Solves a dictionary learning matrix factorization problem online.
 
@@ -763,6 +763,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
 
         # Stopping criterion
         change_ratio = abs(this_residual / last_residual - 1)
+        print(change_ratio)
 
         # print(change_ratio)
         if change_ratio <= tol:
