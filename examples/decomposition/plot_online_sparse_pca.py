@@ -86,7 +86,7 @@ estimators.append(MiniBatchDictionaryLearning(n_components=n_components,
                                             fit_algorithm="cd",
                                             transform_algorithm="lasso_cd",
                                             transform_alpha=1,
-                                            tol=1e-6,
+                                            tol=1e-4,
                                             lasso_tol=1e-8,
                                             verbose=10,
                                             random_state=rng,
@@ -98,7 +98,7 @@ estimators.append(MiniBatchDictionaryLearning(n_components=n_components,
                                             fit_algorithm="cd",
                                             transform_algorithm="lasso_cd",
                                             transform_alpha=1,
-                                            tol=1e-6,
+                                            tol=1e-4,
                                             lasso_tol=1e-4,
                                             verbose=10,
                                             random_state=rng,
@@ -110,7 +110,7 @@ estimators.append(MiniBatchDictionaryLearning(n_components=n_components,
                                             fit_algorithm="lars",
                                             transform_algorithm="lasso_lars",
                                             transform_alpha=1,
-                                            tol=1e-6,
+                                            tol=1e-4,
                                             verbose=10,
                                             random_state=rng,
                                             n_jobs=1)
@@ -158,8 +158,9 @@ for i, estimator in enumerate(estimators):
              label=labels[i])
 plt.xlabel('Empirical objective')
 plt.ylabel('Time')
-plt.xlim([28, 29.5])
-plt.ylim([0, 90])
+# plt.xlim([28, 29.5])
+# plt.ylim([0, 90])
 plt.legend(loc='upper left')
 
-plt.savefig('lars_cd_perf.pdf')
+# plt.savefig('lars_cd_perf.pdf')
+plt.show()

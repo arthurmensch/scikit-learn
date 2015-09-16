@@ -547,6 +547,7 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
                          return_n_iter=False,
                          tol=0,
                          lasso_tol=1e-4,
+                         rho=0,
                          screening=False):
     """Solves a dictionary learning matrix factorization problem online.
 
@@ -708,7 +709,8 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
     ii = iter_offset - 1
 
     last_residual = 0
-    penalty = 0
+    residual_penalty = 0
+    residual_normalization = 0
     residuals = []
     times = []
     patience = 0
@@ -731,8 +733,10 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         if ii < batch_size - 1:
             theta = float((ii + 1) * batch_size)
         else:
+            # Increase the learning rate for first iterations
             theta = float(batch_size ** 2 + ii + 1 - batch_size)
         beta = (theta + 1 - batch_size) / (theta + 1)
+        beta = pow(beta, rho)
 
         A *= beta
         A += np.dot(this_code, this_code.T)
@@ -748,11 +752,14 @@ def dict_learning_online(X, n_components=2, alpha=1, n_iter=100,
         # XXX: Can the residuals be of any use?
 
         # Residual computation
-        penalty += np.sum(this_X ** 2) / 2
+        residual_normalization *= beta
+        residual_normalization += 1
+        residual_penalty *= beta
+        residual_penalty += np.sum(this_X ** 2) / 2
         if method in ('lars', 'cd'):
-            penalty += alpha * np.sum(this_code)
-        this_residual += penalty
-        this_residual /= (ii + 1) * batch_size
+            residual_penalty += alpha * np.sum(this_code)
+        this_residual += residual_penalty
+        this_residual /= residual_normalization
 
         # Stopping criterion
         change_ratio = abs(this_residual / last_residual - 1)
