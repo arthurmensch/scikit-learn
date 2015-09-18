@@ -38,6 +38,7 @@ def enet_scale(v, l1_ratio=0.1, radius=1, inplace=False):
     if not inplace:
         v = v.copy()
     l1_v = np.sum(np.abs(v), axis=1) * l1_ratio
+    l1_v[l1_v == 0] = 1
     if l1_ratio != 1:
         l2_v = np.sum(v ** 2, axis=1) * (1 - l1_ratio)
         S = (- l1_v + np.sqrt(l1_v ** 2 + 4 * radius * l2_v))

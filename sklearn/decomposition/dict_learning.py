@@ -776,7 +776,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     if dict_init is not None:
         dictionary = dict_init
     else:
-        _, S, dictionary = randomized_svd(X, n_components,
+        _, S, dictionary = randomized_svd(X, n_components, n_iter=5,
                                           random_state=random_state)
         dictionary = S[:, np.newaxis] * dictionary
     r = len(dictionary)
