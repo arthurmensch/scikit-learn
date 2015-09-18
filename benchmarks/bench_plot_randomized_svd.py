@@ -57,7 +57,7 @@ References
 (2) A randomized algorithm for the decomposition of matrices
     Per-Gunnar Martinsson, Vladimir Rokhlin and Mark Tygert
 
-(3) An implementation of a randomized algorithm for principal component
+(3) An implementation of a randomized algorithm for principal componentp
     analysis
     A. Szlam et al. 2014
 """
