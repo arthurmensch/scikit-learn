@@ -100,9 +100,9 @@ MAX_MEMORY = np.int(2e9)
 
 CIFAR_FOLDER = "../../scikit_learn_data/cifar-10-batches-py/"
 SVHN_FOLDER = "../../scikit_learn_data/SVHN/"
+HCP_FOLDER = os.path.expanduser("~/scikit_learn_data/HCP")
 
-datasets = ['low rank matrix', 'lfw_people', 'olivetti_faces', '20newsgroups',
-            'MNIST original', 'CIFAR', 'a1a', 'SVHN', 'uncorrelated matrix']
+datasets = ['HCP']
 
 big_sparse_datasets = ['big sparse matrix', 'rcv1']
 
@@ -146,6 +146,8 @@ def get_data(dataset_name):
         X = np.vstack(X2)
         del X1
         del X2
+    elif dataset_name == 'HCP':
+        X = np.load(os.path.join(HCP_FOLDER, 'flat.npy'))
     elif dataset_name == 'low rank matrix':
         X = make_low_rank_matrix(n_samples=500, n_features=np.int(1e4),
                                  effective_rank=100, tail_strength=.5,
