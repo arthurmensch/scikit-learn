@@ -33,7 +33,6 @@ def enet_norm(v, l1_ratio=0.1):
             norms[i] = c_enet_norm(v[i], l1_ratio)
     return norms
 
-
 def enet_scale(v, l1_ratio=0.1, radius=1, inplace=False):
     if not inplace:
         v = v.copy()

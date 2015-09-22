@@ -789,11 +789,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
+    X_train = X
     if shuffle:
-        X_train = X.copy()
-        random_state.shuffle(X_train)
-    else:
-        X_train = X
+        permutation = random_state.permutation(n_samples)
 
     dictionary = check_array(dictionary.T, order='F', dtype=np.float64,
                              copy=False)
@@ -828,8 +826,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                        radius=radius, inplace=True)
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
-        this_X = X_train[batch]
-
+        if shuffle:
+            this_X = X_train[permutation[batch]]
+        else:
+            this_X = X_train[batch]
         dt = (time.time() - t0)
         if verbose == 1:
             sys.stdout.write(".")
@@ -879,7 +879,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         residuals_normalization += gamma
         residuals_penalty *= beta
         this_residual_penalty = np.sum(this_X ** 2) / 2
-        if method in ('lars', 'cd'):
+        if method in ('lasso_lars', 'lasso_cd'):
             this_residual_penalty += alpha * np.sum(np.abs(this_code))
         else:
             this_residual_penalty += alpha * np.sum(this_code ** 2)
