@@ -440,11 +440,4 @@ if __name__ == '__main__':
         bench_a(X, dataset_name, power_iter, n_oversamples=2,
                 n_comps=np.minimum(n_comps, np.min(X.shape)))
 
-    print(" >>>>>> Benching on simulated low rank matrix with variable rank")
-    bench_b(power_iter)
-
-    if fbpca_available:
-        print(" >>>>>> Benching sklearn and fbpca default configurations")
-        bench_c(datasets + big_sparse_datasets, n_comps)
-
     plt.show()
