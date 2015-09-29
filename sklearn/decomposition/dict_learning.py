@@ -789,13 +789,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
-    X_train = X
     if shuffle:
         permutation = random_state.permutation(n_samples)
 
     dictionary = check_array(dictionary.T, order='F', dtype=np.float64,
                              copy=False)
-    X_train = check_array(X_train, order='C', dtype=np.float64, copy=False)
+    X = check_array(X, order='C', dtype=np.float64, copy=False)
 
     batches = gen_batches(n_samples, batch_size)
     batches = itertools.cycle(batches)
@@ -827,9 +826,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     for ii, batch in zip(range(iter_offset, iter_offset + n_iter), batches):
         if shuffle:
-            this_X = X_train[permutation[batch]]
+            this_X = X[permutation[batch]]
         else:
-            this_X = X_train[batch]
+            this_X = X[batch]
         dt = (time.time() - t0)
         if verbose == 1:
             sys.stdout.write(".")
@@ -855,9 +854,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             beta = pow(beta, forget_rate)
             gamma = 1
         elif update_scheme == 'mean':
-            theta = float((ii + 1) * batch_size + 1)
+            this_batch_size = batch.stop - batch.start
+            theta = float((ii + 1) * this_batch_size + 1)
             theta = pow(theta, forget_rate)
-            beta = 1 - batch_size / theta
+            beta = 1 - this_batch_size / theta
             gamma = 1 / theta
 
         A *= beta
