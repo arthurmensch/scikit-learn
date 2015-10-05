@@ -804,13 +804,13 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         A = slowing * np.eye(n_components)
         # The data approximation
         B = dictionary * slowing
-        residuals = []
+        last_residual = np.inf
         residuals_penalty = 0
         residuals_normalization = 0
     else:
         A = inner_stats[0].copy()
         B = inner_stats[1].copy()
-        residuals = inner_stats[2][0]
+        last_residual = inner_stats[2][0]
         residuals_penalty = inner_stats[2][1]
         residuals_normalization = inner_stats[2][2]
     # For tolerance computation
@@ -887,8 +887,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         residuals_penalty += this_residual_penalty
         this_residual += residuals_penalty
         this_residual /= residuals_normalization
-        # XXX: Should we only keep last element in memory ?
-        residuals.append(this_residual)
 
         if return_debug_info:
             debug_info['values'].append(
@@ -897,12 +895,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             debug_info['density'].append(
                 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary))
             debug_info['residuals'].append(this_residual)
-
-        if len(residuals) > 2 and abs(
-                        residuals[-2] - residuals[-1]) < tol * residuals[-1]:
+        if abs(last_residual - this_residual) < tol * this_residual:
             patience += 1
         else:
             patience = 0
+        last_residual = this_residual
 
         if patience >= 3:
             if verbose == 1:
@@ -915,7 +912,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         if callback is not None:
             callback(locals())
 
-    residual_stat = (residuals, residuals_penalty, residuals_normalization)
+    residual_stat = (last_residual, residuals_penalty, residuals_normalization)
 
     if return_inner_stats:
         if return_n_iter:
