@@ -755,8 +755,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     n_samples, n_features = X.shape
 
     l1_ratio = float(l1_ratio)
-    # Alpha scaling
-    alpha = float(alpha) / sqrt(n_features)
     radius = 1.
 
     random_state = check_random_state(random_state)
