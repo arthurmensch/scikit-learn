@@ -3,7 +3,6 @@
 # License: BSD 3 clause
 
 import numpy as np
-
 from ..utils import check_random_state, check_array
 from ..utils.validation import check_is_fitted
 from ..linear_model import ridge_regression
@@ -79,6 +78,7 @@ class SparsePCA(BaseEstimator, TransformerMixin):
     MiniBatchSparsePCA
     DictionaryLearning
     """
+
     def __init__(self, n_components=None, alpha=1, ridge_alpha=0.01,
                  max_iter=1000, tol=1e-8, method='lars', n_jobs=1, U_init=None,
                  V_init=None, verbose=False, random_state=None):
@@ -235,6 +235,7 @@ class MiniBatchSparsePCA(SparsePCA):
     SparsePCA
     DictionaryLearning
     """
+
     def __init__(self, n_components=None, alpha=1, ridge_alpha=0.01,
                  n_iter=100, callback=None, batch_size=3, verbose=False,
                  shuffle=True, n_jobs=1, method='lars', random_state=None):
@@ -293,17 +294,18 @@ class IncrementalSparsePCA(MiniBatchDictionaryLearning):
                  verbose=False, random_state=None,
                  debug_info=False):
         MiniBatchDictionaryLearning.__init__(self, n_components=n_components,
-                                           alpha=alpha,
-                                           l1_ratio=l1_ratio,
-                                           fit_algorithm='ridge',
-                                           n_iter=n_iter,
-                                           n_jobs=n_jobs,
-                                           batch_size=batch_size,
-                                           tol=tol,
-                                           shuffle=shuffle,
-                                           dict_init=dict_init,
-                                           transform_alpha=transform_alpha,
-                                           verbose=verbose,
-                                           random_state=random_state,
-                                           split_sign=False,
-                                           debug_info=debug_info)
+                                             alpha=alpha,
+                                             l1_ratio=l1_ratio,
+                                             fit_algorithm='ridge',
+                                             transform_algorithm='ridge',
+                                             n_iter=n_iter,
+                                             n_jobs=n_jobs,
+                                             batch_size=batch_size,
+                                             tol=tol,
+                                             shuffle=shuffle,
+                                             dict_init=dict_init,
+                                             transform_alpha=transform_alpha,
+                                             verbose=verbose,
+                                             random_state=random_state,
+                                             split_sign=False,
+                                             debug_info=debug_info)

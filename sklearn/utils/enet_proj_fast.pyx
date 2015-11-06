@@ -90,6 +90,9 @@ cpdef void enet_projection_inplace(DOUBLE[:] v, DOUBLE[:] b, double radius,
     cdef double c
     cdef double l
     cdef double norm = 0
+    if radius == 0:
+        b[:] = 0
+        return
 
     # L2 projection
     if l1_ratio == 0:

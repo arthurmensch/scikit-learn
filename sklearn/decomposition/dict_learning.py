@@ -11,6 +11,7 @@ import itertools
 from math import sqrt, ceil
 
 import numpy as np
+from numpy.testing import assert_array_almost_equal
 from scipy import linalg
 from numpy.lib.stride_tricks import as_strided
 
@@ -21,9 +22,10 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
                      gen_batches, _get_n_jobs)
 from ..utils.extmath import randomized_svd, row_norms
 from ..utils.validation import check_is_fitted
+from ..utils.random import sample_without_replacement
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge, \
     ridge_regression
-from ..utils.enet_projection import enet_projection, enet_scale
+from ..utils.enet_projection import enet_projection, enet_scale, enet_norm
 
 
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
@@ -147,7 +149,12 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
             Gram=gram, Xy=cov, n_nonzero_coefs=int(regularization),
             tol=None, norms_squared=row_norms(X, squared=True),
             copy_Xy=copy_cov).T
-
+    elif algorithm == 'ridge':
+        # Ridge solves ||X - DC||^2_2 + alpha * ||C||_2^2,
+        # we want to solve 1 / 2 ||X - DC||^2_2 + alpha * ||C||_2^2
+        alpha = float(regularization) * 2
+        new_code = ridge_regression(dictionary.T, X.T, alpha,
+                                    solver='cholesky')
     else:
         raise ValueError('Sparse coding method must be "lasso_lars" '
                          '"lasso_cd",  "lasso", "threshold" or "omp",'
@@ -354,6 +361,8 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
 
+    radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
+
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
@@ -400,7 +409,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         # Projecting onto the norm ball
         if l1_ratio != 0.:
             dictionary[:, k] = enet_projection(dictionary[:, k],
-                                               radius=1,
+                                               radius=radius[k],
                                                l1_ratio=l1_ratio,
                                                check_input=False)
         else:
@@ -576,15 +585,9 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
                   % (ii, dt, dt / 60, current_cost))
 
         # Update code
-        if method in ['lasso_cd', 'lasso_lars']:
-            code = sparse_encode(X, dictionary, algorithm=method, alpha=alpha,
-                                 init=code, n_jobs=n_jobs, check_input=False,
-                                 random_state=random_state)
-        elif method in ['ridge']:
-            # Ridge solves ||X - DC||^2_2 + alpha * ||C||_2^2,
-            # we want to solve 1 / 2 ||X - DC||^2_2 + alpha * ||C||_2^2
-            code = ridge_regression(dictionary.T, X.T, alpha * 2,
-                                    solver='cholesky')
+        code = sparse_encode(X, dictionary, algorithm=method, alpha=alpha,
+                             init=code, n_jobs=n_jobs, check_input=False,
+                             random_state=random_state)
         # Update dictionary
         dictionary, residuals = _update_dict(dictionary.T, X.T, code.T,
                                              verbose=verbose, return_r2=True,
@@ -744,6 +747,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     MiniBatchDictionaryLearning
     SparsePCA
     MiniBatchSparsePCA
+    :param update_scheme:
 
     """
     if n_components is None:
@@ -834,6 +838,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             this_X = X[permutation[batch]]
         else:
             this_X = X[batch]
+        if ii % 100 == 0:
+            # print("Full update")
+            this_subset = slice(0, n_features)
+            this_alpha = alpha
+        else:
+            this_subset = sample_without_replacement(n_features,
+                                                     n_features // 10,
+                                                     random_state=random_state)
+            this_alpha = alpha / n_features * len(this_subset)
         dt = (time.time() - t0)
         if verbose == 1:
             sys.stdout.write(".")
@@ -842,17 +855,17 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             if verbose > 10 or ii % ceil(100. / verbose) == 0:
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
-
-        if method in ['lasso_cd', 'lasso_lars']:
-            this_code = sparse_encode(this_X, dictionary.T, algorithm=method,
-                                      alpha=alpha, n_jobs=1,
-                                      check_input=False,
-                                      random_state=random_state).T
-        elif method in ['ridge']:
-            # Ridge solves ||X - DC||^2_2 + alpha * ||C||_2^2,
-            # we want to solve 1 / 2 ||X - DC||^2_2 + alpha * ||C||_2^2
-            this_code = ridge_regression(dictionary, this_X.T, alpha * 2,
-                                         solver='cholesky').T
+        subset_dictionary = check_array(dictionary[this_subset], order='F',
+                                        copy=True)
+        # l1_subset_dictionary = np.sum(np.abs(subset_dictionary), axis=0)
+        # subset_dictionary /= l1_subset_dictionary[np.newaxis, :]
+        this_code = sparse_encode(this_X[:, this_subset],
+                                  subset_dictionary.T,
+                                  algorithm=method,
+                                  alpha=this_alpha,
+                                  n_jobs=1,
+                                  check_input=False,
+                                  random_state=random_state).T
 
         # Update the inner statistics
         if update_scheme == 'exp_decay':
@@ -875,15 +888,18 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         A *= beta
         A += np.dot(this_code, this_code.T) * gamma
         B *= beta
-        B += np.dot(this_X.T, this_code.T) * gamma
+        B[this_subset] += np.dot(this_X[:, this_subset].T, this_code.T) * gamma
 
         # Update dictionary
-        dictionary, current_cost = _update_dict(dictionary, B, A,
-                                                verbose=verbose,
-                                                l1_ratio=l1_ratio,
-                                                random_state=random_state,
-                                                return_r2=True,
-                                                online=True, shuffle=shuffle)
+        subset_dictionary, current_cost = _update_dict(
+            subset_dictionary,
+            B[this_subset], A,
+            verbose=verbose,
+            l1_ratio=l1_ratio,
+            random_state=random_state,
+            return_r2=True,
+            online=True, shuffle=shuffle)
+        dictionary[this_subset] = subset_dictionary
 
         # Residual computation
         cost_normalization *= beta
@@ -891,9 +907,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         cost_penalty *= beta
         this_penalty = np.sum(this_X ** 2) / 2
         if method in ('lasso_lars', 'lasso_cd'):
-            this_penalty += alpha * np.sum(np.abs(this_code))
+            this_penalty += this_alpha * np.sum(np.abs(this_code))
         else:
-            this_penalty += alpha * np.sum(this_code ** 2)
+            this_penalty += this_alpha * np.sum(this_code ** 2)
         this_penalty *= gamma
         cost_penalty += this_penalty
         current_cost += cost_penalty
@@ -1430,6 +1446,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             l1_ratio=self.l1_ratio,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
+            update_scheme='exp_decay',
+            forget_rate=0.5,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=random_state,
