@@ -15,7 +15,7 @@ def run():
     # Learn the dictionary of images
 
     print('Learning the dictionary... ')
-    rng = np.random.RandomState(0)
+    rng = 0
     incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.01,
                                      n_iter=100000,
                                      random_state=rng, verbose=2,
@@ -27,8 +27,7 @@ def run():
     t0 = time.time()
 
 
-    # The online learning part: cycle over the whole dataset 6 times
-    for i in range(30):
+    for i in range(100):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)

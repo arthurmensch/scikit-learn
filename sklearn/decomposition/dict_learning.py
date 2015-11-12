@@ -314,7 +314,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     return code
 
 
-def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+def _update_dict(dictionary, Y, code, features, verbose=False, return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
@@ -356,6 +356,9 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
 
     """
     threshold = 1e-20
+
+    features[features == 0] = 1
+    dictionary *= features[:, np.newaxis]
 
     n_components = len(code)
     n_features = Y.shape[0]
@@ -407,6 +410,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
             code[k, :] = 0.0
 
         # Projecting onto the norm ball
+        dictionary[:, k] /= features
         if l1_ratio != 0.:
             dictionary[:, k] = enet_projection(dictionary[:, k],
                                                radius=radius[k],
@@ -414,10 +418,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                                                check_input=False)
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
-
+        dictionary[:, k] *= features
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-
+    dictionary /= features[:, np.newaxis]
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -811,6 +815,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     # The covariance of the dictionary
     if inner_stats is None:
+        features = np.zeros(n_features)
         A = np.zeros((n_components, n_components))
         # The data approximation
         B = np.zeros_like(dictionary)
@@ -820,6 +825,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     else:
         A = inner_stats[0].copy()
         B = inner_stats[1].copy()
+        features = inner_stats[3]
         last_cost = inner_stats[2][0]
         cost_penalty = inner_stats[2][1]
         cost_normalization = inner_stats[2][2]
@@ -884,17 +890,16 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         #     this_batch_size = batch.stop - batch.start
         #     theta = float((ii + 1) * this_batch_size + 1)
         #     theta = pow(theta, forget_rate)
-        #     thetaA = theta * len(this_subset) / n_features
-        #     betaA = 1 - this_batch_size / thetaA
-        #     gammaA = 1 / thetaA
         #     beta = 1 - this_batch_size / theta
         #     gamma = 1 / theta
 
         beta = 1
         gamma = 1
 
+        features *= 1 / (1 + 1 / float((ii + 1)))
+        features[this_subset] += 1 / float((ii + 1) + 1)
         A *= beta
-        A += gamma * np.dot(this_code, this_code.T) * len(this_subset) / n_features
+        A += gamma * np.dot(this_code, this_code.T)
         B *= beta
         B[this_subset] += gamma * np.dot(this_X[:, this_subset].T, this_code.T)
 
@@ -902,6 +907,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         subset_dictionary, current_cost = _update_dict(
             subset_dictionary,
             B[this_subset], A,
+            features[this_subset],
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
@@ -950,9 +956,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     if return_inner_stats:
         if return_n_iter:
-            res = dictionary.T, (A, B, residual_stat), ii - iter_offset + 1
+            res = dictionary.T, (A, B, residual_stat, features), ii - iter_offset + 1
         else:
-            res = dictionary.T, (A, B, residual_stat)
+            res = dictionary.T, (A, B, residual_stat, features)
     elif return_code:
         if verbose > 1:
             print('Learning code...', end=' ')
@@ -1441,7 +1447,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         ----------
         X: array-like, shape (n_samples, n_features)
             Training vector, where n_samples in the number of samples
-            and n_features is the number of features.
+            and n_features is the   number of features.
 
         Returns
         -------

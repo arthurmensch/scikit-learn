@@ -310,6 +310,5 @@ class IncrementalSparsePCA(MiniBatchDictionaryLearning):
                                              verbose=verbose,
                                              random_state=random_state,
                                              feature_ratio=feature_ratio,
-
                                              split_sign=False,
                                              debug_info=debug_info)
