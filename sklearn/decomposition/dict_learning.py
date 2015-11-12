@@ -890,14 +890,13 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         #     beta = 1 - this_batch_size / theta
         #     gamma = 1 / theta
 
-        theta = float((ii + 1) * batch_size)
         beta = 1
         gamma = 1
 
         A *= beta
-        A += np.dot(this_code, this_code.T) * len(this_subset) / n_features
+        A += gamma * np.dot(this_code, this_code.T) * len(this_subset) / n_features
         B *= beta
-        B[this_subset] += np.dot(this_X[:, this_subset].T, this_code.T)
+        B[this_subset] += gamma * np.dot(this_X[:, this_subset].T, this_code.T)
 
         # Update dictionary
         subset_dictionary, current_cost = _update_dict(
@@ -914,7 +913,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         cost_normalization *= beta
         cost_normalization += gamma
         cost_penalty *= beta
-        this_penalty = np.sum(this_X ** 2) / 2
+        this_penalty = np.sum(this_X[:, this_subset] ** 2) / 2
         if method in ('lasso_lars', 'lasso_cd'):
             this_penalty += this_alpha * np.sum(np.abs(this_code))
         else:

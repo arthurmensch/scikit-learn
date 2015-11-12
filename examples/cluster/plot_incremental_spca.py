@@ -28,7 +28,7 @@ def run():
 
 
     # The online learning part: cycle over the whole dataset 6 times
-    for i in range(100):
+    for i in range(30):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)
