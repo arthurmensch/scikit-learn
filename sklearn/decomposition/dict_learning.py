@@ -627,6 +627,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          method='lars',
                          iter_offset=0, tol=0.,
+                         feature_ratio=1,
                          random_state=None,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False,
@@ -838,13 +839,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             this_X = X[permutation[batch]]
         else:
             this_X = X[batch]
-        if ii % 100 == 0:
+        if False:  # ii % 100 == 0:
             # print("Full update")
             this_subset = slice(0, n_features)
             this_alpha = alpha
         else:
             this_subset = sample_without_replacement(n_features,
-                                                     n_features // 10,
+                                                     int(n_features /
+                                                     feature_ratio),
                                                      random_state=random_state)
             this_alpha = alpha / n_features * len(this_subset)
         dt = (time.time() - t0)
@@ -868,27 +870,34 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                                   random_state=random_state).T
 
         # Update the inner statistics
-        if update_scheme == 'exp_decay':
-            if ii < batch_size - 1:
-                theta = float((ii + 1) * batch_size)
-            else:
-                # Increase the learning rate for first iterations
-                theta = float(batch_size ** 2 + ii + 1 - batch_size)
-            beta = (theta + 1 - batch_size) / (theta + 1)
-            beta = pow(beta, forget_rate)
-            gamma = 1
-        # More stable ?
-        elif update_scheme == 'mean':
-            this_batch_size = batch.stop - batch.start
-            theta = float((ii + 1) * this_batch_size + 1)
-            theta = pow(theta, forget_rate)
-            beta = 1 - this_batch_size / theta
-            gamma = 1 / theta
+        # if update_scheme == 'exp_decay':
+        #     if ii < batch_size - 1:
+        #         theta = float((ii + 1) * batch_size)
+        #     else:
+        #         # Increase the learning rate for first iterations
+        #         theta = float(batch_size ** 2 + ii + 1 - batch_size)
+        #     beta = (theta + 1 - batch_size) / (theta + 1)
+        #     beta = pow(beta, forget_rate)
+        #     gamma = 1
+        # # More stable ?
+        # elif update_scheme == 'mean':
+        #     this_batch_size = batch.stop - batch.start
+        #     theta = float((ii + 1) * this_batch_size + 1)
+        #     theta = pow(theta, forget_rate)
+        #     thetaA = theta * len(this_subset) / n_features
+        #     betaA = 1 - this_batch_size / thetaA
+        #     gammaA = 1 / thetaA
+        #     beta = 1 - this_batch_size / theta
+        #     gamma = 1 / theta
+
+        theta = float((ii + 1) * batch_size)
+        beta = 1
+        gamma = 1
 
         A *= beta
-        A += np.dot(this_code, this_code.T) * gamma
+        A += np.dot(this_code, this_code.T) * len(this_subset) / n_features
         B *= beta
-        B[this_subset] += np.dot(this_X[:, this_subset].T, this_code.T) * gamma
+        B[this_subset] += np.dot(this_X[:, this_subset].T, this_code.T)
 
         # Update dictionary
         subset_dictionary, current_cost = _update_dict(
@@ -1407,7 +1416,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
                  random_state=None,
-                 debug_info=False):
+                 debug_info=False,
+                 feature_ratio=1):
         self._set_sparse_coding_params(n_components, transform_algorithm,
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
@@ -1423,6 +1433,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.random_state = random_state
         self.tol = tol
         self.debug_info = debug_info
+        self.feature_ratio = feature_ratio
 
     def fit(self, X, y=None):
         """Fit the model from data in X.
@@ -1446,8 +1457,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             l1_ratio=self.l1_ratio,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
-            update_scheme='exp_decay',
-            forget_rate=0.5,
+            update_scheme='mean',
+            forget_rate=1,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=random_state,
@@ -1455,7 +1466,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             # To be able to run partial_fit behind a fit
             return_inner_stats=True,
             return_n_iter=True,
-            return_debug_info=self.debug_info)
+            return_debug_info=self.debug_info,
+            feature_ratio=self.feature_ratio)
 
         if self.debug_info:
             (U, (A, B, self.inner_stats_), n_iter), debug_info = res
@@ -1514,6 +1526,9 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             l1_ratio=self.l1_ratio,
             n_iter=n_iter,
             tol=0,
+            update_scheme='mean',
+            forget_rate=1.,
+            feature_ratio=self.feature_ratio,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
             # Loading whole X in memory if deprecated

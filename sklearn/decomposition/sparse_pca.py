@@ -238,7 +238,8 @@ class MiniBatchSparsePCA(SparsePCA):
 
     def __init__(self, n_components=None, alpha=1, ridge_alpha=0.01,
                  n_iter=100, callback=None, batch_size=3, verbose=False,
-                 shuffle=True, n_jobs=1, method='lars', random_state=None):
+                 shuffle=True, n_jobs=1, method='lars', random_state=None,
+                 feature_ratio=1):
 
         self.n_components = n_components
         self.alpha = alpha
@@ -251,6 +252,7 @@ class MiniBatchSparsePCA(SparsePCA):
         self.n_jobs = n_jobs
         self.method = method
         self.random_state = random_state
+
 
     def fit(self, X, y=None):
         """Fit the model from data in X.
@@ -276,7 +278,6 @@ class MiniBatchSparsePCA(SparsePCA):
             X.T, n_components, alpha=self.alpha,
             n_iter=self.n_iter, return_code=True,
             dict_init=None, verbose=self.verbose,
-            callback=self.callback,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
             n_jobs=self.n_jobs, method=self.method,
@@ -292,7 +293,8 @@ class IncrementalSparsePCA(MiniBatchDictionaryLearning):
                  batch_size=3, tol=0., shuffle=True, dict_init=None,
                  transform_alpha=None,
                  verbose=False, random_state=None,
-                 debug_info=False):
+                 debug_info=False,
+                 feature_ratio=1):
         MiniBatchDictionaryLearning.__init__(self, n_components=n_components,
                                              alpha=alpha,
                                              l1_ratio=l1_ratio,
@@ -307,5 +309,7 @@ class IncrementalSparsePCA(MiniBatchDictionaryLearning):
                                              transform_alpha=transform_alpha,
                                              verbose=verbose,
                                              random_state=random_state,
+                                             feature_ratio=feature_ratio,
+
                                              split_sign=False,
                                              debug_info=debug_info)
