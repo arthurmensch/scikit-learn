@@ -358,13 +358,13 @@ def _update_dict(dictionary, Y, code, features, verbose=False, return_r2=False,
     threshold = 1e-20
 
     features[features == 0] = 1
-    dictionary *= features[:, np.newaxis]
 
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
 
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
+    dictionary *= features[:, np.newaxis]
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
