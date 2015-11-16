@@ -363,7 +363,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     random_state = check_random_state(random_state)
 
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
-    print('Radius: %s' % radius)
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -846,9 +845,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     if subsets is None:
         subsets = gen_cycling_subsets(n_features, n_features / feature_ratio, random=(feature_ratio > 1))
-
+    total_time = 0
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter), batches, subsets):
-        print(len(subset))
+        t0 = time.time()
         if shuffle:
             this_X = X[permutation[batch]]
         else:
@@ -873,34 +872,21 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                                   check_input=False,
                                   random_state=random_state).T
 
-        # Update the inner statistics
-        # if update_scheme == 'exp_decay':
-        #     if ii < batch_size - 1:
-        #         theta = float((ii + 1) * batch_size)
-        #     else:
-        #         # Increase the learning rate for first iterations
-        #         theta = float(batch_size ** 2 + ii + 1 - batch_size)
-        #     beta = (theta + 1 - batch_size) / (theta + 1)
-        #     beta = pow(beta, forget_rate)
-        #     gamma = 1
-        # # More stable ?
-        # elif update_scheme == 'mean':
-        #     this_batch_size = batch.stop - batch.start
-        #     theta = float((ii + 1) * this_batch_size + 1)
-        #     theta = pow(theta, forget_rate)
-        #     beta = 1 - this_batch_size / theta
-        #     gamma = 1 / theta
         len_batch = batch.stop - batch.start
         cost_normalization += len_batch
         A *= 1 - len_batch / cost_normalization
         A += np.dot(this_code, this_code.T) * len(subset) / n_features / cost_normalization
-        A_ref *= 1 - len_batch / cost_normalization
-        A_ref += np.dot(this_code, this_code.T) / cost_normalization
         B *= 1 - len_batch / cost_normalization
         B[subset] += np.dot(this_X[:, subset].T, this_code.T) / cost_normalization
+        total_time += time.time() - t0
+
+        A_ref *= 1 - len_batch / cost_normalization
+        A_ref += np.dot(this_code, this_code.T) / cost_normalization
         B_ref *= 1 - len_batch / cost_normalization
         B_ref += np.dot(this_X.T, this_code.T) / cost_normalization
         # Update dictionary
+
+        t0 = time.time()
         subset_dictionary, objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
@@ -910,11 +896,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             return_r2=True,
             online=True, shuffle=shuffle)
         dictionary[subset] = subset_dictionary
-        print(enet_norm(dictionary.T, l1_ratio=l1_ratio))
+        total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))
-        # print('_update_dict: %.4f' % objective_cost)
-        # print('real: %.4f' % real_objective_cost)
         # Residual computation
         norm_cost *= 1 - len_batch / cost_normalization
         norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
@@ -936,7 +920,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             debug_info['norm_cost'].append(norm_cost)
             debug_info['penalty_cost'].append(penalty_cost)
             debug_info['objective_cost'].append(objective_cost)
-
         if abs(last_cost - current_cost) < tol * current_cost:
             patience += 1
         else:
@@ -952,6 +935,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             break
 
     residual_stat = (last_cost, norm_cost, penalty_cost, cost_normalization)
+    debug_info['total_time'] = total_time
 
     if return_inner_stats:
         if return_n_iter:
