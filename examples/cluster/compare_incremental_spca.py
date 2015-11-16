@@ -1,0 +1,87 @@
+import time
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
+from sklearn import datasets
+from sklearn.externals.joblib import Parallel, delayed, Memory
+
+
+def single_run(estimator, data):
+    for i in range(20):
+        print('Epoch %i' % i)
+        this_data = data.copy()
+        this_data -= np.mean(this_data, axis=0)
+        this_data /= np.std(this_data, axis=0)
+        estimator.partial_fit(this_data, deprecated=False)
+    this_data = this_data[:3]
+    code = estimator.transform(this_data)
+    reconstruction = code.dot(estimator.components_)
+    estimator.subsets_ = None
+    return estimator, reconstruction
+
+
+def run():
+    faces = datasets.fetch_olivetti_faces()
+
+    data = faces.images.reshape((faces.images.shape[0], -1))
+
+    ###############################################################################
+    # Learn the dictionary of images
+
+    print('Learning the dictionary... ')
+    rng = 0
+    estimators = []
+    for feature_ratio in np.arange(1, 10):
+        estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.01,
+                                               n_iter=100000,
+                                               random_state=rng, verbose=2,
+                                               batch_size=20,
+                                               debug_info=True,
+                                               feature_ratio=feature_ratio))
+
+    t0 = time.time()
+
+    mem = Memory(cachedir='cache')
+    cached_single_run = mem.cache(single_run)
+
+    res = Parallel(n_jobs=4)(delayed(single_run)(estimator, data) for estimator in estimators)
+    estimators, reconstruction = zip(*res)
+    dt = time.time() - t0
+    print('done in %.2fs.' % dt)
+
+    ###############################################################################
+    # Plot the results
+    plt.figure(figsize=(4.2, 4))
+    for j, estimator in enumerate(estimators):
+        for i, component in enumerate(estimator.components_[:3]):
+            if np.sum(component > 0) < np.sum(component < 0):
+                component *= -1
+            plt.subplot(10, 3, 3 * j + i + 1)
+            plt.imshow(component.reshape(faces.images[0].shape), cmap=plt.cm.gray,
+                       interpolation='nearest')
+            plt.xticks(())
+            plt.yticks(())
+
+    plt.suptitle('Patches of faces\nTrain time %.1fs on %d patches' %
+                 (dt, 10 * len(faces.images)), fontsize=16)
+    plt.subplots_adjust(0.08, 0.02, 0.92, 0.85, 0.08, 0.23)
+
+    plt.figure(figsize=(4.2, 4))
+    for j, (estimator, reconstructions) in enumerate(zip(estimators, reconstruction)):
+        for i, img in enumerate(reconstructions):
+            plt.subplot(10, 3, 3 * j + i + 1)
+            plt.imshow(img.reshape(faces.images[0].shape), cmap=plt.cm.gray,
+                       interpolation='nearest')
+            plt.xticks(())
+            plt.yticks(())
+
+    plt.figure(figsize=(4.2, 4))
+    for estimator in estimators:
+        residuals = estimator.debug_info_['residuals']
+        plt.plot(np.arange(len(residuals)), residuals, label='ratio %i' % estimator.feature_ratio)
+        plt.legend()
+    plt.show()
+
+
+if __name__ == '__main__':
+    run()
