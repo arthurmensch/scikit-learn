@@ -366,11 +366,11 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
             accumulate = None
         batches = gen_batches(len(permutation), batch_size)
         for batch in batches:
-            if batch.stop - batch.start != batch_size:
-                continue
-                # accumulate = permutation[batch]
-            else:
-                yield permutation[batch]
+            # if batch.stop - batch.start != batch_size:
+            #     continue
+            #     # accumulate = permutation[batch]
+            # else:
+            yield permutation[batch]
 
 
 def _get_n_jobs(n_jobs):
