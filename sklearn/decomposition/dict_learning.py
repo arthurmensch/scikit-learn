@@ -888,11 +888,16 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         #     theta = pow(theta, forget_rate)
         #     beta = 1 - this_batch_size / theta
         #     gamma = 1 / theta
-
-        A += np.dot(this_code, this_code.T) * len(subset) / n_features
-        A_ref += np.dot(this_code, this_code.T)
-        B[subset] += np.dot(this_X[:, subset].T, this_code.T)
-        B_ref += np.dot(this_X.T, this_code.T)
+        len_batch = batch.stop - batch.start
+        cost_normalization += len_batch
+        A *= 1 - len_batch / cost_normalization
+        A += np.dot(this_code, this_code.T) * len(subset) / n_features / cost_normalization
+        A_ref *= 1 - len_batch / cost_normalization
+        A_ref += np.dot(this_code, this_code.T) / cost_normalization
+        B *= 1 - len_batch / cost_normalization
+        B[subset] += np.dot(this_X[:, subset].T, this_code.T) / cost_normalization
+        B_ref *= 1 - len_batch / cost_normalization
+        B_ref += np.dot(this_X.T, this_code.T) / cost_normalization
         # Update dictionary
         subset_dictionary, objective_cost = _update_dict(
             subset_dictionary,
@@ -908,13 +913,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         # print('_update_dict: %.4f' % objective_cost)
         # print('real: %.4f' % real_objective_cost)
         # Residual computation
-        cost_normalization += batch.stop - batch.start
-        norm_cost += np.sum(this_X ** 2) / 2
+        print(objective_cost)
+        norm_cost *= 1 - len_batch / cost_normalization
+        norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
+        penalty_cost *= 1 - len_batch / cost_normalization
         if method in ('lasso_lars', 'lasso_cd'):
-            penalty_cost += alpha * np.sum(np.abs(this_code))
+            penalty_cost += alpha * np.sum(np.abs(this_code)) / cost_normalization
         else:
-            penalty_cost += alpha * np.sum(this_code ** 2)
-        current_cost = (objective_cost + norm_cost + penalty_cost) / cost_normalization
+            penalty_cost += alpha * np.sum(this_code ** 2) / cost_normalization
+        current_cost = objective_cost + norm_cost + penalty_cost
 
         # XXX to remove
         if return_debug_info:
@@ -924,9 +931,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             debug_info['density'].append(
                 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary))
             debug_info['residuals'].append(current_cost)
-            debug_info['norm_cost'].append(norm_cost / cost_normalization)
-            debug_info['penalty_cost'].append(penalty_cost / cost_normalization)
-            debug_info['objective_cost'].append(objective_cost / cost_normalization)
+            debug_info['norm_cost'].append(norm_cost)
+            debug_info['penalty_cost'].append(penalty_cost)
+            debug_info['objective_cost'].append(objective_cost)
 
         if abs(last_cost - current_cost) < tol * current_cost:
             patience += 1
