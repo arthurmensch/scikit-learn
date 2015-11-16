@@ -353,6 +353,25 @@ def gen_even_slices(n, n_packs, n_samples=None):
             start = end
 
 
+def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
+    random_state = check_random_state(random_state)
+    accumulate = None
+    while True:
+        if random:
+            permutation = random_state.permutation(n)
+        else:
+            permutation = np.arange(n)
+        if accumulate is not None:
+            permutation = np.concatenate((accumulate, permutation))
+            accumulate = None
+        batches = gen_batches(len(permutation), batch_size)
+        for batch in batches:
+            if batch.stop - batch.start != batch_size:
+                accumulate = permutation[batch]
+            else:
+                yield permutation[batch]
+
+
 def _get_n_jobs(n_jobs):
     """Get number of jobs for the computation.
 

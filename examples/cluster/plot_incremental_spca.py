@@ -27,7 +27,7 @@ def run():
     t0 = time.time()
 
 
-    for i in range(100):
+    for i in range(20):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)
@@ -80,8 +80,11 @@ def run():
     residuals = incr_spca.debug_info_['residuals']
 
     plt.figure(figsize=(4.2, 4))
-    plt.plot(np.arange(len(residuals)), residuals)
-
+    plt.plot(np.arange(len(residuals)), residuals, label='Residuals')
+    plt.plot(np.arange(len(residuals)), incr_spca.debug_info_['norm_cost'], label='Norm cost')
+    plt.plot(np.arange(len(residuals)), incr_spca.debug_info_['objective_cost'], label='Objective cost')
+    plt.plot(np.arange(len(residuals)), incr_spca.debug_info_['penalty_cost'], label='Penalty cost')
+    plt.legend()
     plt.show()
 
 if __name__ == '__main__':
