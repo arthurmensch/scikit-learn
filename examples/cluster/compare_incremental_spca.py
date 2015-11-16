@@ -1,4 +1,6 @@
 import time
+from os.path import expanduser
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
@@ -7,7 +9,7 @@ from sklearn.externals.joblib import Parallel, delayed, Memory
 
 
 def single_run(estimator, data):
-    for i in range(20):
+    for i in range(100):
         print('Epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
@@ -41,10 +43,10 @@ def run():
 
     t0 = time.time()
 
-    mem = Memory(cachedir='cache')
+    mem = Memory(cachedir=expanduser('~/sklearn_cache'), verbose=10)
     cached_single_run = mem.cache(single_run)
 
-    res = Parallel(n_jobs=4)(delayed(single_run)(estimator, data) for estimator in estimators)
+    res = Parallel(n_jobs=16, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
     estimators, reconstruction = zip(*res)
     dt = time.time() - t0
     print('done in %.2fs.' % dt)
@@ -65,6 +67,8 @@ def run():
     plt.suptitle('Patches of faces\nTrain time %.1fs on %d patches' %
                  (dt, 10 * len(faces.images)), fontsize=16)
     plt.subplots_adjust(0.08, 0.02, 0.92, 0.85, 0.08, 0.23)
+    plt.savefig(expanduser('~/output/incr_spca/components.pdf'))
+
 
     plt.figure(figsize=(4.2, 4))
     for j, (estimator, reconstructions) in enumerate(zip(estimators, reconstruction)):
@@ -74,13 +78,15 @@ def run():
                        interpolation='nearest')
             plt.xticks(())
             plt.yticks(())
+    plt.savefig(expanduser('~/output/incr_spca/reconstruction.pdf'))
+
 
     plt.figure(figsize=(4.2, 4))
     for estimator in estimators:
         residuals = estimator.debug_info_['residuals']
         plt.plot(np.arange(len(residuals)), residuals, label='ratio %i' % estimator.feature_ratio)
         plt.legend()
-    plt.show()
+    plt.savefig(expanduser('~/output/incr_spca/residuals.pdf'))
 
 
 if __name__ == '__main__':
