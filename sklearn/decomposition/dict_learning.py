@@ -363,6 +363,7 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     random_state = check_random_state(random_state)
 
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
+    print('Radius: %s' % radius)
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -847,6 +848,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         subsets = gen_cycling_subsets(n_features, n_features / feature_ratio, random=(feature_ratio > 1))
 
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter), batches, subsets):
+        print(len(subset))
         if shuffle:
             this_X = X[permutation[batch]]
         else:
@@ -908,6 +910,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             return_r2=True,
             online=True, shuffle=shuffle)
         dictionary[subset] = subset_dictionary
+        print(enet_norm(dictionary.T, l1_ratio=l1_ratio))
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))
         # print('_update_dict: %.4f' % objective_cost)

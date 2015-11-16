@@ -9,17 +9,19 @@ from sklearn.externals.joblib import Parallel, delayed, Memory
 
 
 def single_run(estimator, data):
+    t0 = time.time()
     for i in range(100):
         print('Epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
+    compute_time = time.time() - t0
     this_data = this_data[:3]
     code = estimator.transform(this_data)
     reconstruction = code.dot(estimator.components_)
     estimator.subsets_ = None
-    return estimator, reconstruction
+    return estimator, reconstruction, compute_time
 
 
 def run():
@@ -47,7 +49,7 @@ def run():
     cached_single_run = mem.cache(single_run)
 
     res = Parallel(n_jobs=16, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
-    estimators, reconstruction = zip(*res)
+    estimators, reconstructions, compute_times = zip(*res)
     dt = time.time() - t0
     print('done in %.2fs.' % dt)
 
@@ -71,8 +73,8 @@ def run():
 
 
     plt.figure(figsize=(4.2, 4))
-    for j, (estimator, reconstructions) in enumerate(zip(estimators, reconstruction)):
-        for i, img in enumerate(reconstructions):
+    for j, (estimator, reconstruction) in enumerate(zip(estimators, reconstructions)):
+        for i, img in enumerate(reconstruction):
             plt.subplot(10, 3, 3 * j + i + 1)
             plt.imshow(img.reshape(faces.images[0].shape), cmap=plt.cm.gray,
                        interpolation='nearest')
@@ -82,7 +84,7 @@ def run():
 
 
     plt.figure(figsize=(4.2, 4))
-    for estimator in estimators:
+    for estimator, compute_time in zip(estimators, compute_times):
         residuals = estimator.debug_info_['residuals']
         plt.plot(np.arange(len(residuals)), residuals, label='ratio %i' % estimator.feature_ratio)
         plt.legend()
