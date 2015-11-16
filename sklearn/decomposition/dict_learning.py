@@ -913,7 +913,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         # print('_update_dict: %.4f' % objective_cost)
         # print('real: %.4f' % real_objective_cost)
         # Residual computation
-        print(objective_cost)
         norm_cost *= 1 - len_batch / cost_normalization
         norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
         penalty_cost *= 1 - len_batch / cost_normalization

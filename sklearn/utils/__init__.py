@@ -366,8 +366,9 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
             accumulate = None
         batches = gen_batches(len(permutation), batch_size)
         for batch in batches:
-            if False:  #batch.stop - batch.start != batch_size:
-                accumulate = permutation[batch]
+            if batch.stop - batch.start != batch_size:
+                continue
+                # accumulate = permutation[batch]
             else:
                 yield permutation[batch]
 
