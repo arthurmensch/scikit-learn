@@ -43,7 +43,7 @@ def run():
     # Learn the dictionary of images
 
     print('Learning the dictionary... ')
-    rng = 0
+    rng = 30
     estimators = []
     for feature_ratio in np.linspace(1, 10, 7):
         estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.01,
