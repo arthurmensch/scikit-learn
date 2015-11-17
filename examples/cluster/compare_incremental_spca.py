@@ -1,10 +1,10 @@
 import time
 from os.path import expanduser
-
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn import datasets
+from sklearn.base import clone
 from sklearn.externals.joblib import Parallel, delayed, Memory
 
 
@@ -15,19 +15,23 @@ def single_run(estimator, data):
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
+    first_time = estimator.debug_info_['total_time']
     feature_ratio = estimator.feature_ratio
+    delattr(estimator, 'inner_stats_')
     estimator.set_params(feature_ratio=1)
-    for i in range(20):
+    for i in range(200):
+        print('New epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
+    second_time = estimator.debug_info_['total_time'] - first_time
     estimator.set_params(feature_ratio=feature_ratio)
     this_data = this_data[:3]
     code = estimator.transform(this_data)
     reconstruction = code.dot(estimator.components_)
     estimator.subsets_ = None
-    return estimator, reconstruction, estimator.debug_info_['total_time']
+    return estimator, reconstruction, (first_time, second_time)
 
 
 def run():
@@ -54,7 +58,7 @@ def run():
     mem = Memory(cachedir=expanduser('~/sklearn_cache'), verbose=10)
     cached_single_run = mem.cache(single_run)
 
-    res = Parallel(n_jobs=1, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
+    res = Parallel(n_jobs=7, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
     estimators, reconstructions, compute_times = zip(*res)
     dt = time.time() - t0
     print(compute_times)
@@ -78,7 +82,6 @@ def run():
     plt.subplots_adjust(0.08, 0.02, 0.92, 0.85, 0.08, 0.23)
     plt.savefig(expanduser('~/output/incr_spca/components.pdf'))
 
-
     plt.figure(figsize=(4.2, 4))
     for j, (estimator, reconstruction) in enumerate(zip(estimators, reconstructions)):
         for i, img in enumerate(reconstruction):
@@ -89,12 +92,14 @@ def run():
             plt.yticks(())
     plt.savefig(expanduser('~/output/incr_spca/reconstruction.pdf'))
 
-
     plt.figure(figsize=(8, 8))
     for estimator, compute_time in zip(estimators, compute_times):
         residuals = estimator.debug_info_['residuals']
-        plt.plot(np.linspace(0, 1, len(residuals)) * compute_time, residuals, label='ratio %.2f'
-                                                                                    % estimator.feature_ratio)
+        plt.plot(np.concatenate((np.linspace(0, compute_time[0], len(residuals) // 2, endpoint=False),
+                                 np.linspace(compute_time[0], compute_time[0] + compute_time[1],
+                                             len(residuals) // 2))), residuals,
+                 label='ratio %.2f' % estimator.feature_ratio)
+        plt.scatter(compute_time[0], residuals[len(residuals) // 2 - 1])
         plt.legend()
     plt.savefig(expanduser('~/output/incr_spca/residuals.pdf'))
 
