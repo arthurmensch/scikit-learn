@@ -16,13 +16,13 @@ def single_run(estimator, data):
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
     feature_ratio = estimator.feature_ratio
-    estimator.set_parameters(feature_ratio=1)
+    estimator.set_params(feature_ratio=1)
     for i in range(20):
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
-    estimator.set_parameters(feature_ratio=feature_ratio)
+    estimator.set_params(feature_ratio=feature_ratio)
     this_data = this_data[:3]
     code = estimator.transform(this_data)
     reconstruction = code.dot(estimator.components_)
@@ -54,7 +54,7 @@ def run():
     mem = Memory(cachedir=expanduser('~/sklearn_cache'), verbose=10)
     cached_single_run = mem.cache(single_run)
 
-    res = Parallel(n_jobs=7, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
+    res = Parallel(n_jobs=1, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
     estimators, reconstructions, compute_times = zip(*res)
     dt = time.time() - t0
     print(compute_times)
