@@ -9,8 +9,14 @@ from sklearn.externals.joblib import Parallel, delayed, Memory
 
 
 def single_run(estimator, data):
-    for i in range(100):
+    for i in range(200):
         print('Epoch %i' % i)
+        this_data = data.copy()
+        this_data -= np.mean(this_data, axis=0)
+        this_data /= np.std(this_data, axis=0)
+        estimator.partial_fit(this_data, deprecated=False)
+    estimator.set_parameters(feature_ratio=1)
+    for i in range(20):
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
