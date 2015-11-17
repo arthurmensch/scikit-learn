@@ -21,7 +21,7 @@ def run():
                                      random_state=rng, verbose=2,
                                      batch_size=20,
                                      debug_info=True,
-                                     feature_ratio=4,
+                                     feature_ratio=1,
                                      )
 
     t0 = time.time()
