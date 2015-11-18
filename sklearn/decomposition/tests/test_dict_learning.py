@@ -1,4 +1,6 @@
 import numpy as np
+
+from sklearn.random_projection import sparse_random_matrix
 from sklearn.utils import check_array
 
 from sklearn.utils.testing import assert_array_almost_equal
@@ -177,6 +179,35 @@ def test_dict_learning_online():
             dict2.partial_fit(sample[np.newaxis, :])
 
     assert_true(not np.all(sparse_encode(X, dict1.components_, alpha=1) ==
+                           0))
+    assert_array_almost_equal(dict1.components_, dict2.components_, decimal=6)
+
+
+def test_dict_learning_online_missing_value():
+    n_components = 12
+    rng = np.random.RandomState(0)
+    V = rng.randn(n_components, n_features)  # random init
+    V /= np.sum(V ** 2, axis=1)[:, np.newaxis]
+    sp_X = sparse_random_matrix(n_components, n_features)
+    dict1 = MiniBatchDictionaryLearning(n_components, n_iter=10 * len(X),
+                                        batch_size=1,
+                                        fit_algorithm='cd',
+                                        missing_values=0,
+                                        alpha=1, shuffle=False, dict_init=V,
+                                        verbose=1,
+                                        random_state=0).fit(sp_X)
+    dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
+                                        fit_algorithm='cd',
+
+                                        missing_values=0,
+                                        n_iter=1, dict_init=V, verbose=1,
+                                        shuffle=False,
+                                        random_state=0)
+    for i in range(10):
+        for sample in sp_X:
+            dict2.partial_fit(sample)
+
+    assert_true(not np.all(sparse_encode(sp_X, dict1.components_, alpha=1) ==
                            0))
     assert_array_almost_equal(dict1.components_, dict2.components_, decimal=6)
 
