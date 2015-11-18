@@ -207,6 +207,8 @@ def test_dict_learning_online_missing_value():
         for sample in sp_X:
             dict2.partial_fit(sample)
 
+
+
     assert_true(not np.all(sparse_encode(sp_X, dict1.components_, alpha=1) ==
                            0))
     assert_array_almost_equal(dict1.components_, dict2.components_, decimal=6)
