@@ -292,6 +292,7 @@ class IncrementalSparsePCA(MiniBatchDictionaryLearning):
                  n_iter=1000, n_jobs=1,
                  batch_size=3, tol=0., shuffle=True, dict_init=None,
                  transform_alpha=None,
+                 missing_values=None,
                  verbose=False, random_state=None,
                  debug_info=False,
                  feature_ratio=1):
@@ -302,6 +303,7 @@ class IncrementalSparsePCA(MiniBatchDictionaryLearning):
                                              transform_algorithm='ridge',
                                              n_iter=n_iter,
                                              n_jobs=n_jobs,
+                                             missing_values=missing_values,
                                              batch_size=batch_size,
                                              tol=tol,
                                              shuffle=shuffle,
