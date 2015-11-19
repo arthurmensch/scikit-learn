@@ -198,18 +198,17 @@ def test_dict_learning_online_missing_value():
                                         random_state=0).fit(sp_X)
     dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
                                         fit_algorithm='cd',
-
                                         missing_values=0,
                                         n_iter=1, dict_init=V, verbose=1,
                                         shuffle=False,
                                         random_state=0)
-    for i in range(10):
+    for i in range(11):
         for sample in sp_X:
             dict2.partial_fit(sample)
 
 
 
-    assert_true(not np.all(sparse_encode(sp_X, dict1.components_, alpha=1) ==
+    assert_true(not np.all(sparse_encode(sp_X, dict1.components_, alpha=1, missing_values=0, algorithm='lasso_cd') ==
                            0))
     assert_array_almost_equal(dict1.components_, dict2.components_, decimal=6)
 

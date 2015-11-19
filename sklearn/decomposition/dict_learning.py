@@ -102,17 +102,19 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
 
     if algorithm == 'lasso_lars':
         # Lars solves (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
-        alpha = float(regularization) / n_features  # account for scaling
-        try:
-            err_mgt = np.seterr(all='ignore')
-            lasso_lars = LassoLars(alpha=alpha, fit_intercept=False,
-                                   verbose=verbose, normalize=False,
-                                   precompute=gram, fit_path=False)
-            lasso_lars.fit(dictionary.T, X.T, Xy=cov)
-            new_code = lasso_lars.coef_
-        finally:
-            np.seterr(**err_mgt)
-
+        if missing_values is None:
+            alpha = float(regularization) / n_features  # account for scaling
+            try:
+                err_mgt = np.seterr(all='ignore')
+                lasso_lars = LassoLars(alpha=alpha, fit_intercept=False,
+                                       verbose=verbose, normalize=False,
+                                       precompute=gram, fit_path=False)
+                lasso_lars.fit(dictionary.T, X.T, Xy=cov)
+                new_code = lasso_lars.coef_
+            finally:
+                np.seterr(**err_mgt)
+        else:
+            raise NotImplementedError
     elif algorithm == 'lasso_cd':
         # Lasso solves (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
         alpha = float(regularization) / n_features  # account for scaling
@@ -134,9 +136,9 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                     idx = X[i].nonzero()[0]
                 else:
                     raise NotImplementedError
-                print(idx)
-                clf.fit(dictionary.T[idx], X.T[idx, i].todense())
-                new_code[i] = clf.coef_
+                if len(idx) != 0:
+                    clf.fit(dictionary.T[idx], X.T[idx, i].todense())
+                    new_code[i] = clf.coef_
 
 
     elif algorithm == 'lars':
@@ -158,8 +160,9 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                         idx = X[i].nonzero()[0]
                     else:
                         raise NotImplementedError
-                    lars.fit(dictionary.T[idx], X.T[idx, i])
-                    new_code[i] = lars.coef_
+                    if len(idx) != 0:
+                        lars.fit(dictionary.T[idx], X.T[idx, i].todense())
+                        new_code[i] = lars.coef_
         finally:
             np.seterr(**err_mgt)
 
@@ -187,14 +190,18 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
             new_code = ridge_regression(dictionary.T, X.T, alpha,
                                         solver='cholesky')
         else:
-            new_code = np.empty((n_samples, n_components))
+            new_code = np.zeros((n_samples, n_components))
             for i in range(n_samples):
                 if missing_values == 0:
-                    idx = X[i].nonzero()[0]
+                    idx = X[i].nonzero()[1]
                 else:
                     raise NotImplementedError
-                new_code[i] = ridge_regression(dictionary.T[idx], X.T[idx, i].todense(), alpha=alpha,
-                                                  solver='cholesky')
+                if len(idx) != 0:
+                    new_code[i] = ridge_regression(dictionary.T[idx], X.T[idx, i].todense(), alpha=alpha
+                                                                                                   * len(idx)
+
+                                                                                                   / X.shape[1],
+                                                   solver='cholesky')
     else:
         raise ValueError('Sparse coding method must be "lasso_lars" '
                          '"lasso_cd",  "lasso", "threshold" or "omp",'
@@ -292,10 +299,10 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None, algor
     if check_input:
         if algorithm == 'lasso_cd':
             dictionary = check_array(dictionary, order='C', dtype='float64')
-            X = check_array(X, order='C', dtype='float64')
+            X = check_array(X, order='C', dtype='float64', accept_sparse='csr')
         else:
-            dictionary = check_array(dictionary, accept_sparse='csr')
-            X = check_array(X, accept_sparse='csr')
+            dictionary = check_array(dictionary)
+            X = check_array(X, accept_sparse='csr' if algorithm == 'ridge' else None)
 
     n_samples, n_features = X.shape
     n_components = dictionary.shape[0]
@@ -884,7 +891,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     if n_iter != 0:
         if inner_stats is None and l1_ratio != 0.:
-            print('enet_scale   ')
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
                        inplace=True)
 
@@ -900,12 +906,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         if missing_values == 0:
             subset = np.array([], dtype='int')
             for i in range(this_X.shape[0]):
-                single_subset = this_X[i].nonzero()[0]
+                single_subset = this_X[i].nonzero()[1]
                 subset = np.union1d(single_subset, subset)
-            print(len(subset))
             if len(subset) == 0:
                 continue
-        this_alpha = alpha / n_features * len(subset)
+        this_alpha = alpha  # / n_features * len(subset)
         dt = (time.time() - t0)
         if verbose == 1:
             sys.stdout.write(".")
@@ -938,7 +943,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         A_ref *= 1 - len_batch / cost_normalization
         A_ref += np.dot(this_code, this_code.T) / cost_normalization
         B_ref *= 1 - len_batch / cost_normalization
-        B_ref += np.dot(this_X.T, this_code.T) / cost_normalization
+        B_ref += safe_sparse_dot(this_X.T, this_code.T) / cost_normalization
         # Update dictionary
 
         t0 = time.time()
@@ -956,7 +961,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))
         # Residual computation
         norm_cost *= 1 - len_batch / cost_normalization
-        norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
+        if sp.issparse(this_X):
+            norm_cost += np.sum(this_X.data ** 2) / 2 / cost_normalization
+        else:
+            norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
         penalty_cost *= 1 - len_batch / cost_normalization
         if method in ('lasso_lars', 'lasso_cd'):
             penalty_cost += alpha * np.sum(np.abs(this_code)) / cost_normalization
@@ -988,6 +996,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             elif verbose:
                 print("--- Convergence reached after %d iterations" % ii)
             break
+        print(this_code.max())
+        print(dictionary)
 
     residual_stat = (last_cost, norm_cost, penalty_cost, cost_normalization)
     if return_debug_info:
@@ -1029,6 +1039,7 @@ class SparseCodingMixin(TransformerMixin):
     """Sparse coding mixin"""
 
     def _set_sparse_coding_params(self, n_components,
+                                  missing_values=None,
                                   transform_algorithm='omp',
                                   transform_n_nonzero_coefs=None,
                                   transform_alpha=None, split_sign=False,
@@ -1039,6 +1050,7 @@ class SparseCodingMixin(TransformerMixin):
         self.transform_alpha = transform_alpha
         self.split_sign = split_sign
         self.n_jobs = n_jobs
+        self.missing_values = missing_values
 
     def transform(self, X, y=None):
         """Encode the data as a sparse combination of the dictionary atoms.
@@ -1061,11 +1073,12 @@ class SparseCodingMixin(TransformerMixin):
         check_is_fitted(self, 'components_')
 
         # XXX : kwargs is not documented
-        X = check_array(X)
+        X = check_array(X, accept_sparse='csr')
         n_samples, n_features = X.shape
 
         code = sparse_encode(
             X, self.components_, algorithm=self.transform_algorithm,
+            missing_values=self.missing_values,
             n_nonzero_coefs=self.transform_n_nonzero_coefs,
             alpha=self.transform_alpha, n_jobs=self.n_jobs)
 
@@ -1464,7 +1477,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                  random_state=None,
                  debug_info=False,
                  feature_ratio=1):
-        self._set_sparse_coding_params(n_components, transform_algorithm,
+        self._set_sparse_coding_params(n_components, missing_values, transform_algorithm,
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
         self.alpha = alpha
@@ -1473,7 +1486,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.fit_algorithm = fit_algorithm
         self.dict_init = dict_init
         self.verbose = verbose
-        self.missing_values = missing_values
         self.shuffle = shuffle
         self.batch_size = batch_size
         self.split_sign = split_sign
