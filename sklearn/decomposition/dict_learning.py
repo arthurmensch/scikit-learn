@@ -197,9 +197,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                 else:
                     raise NotImplementedError
                 if len(idx) != 0:
-                    new_code[i] = ridge_regression(dictionary.T[idx], X.T[idx, i].todense(), alpha=alpha
-                                                                                                   * len(idx)
-
+                    new_code[i] = ridge_regression(dictionary.T[idx], X.T[idx, i].todense(), alpha=alpha * len(idx)
                                                                                                    / X.shape[1],
                                                    solver='cholesky')
     else:
@@ -955,7 +953,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
+        print(subset)
         dictionary[subset] = subset_dictionary
+        print(np.sum(np.all(dictionary == 0, axis=1)))
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))
@@ -996,8 +996,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             elif verbose:
                 print("--- Convergence reached after %d iterations" % ii)
             break
-        print(this_code.max())
-        print(dictionary)
+
 
     residual_stat = (last_cost, norm_cost, penalty_cost, cost_normalization)
     if return_debug_info:

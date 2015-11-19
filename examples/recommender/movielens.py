@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 import pandas as pd
 import numpy as np
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
+from sklearn.utils import check_random_state
 
 
 def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv'):
@@ -59,10 +60,11 @@ def run():
     mem = Memory(cachedir=expanduser("~/cache"))
     X = mem.cache(fetch_dataset)(datafile='/home/arthur/data/own/ml-20m/ratings.csv')
     X_test, X_train = mem.cache(split_dataset)(X)
-    X_train, mean_train = mem.cache(center_non_zero_data_along_row)(X_train[:10000])
-    # dict_init = X_train[:20].todense()
-    sparse_pca = IncrementalSparsePCA(n_components=20,
-                                      alpha=0.0001, batch_size=10, n_iter=1000, missing_values=0,
+    X_train, mean_train = mem.cache(center_non_zero_data_along_row)(X_train[:1000])
+    random_state = check_random_state(0)
+    dict_init = random_state.randn(20, X.shape[1])
+    sparse_pca = IncrementalSparsePCA(n_components=20, dict_init=dict_init,
+                                      alpha=0.000001, batch_size=1, n_iter=1000, missing_values=0,
                                       verbose=10)
     sparse_pca.fit(X_train)
     code = sparse_pca.transform(X_train)
