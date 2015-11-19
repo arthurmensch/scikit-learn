@@ -61,7 +61,7 @@ def run():
     X_test, X_train = mem.cache(split_dataset)(X)
     X_train, mean_train = mem.cache(center_non_zero_data_along_row)(X_train[:10000])
     # dict_init = X_train[:20].todense()
-    sparse_pca = IncrementalSparsePCA(n_components=20, dict_init=dict_init,
+    sparse_pca = IncrementalSparsePCA(n_components=20,
                                       alpha=0.0001, batch_size=10, n_iter=1000, missing_values=0,
                                       verbose=10)
     sparse_pca.fit(X_train)
