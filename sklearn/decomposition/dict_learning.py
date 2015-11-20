@@ -313,8 +313,9 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
     return code
 
-
-def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+def _update_dict(dictionary, Y, code, appear_prob=None,
+                 verbose=False,
+                 return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
@@ -357,7 +358,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     """
     threshold = 1e-20
 
-
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
@@ -367,29 +367,31 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
-    R = np.asfortranarray(R)
+    R = np.asfortranarray(R / appear_prob[:, np.newaxis])
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
         component_range = random_state.permutation(n_components)
     else:
         component_range = np.arange(n_components)
-
+    old_dictionary = np.zeros(n_features)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
-        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        old_dictionary[:] = dictionary[:, k]
         # Coordinate update
         if online:
-            dictionary[:, k] = R[:, k]
-            scale = code[k, k]
+            scale = code[k, k] / np.mean(appear_prob)
         else:
-            dictionary[:, k] = np.dot(R, code[k, :].T)
-            scale = np.sum(code[k, :] ** 2)
+            scale = np.sum(code[k, :] ** 2) / np.mean(appear_prob)
         if scale < threshold:
-            # Trigger cleaning
             dictionary[:, k] = 0
         else:
-            dictionary[:, k] /= scale
+            if online:
+                dictionary[:, k] += R[:, k] / scale
+            else:
+                dictionary[:, k] += np.dot(R, code[k, :].T) / np.sum(code[k,
+                                                                     :] ** 2)\
+                                    / scale
 
         # Cleaning small atoms
         atom_norm_square = np.sum(dictionary[:, k] ** 2)
@@ -415,8 +417,10 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
                                                check_input=False)
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
-        # R <- -1.0 * U_k * V_k^T + R
-        R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        # R <- 1.0 * (U_k_old - U_k_new) * V_k^T + R
+        R = ger(1.0, (old_dictionary - dictionary[:, k]) / appear_prob,
+                code[k, :], a=R,
+                overwrite_a=True)
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -846,13 +850,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     if subsets is None:
         subsets = gen_cycling_subsets(n_features, n_features / feature_ratio, random=(feature_ratio > 1))
     total_time = 0
+
+    appear_prob = np.ones(n_features)
+
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter), batches, subsets):
         t0 = time.time()
         if shuffle:
             this_X = X[permutation[batch]]
         else:
             this_X = X[batch]
-        this_alpha = alpha / n_features * len(subset)
         dt = (time.time() - t0)
         if verbose == 1:
             sys.stdout.write(".")
@@ -863,11 +869,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                       % (ii, dt, dt / 60))
         subset_dictionary = check_array(dictionary[subset], order='F',
                                         copy=True)
-
-        this_code = sparse_encode(this_X[:, subset],
-                                  subset_dictionary.T,
+        # XXX Use sample weights
+        appear_prob[subset] = len(subset) / n_features
+        this_code = sparse_encode(this_X[:, subset] / np.sqrt(appear_prob[subset])[
+            np.newaxis, :],
+                                  subset_dictionary.T / np.sqrt(appear_prob[subset])[
+            np.newaxis, :],
                                   algorithm=method,
-                                  alpha=this_alpha,
+                                  alpha=alpha,
                                   n_jobs=1,
                                   check_input=False,
                                   random_state=random_state).T
@@ -875,9 +884,10 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         len_batch = batch.stop - batch.start
         cost_normalization += len_batch
         A *= 1 - len_batch / cost_normalization
-        A += np.dot(this_code, this_code.T) * len(subset) / n_features / cost_normalization
-        B[subset] *= 1 - len_batch / cost_normalization
-        B[subset] += np.dot(this_X[:, subset].T, this_code.T) / cost_normalization
+        A += np.dot(this_code, this_code.T) / cost_normalization
+        B *= 1 - len_batch / cost_normalization
+        B[subset] += np.dot((this_X[:, subset] / appear_prob[subset]).T,
+                            this_code.T) / cost_normalization
         total_time += time.time() - t0
 
         A_ref *= 1 - len_batch / cost_normalization
@@ -887,15 +897,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         # Update dictionary
 
         t0 = time.time()
-        subset_dictionary, objective_cost = _update_dict(
+        dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
+            appear_prob=appear_prob[subset],
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        dictionary[subset] = subset_dictionary
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))

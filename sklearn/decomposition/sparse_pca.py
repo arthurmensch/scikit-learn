@@ -288,7 +288,7 @@ class MiniBatchSparsePCA(SparsePCA):
 
 
 class IncrementalSparsePCA(MiniBatchDictionaryLearning):
-    def __init__(self, n_components=None, alpha=1, l1_ratio=1.0,
+    def     __init__(self, n_components=None, alpha=1, l1_ratio=1.0,
                  n_iter=1000, n_jobs=1,
                  batch_size=3, tol=0., shuffle=True, dict_init=None,
                  transform_alpha=None,

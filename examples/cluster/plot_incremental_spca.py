@@ -16,18 +16,18 @@ def run():
 
     print('Learning the dictionary... ')
     rng = 0
-    incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.01,
+    incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.001,
                                      n_iter=100000,
                                      random_state=rng, verbose=2,
                                      batch_size=20,
                                      debug_info=True,
-                                     feature_ratio=1,
+                                     feature_ratio=5,
                                      )
 
     t0 = time.time()
 
 
-    for i in range(10):
+    for i in range(30):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)
