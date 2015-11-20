@@ -7,14 +7,11 @@ from __future__ import print_function, division
 import time
 import sys
 import itertools
-
 from math import sqrt, ceil
-
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 from scipy import linalg
 from numpy.lib.stride_tricks import as_strided
-
 from ..base import BaseEstimator, TransformerMixin
 from ..externals.joblib import Parallel, delayed, cpu_count
 from ..externals.six.moves import zip
@@ -313,6 +310,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
     return code
 
+
 def _update_dict(dictionary, Y, code, weights=None,
                  verbose=False, return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
@@ -357,7 +355,6 @@ def _update_dict(dictionary, Y, code, weights=None,
     """
     threshold = 1e-20
 
-
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
@@ -379,10 +376,11 @@ def _update_dict(dictionary, Y, code, weights=None,
         old_atom[:] = dictionary[:, k]
         # Coordinate update
         if online:
-            dictionary[:, k] += R[:, k] / code[k, k] * weights
+            dictionary[:, k] += R[:, k] / code[k, k] / weights
             scale = code[k, k]
         else:
-            dictionary[:, k] += np.dot(R, code[k, :].T) / np.sum(code[k, :] ** 2)
+            dictionary[:, k] += np.dot(R, code[k, :].T) / np.sum(
+                code[k, :] ** 2)
             scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
             # Trigger cleaning
@@ -847,12 +845,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                        inplace=True)
 
     if subsets is None:
-        subsets = gen_cycling_subsets(n_features, n_features / feature_ratio, random=(feature_ratio > 1))
+        subsets = gen_cycling_subsets(n_features, n_features / feature_ratio,
+                                      random=(feature_ratio > 1))
     total_time = 0
 
     appear_prob = np.ones(n_features)
 
-    for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter), batches, subsets):
+    for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
+                                 batches, subsets):
         t0 = time.time()
         if shuffle:
             this_X = X[permutation[batch]]
@@ -870,15 +870,16 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                                         copy=True)
         # XXX Use sample weights
         appear_prob[subset] = len(subset) / n_features
-        this_code = sparse_encode(this_X[:, subset] / np.sqrt(appear_prob[subset])[
-            np.newaxis, :],
-                                  subset_dictionary.T / np.sqrt(appear_prob[subset])[
-            np.newaxis, :],
-                                  algorithm=method,
-                                  alpha=alpha,
-                                  n_jobs=1,
-                                  check_input=False,
-                                  random_state=random_state).T
+        this_code = sparse_encode(
+            this_X[:, subset] / np.sqrt(appear_prob[subset])[
+                                np.newaxis, :],
+            subset_dictionary.T / np.sqrt(appear_prob[subset])[
+                                  np.newaxis, :],
+            algorithm=method,
+            alpha=alpha,
+            n_jobs=1,
+            check_input=False,
+            random_state=random_state).T
 
         len_batch = batch.stop - batch.start
         cost_normalization += len_batch
@@ -886,10 +887,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         A += np.dot(this_code, this_code.T) / cost_normalization
         B *= 1 - len_batch / cost_normalization
         new_B = np.dot(this_X[:, subset].T,
-                            this_code.T) / cost_normalization
+                       this_code.T) / cost_normalization
         B[subset] += new_B
         total_time += time.time() - t0
-        print(appear_prob[subset[0]])
         A_ref *= 1 - len_batch / cost_normalization
         A_ref += np.dot(this_code, this_code.T) / cost_normalization
         B_ref *= 1 - len_batch / cost_normalization
@@ -906,7 +906,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        B[subset] += (1/appear_prob[subset][:, np.newaxis] - 1) * new_B
+        B[subset] += (1 / appear_prob[subset][:, np.newaxis] - 1) * new_B
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) \
@@ -916,7 +916,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
         penalty_cost *= 1 - len_batch / cost_normalization
         if method in ('lasso_lars', 'lasso_cd'):
-            penalty_cost += alpha * np.sum(np.abs(this_code)) / cost_normalization
+            penalty_cost += alpha * np.sum(
+                np.abs(this_code)) / cost_normalization
         else:
             penalty_cost += alpha * np.sum(this_code ** 2) / cost_normalization
         current_cost = objective_cost + norm_cost + penalty_cost
@@ -951,7 +952,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     if return_inner_stats:
         if return_n_iter:
-            res = dictionary.T, (A, B, residual_stat, A_ref, B_ref), ii - iter_offset + 1
+            res = dictionary.T, (
+            A, B, residual_stat, A_ref, B_ref), ii - iter_offset + 1
         else:
             res = dictionary.T, (A, B, residual_stat, A_ref, B_ref)
     elif return_code:
@@ -1452,8 +1454,10 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.random_state_ = check_random_state(self.random_state)
         X = check_array(X)
 
-        self.subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(X.shape[1] / self.feature_ratio),
-                                            random_state=self.random_state_, random=self.feature_ratio > 1)
+        self.subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(
+            X.shape[1] / self.feature_ratio),
+                                            random_state=self.random_state_,
+                                            random=self.feature_ratio > 1)
 
         res = dict_learning_online(
             X, self.n_components, self.alpha,
@@ -1511,8 +1515,10 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             self.random_state_ = check_random_state(self.random_state)
         X = check_array(X)
         if not hasattr(self, 'subsets'):
-            self.subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(X.shape[1] / self.feature_ratio),
-                                                random_state=self.random_state_, random=self.feature_ratio > 1)
+            self.subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(
+                X.shape[1] / self.feature_ratio),
+                                                random_state=self.random_state_,
+                                                random=self.feature_ratio > 1)
         if hasattr(self, 'components_'):
             dict_init = self.components_
         else:
@@ -1536,7 +1542,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             update_scheme='mean',
             forget_rate=1.,
             feature_ratio=self.feature_ratio,
-            subsets = self.subsets_,
+            subsets=self.subsets_,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
             # Loading whole X in memory if deprecated
