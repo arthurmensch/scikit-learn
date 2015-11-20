@@ -902,7 +902,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary / appear_prob[subset][:, np.newaxis],
             B[subset] / appear_prob[subset][:, np.newaxis], A,
-            # l1_weights=appear_prob[subset],
+            l1_weights=appear_prob[subset],
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
