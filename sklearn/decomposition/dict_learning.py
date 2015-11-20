@@ -886,10 +886,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
+    radius = 1 * sqrt(n_features)
 
     if n_iter != 0:
         if inner_stats is None and l1_ratio != 0.:
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
+                       radius=radius,
                        inplace=True)
 
     if subsets is None:
@@ -908,6 +910,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 subset = np.union1d(single_subset, subset)
             if len(subset) == 0:
                 continue
+            random_state.shuffle(subset)
         this_alpha = alpha  # / n_features * len(subset)
         dt = (time.time() - t0)
         if verbose == 1:
@@ -932,9 +935,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
         len_batch = X.shape[0]
         cost_normalization += len_batch
-        A *= 1 - len_batch / cost_normalization
-        A += np.dot(this_code, this_code.T) * len(subset) / n_features / cost_normalization
-        B *= 1 - len_batch / cost_normalization
+        A *= 1 - len_batch / cost_normalization * len(subset) / n_features
+        A += np.dot(this_code, this_code.T) / cost_normalization * len(subset) / n_features
+        B[subset] *= 1 - len_batch / cost_normalization
         B[subset] += safe_sparse_dot(this_X[:, subset].T, this_code.T) / cost_normalization
         total_time += time.time() - t0
 
@@ -953,9 +956,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        print(subset)
         dictionary[subset] = subset_dictionary
-        print(np.sum(np.all(dictionary == 0, axis=1)))
+        print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))

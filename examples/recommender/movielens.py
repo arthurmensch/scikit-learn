@@ -4,6 +4,8 @@ from joblib import Memory
 from scipy.sparse import csr_matrix
 import pandas as pd
 import numpy as np
+
+from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn.utils import check_random_state
 
@@ -25,7 +27,7 @@ def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv'):
     X = csr_matrix((ratings, (ratings.index.get_level_values(0) - 1,
                              ratings.index.get_level_values(1) -1)),
                    shape=(n_users, n_movies))
-    return X
+    return X[:, :10000]
 
 
 def split_dataset(X):
@@ -60,14 +62,15 @@ def run():
     mem = Memory(cachedir=expanduser("~/cache"))
     X = mem.cache(fetch_dataset)(datafile='/home/arthur/data/own/ml-20m/ratings.csv')
     X_test, X_train = mem.cache(split_dataset)(X)
-    X_train, mean_train = mem.cache(center_non_zero_data_along_row)(X_train[:1000])
+    X_train, mean_train = mem.cache(center_non_zero_data_along_row)(X_train[:10000])
     random_state = check_random_state(0)
-    dict_init = random_state.randn(20, X.shape[1])
+    dict_init = (random_state.binomial(1, 0.5, size=(20, X.shape[1])) - .5) * 2
     sparse_pca = IncrementalSparsePCA(n_components=20, dict_init=dict_init,
-                                      alpha=0.000001, batch_size=1, n_iter=1000, missing_values=0,
-                                      verbose=10)
+                                      alpha=0.1, batch_size=10, n_iter=10000, missing_values=0,
+                                      verbose=10, transform_alpha=1,
+                                      random_state=random_state)
     sparse_pca.fit(X_train)
-    code = sparse_pca.transform(X_train)
+    code = sparse_pca.transform(X_train[:10000])
     np.save('code', code)
     np.save('components', sparse_pca.components_)
 
