@@ -19,7 +19,7 @@ def run():
     incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.01,
                                      n_iter=100000,
                                      random_state=rng, verbose=2,
-                                     batch_size=1,
+                                     batch_size=20,
                                      debug_info=True,
                                      feature_ratio=8,
                                      )
