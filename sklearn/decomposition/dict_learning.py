@@ -876,7 +876,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         cost_normalization += len_batch
         A *= 1 - len_batch / cost_normalization
         A += np.dot(this_code, this_code.T) * len(subset) / n_features / cost_normalization
-        B[subset] *= 1 - len_batch / cost_normalization
+        B *= 1 - len_batch / cost_normalization
         B[subset] += np.dot(this_X[:, subset].T, this_code.T) / cost_normalization
         total_time += time.time() - t0
 
