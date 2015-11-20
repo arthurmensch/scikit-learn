@@ -313,7 +313,7 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
     return code
 
-def _update_dict(dictionary, Y, code, l1_weights=None,
+def _update_dict(dictionary, Y, code, weights=None,
                  verbose=False, return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
@@ -361,13 +361,10 @@ def _update_dict(dictionary, Y, code, l1_weights=None,
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
-    if l1_weights is not None:
-        radius = enet_norm(dictionary.T * l1_weights, l1_ratio=l1_ratio)
-    else:
-        radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
+    radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
     # Residuals, computed 'in-place' for efficiency
-    R = -np.dot(code.T, dictionary.T).T
-    R += Y
+    R = -np.dot(code.T, dictionary.T / weights).T
+    R += Y / weights[:, np.newaxis]
     R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
@@ -376,15 +373,16 @@ def _update_dict(dictionary, Y, code, l1_weights=None,
     else:
         component_range = np.arange(n_components)
 
+    old_atom = np.zeros(n_features)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
-        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        old_atom[:] = dictionary[:, k]
         # Coordinate update
         if online:
-            dictionary[:, k] = R[:, k]
+            dictionary[:, k] += R[:, k] / code[k, k] * weights
             scale = code[k, k]
         else:
-            dictionary[:, k] = np.dot(R, code[k, :].T)
+            dictionary[:, k] += np.dot(R, code[k, :].T) / np.sum(code[k, :] ** 2)
             scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
             # Trigger cleaning
@@ -410,18 +408,18 @@ def _update_dict(dictionary, Y, code, l1_weights=None,
 
         # Projecting onto the norm ball
         if l1_ratio != 0.:
-            if l1_weights is not None:
-                dictionary[:, k] *= l1_weights
             dictionary[:, k] = enet_projection(dictionary[:, k],
                                                radius=radius[k],
                                                l1_ratio=l1_ratio,
                                                check_input=False)
-            if l1_weights is not None:
-                dictionary[:, k] /= l1_weights
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
-        R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+
+        R = ger(1.0, old_atom / weights, code[k, :], a=R,
+                overwrite_a=True)
+        R = ger(-1.0, dictionary[:, k] / weights, code[k, :], a=R,
+                overwrite_a=True)
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -891,7 +889,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                             this_code.T) / cost_normalization
         B[subset] += new_B
         total_time += time.time() - t0
-
+        print(appear_prob[subset[0]])
         A_ref *= 1 - len_batch / cost_normalization
         A_ref += np.dot(this_code, this_code.T) / cost_normalization
         B_ref *= 1 - len_batch / cost_normalization
@@ -900,15 +898,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
         t0 = time.time()
         dictionary[subset], objective_cost = _update_dict(
-            subset_dictionary / appear_prob[subset][:, np.newaxis],
-            B[subset] / appear_prob[subset][:, np.newaxis], A,
-            l1_weights=appear_prob[subset],
+            subset_dictionary,
+            B[subset], A,
+            weights=appear_prob[subset],
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        dictionary[subset] *= appear_prob[subset][:, np.newaxis]
         B[subset] += (1/appear_prob[subset][:, np.newaxis] - 1) * new_B
         total_time += time.time() - t0
 
