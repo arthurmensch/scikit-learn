@@ -361,8 +361,10 @@ def _update_dict(dictionary, Y, code, l1_weights=None,
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
-
-    radius = enet_norm(dictionary.T * l1_weights    , l1_ratio=l1_ratio)
+    if l1_weights is not None:
+        radius = enet_norm(dictionary.T * l1_weights, l1_ratio=l1_ratio)
+    else:
+        radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
     print(radius)
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -883,11 +885,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
         len_batch = batch.stop - batch.start
         cost_normalization += len_batch
-        # A *= 1 - len_batch / cost_normalization
-        A += np.dot(this_code, this_code.T)   # / cost_normalization
-        # B *= 1 - len_batch / cost_normalization
-        B[subset] += np.dot((this_X[:, subset] / appear_prob[subset]).T,
-                            this_code.T)  # / cost_normalization
+        A *= 1 - len_batch / cost_normalization
+        A += np.dot(this_code, this_code.T) / cost_normalization
+        B *= 1 - len_batch / cost_normalization
+        new_B = np.dot(this_X[:, subset].T,
+                            this_code.T) / cost_normalization
+        B[subset] += new_B
         total_time += time.time() - t0
 
         A_ref *= 1 - len_batch / cost_normalization
@@ -907,9 +910,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             return_r2=True,
             online=True, shuffle=shuffle)
         dictionary[subset] *= appear_prob[subset][:, np.newaxis]
+        B[subset] += (1/appear_prob[subset][:, np.newaxis] - 1) * new_B
         total_time += time.time() - t0
 
-        objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))
+        objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) \
+                         - np.sum(dictionary.T.dot(B_ref))
         # Residual computation
         norm_cost *= 1 - len_batch / cost_normalization
         norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
