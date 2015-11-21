@@ -16,7 +16,7 @@ def run():
 
     print('Learning the dictionary... ')
     rng = 0
-    incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.1,
+    incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.01,
                                      n_iter=100000,
                                      random_state=rng, verbose=2,
                                      batch_size=20,

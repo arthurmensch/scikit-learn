@@ -311,8 +311,8 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     return code
 
 
-def _update_dict(dictionary, Y, code, weights=None,
-                 verbose=False, return_r2=False,
+def _update_dict(dictionary, Y, code, weights=None, verbose=False,
+                 return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
@@ -358,9 +358,13 @@ def _update_dict(dictionary, Y, code, weights=None,
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
+
+    dictionary /= weights[:, np.newaxis]
+
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
+
     # Residuals, computed 'in-place' for efficiency
-    R = -np.dot(code.T, dictionary.T / weights).T
+    R = -np.dot(code.T, dictionary.T).T
     R += Y / weights[:, np.newaxis]
     R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
@@ -370,17 +374,15 @@ def _update_dict(dictionary, Y, code, weights=None,
     else:
         component_range = np.arange(n_components)
 
-    old_atom = np.zeros(n_features)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
-        old_atom[:] = dictionary[:, k]
+        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            dictionary[:, k] += R[:, k] / code[k, k] / weights
+            dictionary[:, k] = R[:, k]
             scale = code[k, k]
         else:
-            dictionary[:, k] += np.dot(R, code[k, :].T) / np.sum(
-                code[k, :] ** 2)
+            dictionary[:, k] = np.dot(R, code[k, :].T)
             scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
             # Trigger cleaning
@@ -413,11 +415,8 @@ def _update_dict(dictionary, Y, code, weights=None,
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
-
-        R = ger(1.0, old_atom / weights, code[k, :], a=R,
-                overwrite_a=True)
-        R = ger(-1.0, dictionary[:, k] / weights, code[k, :], a=R,
-                overwrite_a=True)
+        R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+    dictionary *= weights[:, np.newaxis]
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -849,7 +848,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                                       random=(feature_ratio > 1))
     total_time = 0
 
-    appear_prob = np.ones(n_features)
+    inner_weights = np.ones(n_features)
+    count = np.zeros((n_features, 1))
 
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
                                  batches, subsets):
@@ -869,11 +869,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         subset_dictionary = check_array(dictionary[subset], order='F',
                                         copy=True)
         # XXX Use sample weights
-        appear_prob[subset] = len(subset) / n_features
+        inner_weights[subset] = len(subset) / n_features
         this_code = sparse_encode(
-            this_X[:, subset] / np.sqrt(appear_prob[subset])[
+            this_X[:, subset] / np.sqrt(inner_weights[subset])[
                                 np.newaxis, :],
-            subset_dictionary.T / np.sqrt(appear_prob[subset])[
+            subset_dictionary.T / np.sqrt(inner_weights[subset])[
                                   np.newaxis, :],
             algorithm=method,
             alpha=alpha,
@@ -885,10 +885,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         cost_normalization += len_batch
         A *= 1 - len_batch / cost_normalization
         A += np.dot(this_code, this_code.T) / cost_normalization
-        B *= 1 - len_batch / cost_normalization
-        new_B = np.dot(this_X[:, subset].T,
-                       this_code.T) / cost_normalization
-        B[subset] += new_B
+        count[subset] += len_batch
+        B[subset] *= 1 - len_batch / cost_normalization
+        B[subset] += np.dot(this_X[:, subset].T / inner_weights[subset][:,
+                                                                np.newaxis],
+                            this_code.T) / cost_normalization
         total_time += time.time() - t0
         A_ref *= 1 - len_batch / cost_normalization
         A_ref += np.dot(this_code, this_code.T) / cost_normalization
@@ -900,13 +901,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
-            weights=appear_prob[subset],
+            weights=inner_weights[subset],
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        B[subset] += (1 / appear_prob[subset][:, np.newaxis] - 1) * new_B
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) \
