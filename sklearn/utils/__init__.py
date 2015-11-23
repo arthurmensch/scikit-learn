@@ -357,16 +357,19 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
     random_state = check_random_state(random_state)
     while True:
         if random:
-            permutation = random_state.permutation(n)
+            permutation = random_state.randint(0, n, size=[n])
         else:
             permutation = np.arange(n)
         # if accumulate is not None:
         #     permutation = np.concatenate((accumulate, permutation))
         #     accumulate = None
-        batches = gen_batches(len(permutation), batch_size)
-        for batch in batches:
-            # if batch.stop - batch.start == batch_size:
-            yield permutation[batch]
+        i = 0
+        j = 0
+        while j < n:
+            j = random_state.randint(i, i + 2 * batch_size)
+            j = min(j, n)
+            yield permutation[i:j]
+            i = j
 
 
 def _get_n_jobs(n_jobs):
