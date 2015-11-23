@@ -9,7 +9,6 @@ import sys
 import itertools
 from math import sqrt, ceil
 import numpy as np
-from numpy.testing import assert_array_almost_equal
 from scipy import linalg
 from numpy.lib.stride_tricks import as_strided
 from ..base import BaseEstimator, TransformerMixin
@@ -19,7 +18,6 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
                      gen_batches, _get_n_jobs, gen_cycling_subsets)
 from ..utils.extmath import randomized_svd, row_norms
 from ..utils.validation import check_is_fitted
-from ..utils.random import sample_without_replacement
 from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge, \
     ridge_regression
 from ..utils.enet_projection import enet_projection, enet_scale, enet_norm
@@ -359,37 +357,35 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
 
-    # dictionary /= weights[:, np.newaxis]
-
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
-    R += Y # / weights[:, np.newaxis]
-    R = np.asfortranarray(R)
+    R = np.asfortranarray(R * weights[:, np.newaxis])
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
         component_range = random_state.permutation(n_components)
     else:
         component_range = np.arange(n_components)
-
+    old_dict = np.empty(n_features)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
-        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        # R = ger(1.0, old_dict[:, k], code[k, :], a=R, overwrite_a=True)
+        old_dict[:] = dictionary[:, k]
         # Coordinate update
         if online:
-            dictionary[:, k] = R[:, k]
             scale = code[k, k]
         else:
-            dictionary[:, k] = np.dot(R, code[k, :].T)
             scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
             # Trigger cleaning
             dictionary[:, k] = 0
         else:
-            dictionary[:, k] /= scale
-
+            if online:
+                dictionary[:, k] += R[:, k] / scale
+            else:
+                dictionary[:, k] += np.dot(R, code[k, :].T) / scale
         # Cleaning small atoms
         atom_norm_square = np.sum(dictionary[:, k] ** 2)
         if atom_norm_square < threshold:
@@ -415,8 +411,10 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
-        R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-    # dictionary *= weights[:, np.newaxis]
+        R = ger(1.0, (old_dict - dictionary[:, k]) * weights,
+                code[k, :],
+                a=R,
+                overwrite_a=True)
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -822,8 +820,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         last_cost = np.inf
         norm_cost = 0
         penalty_cost = 0
-        cost_normalization = 0
-        count = np.zeros((n_features, 1))
+        n_seen_samples = 0
+        count = np.zeros(n_features)
 
     else:
         A = inner_stats[0].copy()
@@ -833,7 +831,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         last_cost = inner_stats[2][0]
         norm_cost = inner_stats[2][1]
         penalty_cost = inner_stats[2][2]
-        cost_normalization = inner_stats[2][3]
+        n_seen_samples = inner_stats[2][3]
         count = inner_stats[2][4]
     # For tolerance computation
     patience = 0
@@ -851,11 +849,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                                       random=(feature_ratio > 1))
     total_time = 0
 
-    inner_weights = np.ones(n_features)
-
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
                                  batches, subsets):
         t0 = time.time()
+        len_batch = batch.stop - batch.start
+        n_seen_samples += len_batch
+        count[subset] += len_batch
+        appear_freq = count[subset] / n_seen_samples
+
         if shuffle:
             this_X = X[permutation[batch]]
         else:
@@ -871,62 +872,52 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         subset_dictionary = check_array(dictionary[subset], order='F',
                                         copy=True)
         # XXX Use sample weights
-        inner_weights[subset] = len(subset) / n_features
         this_code = sparse_encode(
-            this_X[:, subset] / np.sqrt(inner_weights[subset])[
-                                np.newaxis, :],
-            subset_dictionary.T / np.sqrt(inner_weights[subset])[
-                                  np.newaxis, :],
+            this_X[:, subset] / np.sqrt(len(subset) / n_features),
+            subset_dictionary.T / np.sqrt(len(subset) / n_features),
             algorithm=method,
             alpha=alpha,
             n_jobs=1,
             check_input=False,
             random_state=random_state).T
 
-        len_batch = batch.stop - batch.start
-        cost_normalization += len_batch
-        A *= 1 - len_batch / cost_normalization
-        A += np.dot(this_code, this_code.T) / cost_normalization
-        count[subset] += len_batch
-        B[subset] *= 1 - len_batch / count[subset]
+        A *= 1 - len_batch / n_seen_samples
+        A += np.dot(this_code, this_code.T) / n_seen_samples
+        B[subset] *= 1 - len_batch / count[subset][:, np.newaxis]
         B[subset] += np.dot(this_X[:, subset].T,
-                            this_code.T) / count[subset]
-        # B *= 1 - len_batch / cost_normalization
-        # new_B = np.dot(this_X[:, subset].T,
-        #                     this_code.T) / cost_normalization
-        # B[subset] += new_B
+                            this_code.T) / count[subset][:, np.newaxis]
 
         total_time += time.time() - t0
-        A_ref *= 1 - len_batch / cost_normalization
-        A_ref += np.dot(this_code, this_code.T) / cost_normalization
-        B_ref *= 1 - len_batch / cost_normalization
-        B_ref += np.dot(this_X.T, this_code.T) / cost_normalization
+        A_ref *= 1 - len_batch / n_seen_samples
+        A_ref += np.dot(this_code, this_code.T) / n_seen_samples
+        B_ref *= 1 - len_batch / n_seen_samples
+        B_ref += np.dot(this_X.T, this_code.T) / n_seen_samples
+
         # Update dictionary
 
         t0 = time.time()
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
-            weights=inner_weights[subset],
+            weights=appear_freq,
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        # B[subset] += (1 / inner_weights[subset][:, np.newaxis] - 1) * new_B
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
         objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
-        norm_cost *= 1 - len_batch / cost_normalization
-        norm_cost += .5 * np.sum(this_X ** 2) / cost_normalization
-        penalty_cost *= 1 - len_batch / cost_normalization
+        norm_cost *= 1 - len_batch / n_seen_samples
+        norm_cost += .5 * np.sum(this_X ** 2) / n_seen_samples
+        penalty_cost *= 1 - len_batch / n_seen_samples
         if method in ('lasso_lars', 'lasso_cd'):
             penalty_cost += alpha * np.sum(
-                np.abs(this_code)) / cost_normalization
+                np.abs(this_code)) / n_seen_samples
         else:
-            penalty_cost += alpha * np.sum(this_code ** 2) / cost_normalization
+            penalty_cost += alpha * np.sum(this_code ** 2) / n_seen_samples
         current_cost = objective_cost + norm_cost + penalty_cost
 
         # XXX to remove
@@ -954,7 +945,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 print("--- Convergence reached after %d iterations" % ii)
             break
 
-    residual_stat = (last_cost, norm_cost, penalty_cost, cost_normalization,
+    residual_stat = (last_cost, norm_cost, penalty_cost, n_seen_samples,
                      count)
     debug_info['total_time'] = total_time
 
