@@ -2,11 +2,9 @@
 The :mod:`sklearn.utils` module includes various utilities.
 """
 from collections import Sequence
-
 import numpy as np
 from scipy.sparse import issparse
 import warnings
-
 from .murmurhash import murmurhash3_32
 from .validation import (as_float_array,
                          assert_all_finite,
@@ -23,11 +21,11 @@ from ..exceptions import DataConversionWarning as DataConversionWarning_
 class ConvergenceWarning(ConvergenceWarning_):
     pass
 
+
 ConvergenceWarning = deprecated("ConvergenceWarning has been moved "
                                 "into the sklearn.exceptions module. "
                                 "It will not be available here from "
                                 "version 0.19")(ConvergenceWarning)
-
 
 __all__ = ["murmurhash3_32", "as_float_array",
            "assert_all_finite", "check_array",
@@ -88,7 +86,7 @@ def safe_indexing(X, indices):
             return X.copy().iloc[indices]
     elif hasattr(X, "shape"):
         if hasattr(X, 'take') and (hasattr(indices, 'dtype') and
-                                   indices.dtype.kind == 'i'):
+                                           indices.dtype.kind == 'i'):
             # This is often substantially faster than X[indices]
             return X.take(indices, axis=0)
         else:
@@ -357,7 +355,9 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
     random_state = check_random_state(random_state)
     while True:
         if random:
-            permutation = random_state.randint(0, n, size=[n])
+            p = 1 / (1 + np.arange(n, dtype='float'))
+            p /= np.sum(p)
+            permutation = random_state.choice(np.arange(n), p=p, size=[n])
         else:
             permutation = np.arange(n)
         # if accumulate is not None:
@@ -366,7 +366,7 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
         i = 0
         j = 0
         while j < n:
-            j = random_state.randint(i, i + 2 * batch_size)
+            j = random_state.randint(i + 1, i + 2 * batch_size + 1)
             j = min(j, n)
             yield permutation[i:j]
             i = j

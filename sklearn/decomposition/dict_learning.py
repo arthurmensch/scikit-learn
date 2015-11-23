@@ -364,7 +364,7 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
-    R = np.asfortranarray(R * weights[:, np.newaxis])
+    R = np.asfortranarray(R / weights[:, np.newaxis])
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
@@ -378,7 +378,7 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
         # R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            scale = code[k, k]
+            scale = code[k, k] * np.sum(1 / weights) / n_features
         else:
             scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
@@ -415,7 +415,7 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
-        R = ger(1.0, (old_atom - dictionary[:, k]) * weights, code[k, :],
+        R = ger(1.0, (old_atom - dictionary[:, k]) / weights, code[k, :],
                 a=R, overwrite_a=True)
     if return_r2:
         if online:
@@ -823,7 +823,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         norm_cost = 0
         penalty_cost = 0
         n_seen_samples = 0
-        count_seen_features = np.ones(n_features)
+        count_seen_features = np.zeros(n_features)
 
     else:
         A = inner_stats[0].copy()
@@ -876,10 +876,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         appear_freq = count_seen_features[subset] / n_seen_samples
         subset_dictionary = check_array(dictionary[subset], order='F',
                                         copy=True)
+        # print(count_seen_features)
         # XXX Use sample weights
         this_code = sparse_encode(
-            this_X[:, subset] / np.sqrt(appear_freq[np.newaxis, :]),
-            subset_dictionary.T / np.sqrt(appear_freq[np.newaxis, :]),
+            this_X[:, subset] / np.sqrt(appear_freq),
+            subset_dictionary.T / np.sqrt(appear_freq),
             algorithm=method,
             alpha=alpha,
             n_jobs=1,
@@ -892,10 +893,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         B[subset] += np.dot(this_X[:, subset].T,
                             this_code.T) / count_seen_features[subset,
                                                                np.newaxis]
-        # B *= 1 - len_batch / cost_normalization
-        # new_B = np.dot(this_X[:, subset].T,
-        #                     this_code.T) / cost_normalization
-        # B[subset] += new_B
 
         total_time += time.time() - t0
         A_ref *= 1 - len_batch / n_seen_samples
@@ -908,13 +905,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
-            weights=appear_freq,
+            weights=np.ones(len(subset)),
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        # B[subset] += (1 / inner_weights[subset][:, np.newaxis] - 1) * new_B
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
