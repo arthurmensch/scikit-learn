@@ -359,13 +359,13 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
 
-    dictionary /= weights[:, np.newaxis]
+    # dictionary /= weights[:, np.newaxis]
 
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
-    R += Y / weights[:, np.newaxis]
+    R += Y # / weights[:, np.newaxis]
     R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
@@ -416,7 +416,7 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
-    dictionary *= weights[:, np.newaxis]
+    # dictionary *= weights[:, np.newaxis]
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -823,6 +823,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         norm_cost = 0
         penalty_cost = 0
         cost_normalization = 0
+        count = np.zeros((n_features, 1))
+
     else:
         A = inner_stats[0].copy()
         B = inner_stats[1].copy()
@@ -832,6 +834,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         norm_cost = inner_stats[2][1]
         penalty_cost = inner_stats[2][2]
         cost_normalization = inner_stats[2][3]
+        count = inner_stats[2][4]
     # For tolerance computation
     patience = 0
 
@@ -849,7 +852,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     total_time = 0
 
     inner_weights = np.ones(n_features)
-    count = np.zeros((n_features, 1))
 
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
                                  batches, subsets):
@@ -886,10 +888,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         A *= 1 - len_batch / cost_normalization
         A += np.dot(this_code, this_code.T) / cost_normalization
         count[subset] += len_batch
-        B[subset] *= 1 - len_batch / cost_normalization
-        B[subset] += np.dot(this_X[:, subset].T / inner_weights[subset][:,
-                                                                np.newaxis],
-                            this_code.T) / cost_normalization
+        B[subset] *= 1 - len_batch / count[subset]
+        B[subset] += np.dot(this_X[:, subset].T,
+                            this_code.T) / count[subset]
+        # B *= 1 - len_batch / cost_normalization
+        # new_B = np.dot(this_X[:, subset].T,
+        #                     this_code.T) / cost_normalization
+        # B[subset] += new_B
+
         total_time += time.time() - t0
         A_ref *= 1 - len_batch / cost_normalization
         A_ref += np.dot(this_code, this_code.T) / cost_normalization
@@ -907,13 +913,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
+        # B[subset] += (1 / inner_weights[subset][:, np.newaxis] - 1) * new_B
         total_time += time.time() - t0
 
-        objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) \
-                         - np.sum(dictionary.T.dot(B_ref))
+        objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
+        objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
         norm_cost *= 1 - len_batch / cost_normalization
-        norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
+        norm_cost += .5 * np.sum(this_X ** 2) / cost_normalization
         penalty_cost *= 1 - len_batch / cost_normalization
         if method in ('lasso_lars', 'lasso_cd'):
             penalty_cost += alpha * np.sum(
@@ -947,13 +954,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 print("--- Convergence reached after %d iterations" % ii)
             break
 
-    residual_stat = (last_cost, norm_cost, penalty_cost, cost_normalization)
+    residual_stat = (last_cost, norm_cost, penalty_cost, cost_normalization,
+                     count)
     debug_info['total_time'] = total_time
 
     if return_inner_stats:
         if return_n_iter:
             res = dictionary.T, (
-            A, B, residual_stat, A_ref, B_ref), ii - iter_offset + 1
+                A, B, residual_stat, A_ref, B_ref), ii - iter_offset + 1
         else:
             res = dictionary.T, (A, B, residual_stat, A_ref, B_ref)
     elif return_code:

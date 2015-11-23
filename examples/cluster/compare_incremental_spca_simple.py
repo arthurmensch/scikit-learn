@@ -9,24 +9,25 @@ from sklearn.externals.joblib import Parallel, delayed, Memory
 
 
 def single_run(estimator, data):
-    for i in range(30):
-        print('Epoch %i' % i)
-        this_data = data.copy()
-        this_data -= np.mean(this_data, axis=0)
-        this_data /= np.std(this_data, axis=0)
-        estimator.partial_fit(this_data, deprecated=False)
-    first_time = estimator.debug_info_['total_time']
     feature_ratio = estimator.feature_ratio
-    delattr(estimator, 'inner_stats_')
     estimator.set_params(feature_ratio=1)
-    for i in range(200):
+    for i in range(5):
         print('New epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
-    second_time = estimator.debug_info_['total_time'] - first_time
+    first_time = estimator.debug_info_['total_time']
+    delattr(estimator, 'inner_stats_')
     estimator.set_params(feature_ratio=feature_ratio)
+    for i in range(40):
+        print('Epoch %i' % i)
+        this_data = data.copy()
+        this_data -= np.mean(this_data, axis=0)
+        this_data /= np.std(this_data, axis=0)
+        estimator.partial_fit(this_data, deprecated=False)
+    second_time = estimator.debug_info_['total_time'] - first_time
+    feature_ratio = estimator.feature_ratio
     this_data = this_data[:3]
     code = estimator.transform(this_data)
     reconstruction = code.dot(estimator.components_)
@@ -100,7 +101,7 @@ def run():
                                  np.linspace(compute_time[0], compute_time[0] + compute_time[1],
                                              len(residuals) // 2))), residuals,
                  label='ratio %.2f' % estimator.feature_ratio)
-        plt.ylim([1500, 1700])
+        plt.ylim([1500, 1900])
         plt.scatter(compute_time[0], residuals[len(residuals) // 2 - 1])
         plt.legend()
     plt.savefig(expanduser('~/output/incr_spca/residuals.pdf'))
