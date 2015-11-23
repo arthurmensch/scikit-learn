@@ -21,13 +21,13 @@ def run():
                                      random_state=rng, verbose=2,
                                      batch_size=20,
                                      debug_info=True,
-                                     feature_ratio=1,
+                                     feature_ratio=7,
                                      )
 
     t0 = time.time()
 
 
-    for i in range(10):
+    for i in range(20):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)

@@ -362,7 +362,8 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None, algor
     return code
 
 
-def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
+def _update_dict(dictionary, Y, code, weights=None, verbose=False,
+                 return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
@@ -405,7 +406,6 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     """
     threshold = 1e-20
 
-
     n_components = len(code)
     n_features = Y.shape[0]
     random_state = check_random_state(random_state)
@@ -415,29 +415,31 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
-    R = np.asfortranarray(R)
+    R = np.asfortranarray(R * weights[:, np.newaxis])
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
         component_range = random_state.permutation(n_components)
     else:
         component_range = np.arange(n_components)
-
+    old_atom = np.empty(n_features)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
-        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        old_atom[:] = dictionary[:, k]
+        # R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            dictionary[:, k] = R[:, k]
-            scale = code[k, k]
+            scale = code[k, k] # * np.max(weights)
         else:
-            dictionary[:, k] = np.dot(R, code[k, :].T)
-            scale = np.sum(code[k, :] ** 2)
+            scale = np.sum(code[k, :] ** 2)  # * np.max(weights)
         if scale < threshold:
             # Trigger cleaning
             dictionary[:, k] = 0
         else:
-            dictionary[:, k] /= scale
+            if online:
+                dictionary[:, k] += R[:, k] / scale
+            else:
+                dictionary[:, k] += np.dot(R, code[k, :].T) / scale
 
         # Cleaning small atoms
         atom_norm_square = np.sum(dictionary[:, k] ** 2)
@@ -464,7 +466,8 @@ def _update_dict(dictionary, Y, code, verbose=False, return_r2=False,
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
-        R = ger(-1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        R = ger(1.0, (old_atom - dictionary[:, k]) * weights, code[k, :],
+                a=R, overwrite_a=True)
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -871,7 +874,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         last_cost = np.inf
         norm_cost = 0
         penalty_cost = 0
-        cost_normalization = 0
+        n_seen_samples = 0
+        count_seen_features = np.zeros(n_features)
+
     else:
         A = inner_stats[0].copy()
         B = inner_stats[1].copy()
@@ -880,13 +885,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         last_cost = inner_stats[2][0]
         norm_cost = inner_stats[2][1]
         penalty_cost = inner_stats[2][2]
-        cost_normalization = inner_stats[2][3]
+        n_seen_samples = inner_stats[2][3]
+        count_seen_features = inner_stats[2][4]
     # For tolerance computation
     patience = 0
 
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
-    radius = 1 * sqrt(n_features)
+    radius = 1   #* sqrt(n_features)
 
     if n_iter != 0:
         if inner_stats is None and l1_ratio != 0.:
@@ -895,9 +901,12 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                        inplace=True)
 
     if subsets is None:
-        subsets = gen_cycling_subsets(n_features, n_features / feature_ratio, random=(feature_ratio > 1))
+        subsets = gen_cycling_subsets(n_features, n_features / feature_ratio,
+                                      random=(feature_ratio > 1))
     total_time = 0
-    for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter), batches, subsets):
+
+    for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
+                                 batches, subsets):
         t0 = time.time()
         if shuffle:
             this_X = X[permutation[batch]]
@@ -911,7 +920,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             if len(subset) == 0:
                 continue
             random_state.shuffle(subset)
-        this_alpha = alpha  # / n_features * len(subset)
         dt = (time.time() - t0)
         if verbose == 1:
             sys.stdout.write(".")
@@ -921,57 +929,67 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
 
+        len_batch = batch.stop - batch.start
+        n_seen_samples += len_batch
+        count_seen_features[subset] += len_batch
+
         subset_dictionary = check_array(dictionary[subset], order='F',
                                         copy=True)
 
-        this_code = sparse_encode(this_X[:, subset],
-                                  subset_dictionary.T,
-                                  missing_values=missing_values,
-                                  algorithm=method,
-                                  alpha=this_alpha,
-                                  n_jobs=1,
-                                  check_input=False,
-                                  random_state=random_state).T
+        ratio = sqrt(len(subset) / n_features)
 
-        len_batch = X.shape[0]
-        cost_normalization += len_batch
-        A *= 1 - len_batch / cost_normalization * len(subset) / n_features
-        A += np.dot(this_code, this_code.T) / cost_normalization * len(subset) / n_features
-        B[subset] *= 1 - len_batch / cost_normalization
-        B[subset] += safe_sparse_dot(this_X[:, subset].T, this_code.T) / cost_normalization
+        this_code = sparse_encode(
+            this_X[:, subset] / ratio,
+            subset_dictionary.T / ratio,
+            algorithm=method,
+            alpha=alpha,
+            missing_values=missing_values,
+            n_jobs=1,
+            check_input=False,
+            random_state=random_state).T
+
+        A *= 1 - len_batch / n_seen_samples
+        A += np.dot(this_code, this_code.T) / n_seen_samples
+        B[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
+        B[subset] += safe_sparse_dot(this_X[:, subset].T,
+                            this_code.T) / count_seen_features[subset,
+                                                               np.newaxis]
+
         total_time += time.time() - t0
-
-        A_ref *= 1 - len_batch / cost_normalization
-        A_ref += np.dot(this_code, this_code.T) / cost_normalization
-        B_ref *= 1 - len_batch / cost_normalization
-        B_ref += safe_sparse_dot(this_X.T, this_code.T) / cost_normalization
+        A_ref *= 1 - len_batch / n_seen_samples
+        A_ref += np.dot(this_code, this_code.T) / n_seen_samples
+        B_ref *= 1 - len_batch / n_seen_samples
+        B_ref += safe_sparse_dot(this_X.T, this_code.T) / n_seen_samples
         # Update dictionary
 
+        ones = np.ones(len(subset))
         t0 = time.time()
-        subset_dictionary, objective_cost = _update_dict(
+        dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
             verbose=verbose,
             l1_ratio=l1_ratio,
+            weights=ones,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        dictionary[subset] = subset_dictionary
-        print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
         total_time += time.time() - t0
 
-        objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref) - np.sum(dictionary.T.dot(B_ref))
+        objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
+        objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
-        norm_cost *= 1 - len_batch / cost_normalization
+        norm_cost *= 1 - len_batch / n_seen_samples
         if sp.issparse(this_X):
-            norm_cost += np.sum(this_X.data ** 2) / 2 / cost_normalization
+            norm_cost += .5 * np.sum(this_X.data ** 2) / n_seen_samples
         else:
-            norm_cost += np.sum(this_X ** 2) / 2 / cost_normalization
-        penalty_cost *= 1 - len_batch / cost_normalization
+            norm_cost += .5 * np.sum(this_X ** 2) / n_seen_samples
+
+        penalty_cost *= 1 - len_batch / n_seen_samples
         if method in ('lasso_lars', 'lasso_cd'):
-            penalty_cost += alpha * np.sum(np.abs(this_code)) / cost_normalization
+            penalty_cost += alpha * np.sum(
+                np.abs(this_code)) / n_seen_samples
         else:
-            penalty_cost += alpha * np.sum(this_code ** 2) / cost_normalization
+            penalty_cost += alpha * np.sum(this_code ** 2) / n_seen_samples
         current_cost = objective_cost + norm_cost + penalty_cost
 
         # XXX to remove
@@ -999,14 +1017,15 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 print("--- Convergence reached after %d iterations" % ii)
             break
 
-
-    residual_stat = (last_cost, norm_cost, penalty_cost, cost_normalization)
+    residual_stat = (last_cost, norm_cost, penalty_cost, n_seen_samples,
+                     count_seen_features)
     if return_debug_info:
         debug_info['total_time'] = total_time
 
     if return_inner_stats:
         if return_n_iter:
-            res = dictionary.T, (A, B, residual_stat, A_ref, B_ref), ii - iter_offset + 1
+            res = dictionary.T, (
+                A, B, residual_stat, A_ref, B_ref), ii - iter_offset + 1
         else:
             res = dictionary.T, (A, B, residual_stat, A_ref, B_ref)
     elif return_code:
@@ -1535,7 +1554,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             subsets=self.subsets_)
 
         if self.debug_info:
-            (U, (A, B, self.inner_stats_), n_iter), debug_info = res
+            (U, (A, B, self.inner_stats_, A_ref, B_ref), n_iter), debug_info =\
+                res
             if not hasattr(self, 'debug_info_'):
                 self.debug_info_ = debug_info
             else:
