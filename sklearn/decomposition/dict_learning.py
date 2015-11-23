@@ -378,9 +378,9 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
         # R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            scale = code[k, k] * np.max(weights)
+            scale = code[k, k] # * np.max(weights)
         else:
-            scale = np.sum(code[k, :] ** 2) * np.max(weights)
+            scale = np.sum(code[k, :] ** 2)  # * np.max(weights)
         if scale < threshold:
             # Trigger cleaning
             dictionary[:, k] = 0
@@ -903,16 +903,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         B_ref += np.dot(this_X.T, this_code.T) / n_seen_samples
         # Update dictionary
 
-        appear_freq = count_seen_features[subset] / n_seen_samples
-        # weights = 1 / np.sqrt(appear_freq)
-        weights = np.ones(len(subset))
+        ones = np.ones(len(subset))
         t0 = time.time()
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
             verbose=verbose,
             l1_ratio=l1_ratio,
-            weights=weights,
+            weights=ones,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)

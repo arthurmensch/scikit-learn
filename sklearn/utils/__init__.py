@@ -368,7 +368,7 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
         while j < n:
             j = random_state.randint(i + 1, i + 2 * batch_size + 1)
             j = min(j, n)
-            yield permutation[i:j]
+            yield np.unique(permutation[i:j])
             i = j
 
 
