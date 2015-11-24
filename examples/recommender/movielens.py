@@ -5,13 +5,13 @@ from scipy.sparse import csr_matrix
 import pandas as pd
 import numpy as np
 
-from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn.utils import check_random_state
 
 import matplotlib.pyplot as plt
 
-def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv'):
+def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv',
+                  n_users=10000, n_movies=10000):
     df = pd.read_csv(datafile)
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
@@ -28,7 +28,7 @@ def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv'):
     X = csr_matrix((ratings, (ratings.index.get_level_values(0) - 1,
                              ratings.index.get_level_values(1) -1)),
                    shape=(n_users, n_movies))
-    return X[:, :10000]
+    return X[:, : 10000]
 
 
 def split_dataset(X):
@@ -66,17 +66,20 @@ def run():
     X_train, mean_train = mem.cache(center_non_zero_data_along_row)(X_train[
                                                                     :1000])
     random_state = check_random_state(0)
-    dict_init = (random_state.binomial(1, 0.5, size=(40, X.shape[1])) - .5) * 2
-    sparse_pca = IncrementalSparsePCA(n_components=40, dict_init=dict_init,
-                                      alpha=0.01, batch_size=1,
-                                      n_iter=10000, missing_values=0,
-                                      verbose=10, transform_alpha=1,
+    dict_init = (random_state.binomial(1, 0.5, size=(150, X.shape[1])) - .5)\
+                * 2
+    sparse_pca = IncrementalSparsePCA(n_components=150, dict_init=dict_init,
+                                      alpha=10, batch_size=10,
+                                      n_iter=1000, missing_values=0,
+                                      verbose=10, transform_alpha=10,
                                       random_state=random_state,
                                       debug_info=True)
     sparse_pca.fit(X_train)
-    code = sparse_pca.transform(X_train[:1000])
+    code = sparse_pca.transform(X_train[:10000])
     np.save('code', code)
     np.save('components', sparse_pca.components_)
+
+    X_test, mean_test = mem.cache(center_non_zero_data_along_row)(X_test[:10000])
 
     residuals = sparse_pca.debug_info_['residuals']
 
