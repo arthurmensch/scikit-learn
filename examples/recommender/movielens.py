@@ -253,7 +253,8 @@ def grid_point_fit(recommender, X, scorer, alpha):
 
 class SPCARecommenderCV(BaseEstimator):
     def __init__(self, random_state=None, n_components=10, n_runs=1,
-                 alphas=[1], debug_folder=None, n_epochs=1, n_jobs=1,
+                 alphas=[1], debug_folder=None, batch_size=10,
+                 n_epochs=1, n_jobs=1,
                  memory=Memory(cachedir=None)):
         self.alphas = alphas
         self.n_components = n_components
@@ -290,10 +291,10 @@ class SPCARecommenderCV(BaseEstimator):
         self.recommender_.fit(X)
 
     def transform(self, X, y=None):
-        self.recommender_.transform(self, X)
+        return self.recommender_.transform(self, X)
 
     def score(self, X):
-        self.recommender_.score(self, X)
+        return self.recommender_.score(X)
 
 
 def recommender_scorer(estimator, X, y=None, n_splits=1, test_size=0.2,
@@ -406,30 +407,31 @@ def run():
     print("Loading dataset")
     X = mem.cache(fetch_dataset)(
         datafile='/home/arthur/data/own/ml-20m/ratings.csv')
+    X = X[:1000]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
+    alphas = [.01, .1, 1, 10]
     for i, (X_train, X_test) in enumerate(splits):
-        # if i == 0:
-        # recommender = SPCARecommenderCV(n_components=50,
-        #                                 n_epochs=1,
-        #                                 n_runs=1,
-        #                                 n_jobs=3,
-        #                                 random_state=random_state,
-        #                                 alphas=alphas,
-        #                                 memory=mem)
-        # alpha = recommender.alpha_
-        # else:
-        recommender = SPCARecommender(n_components=50,
-                                      batch_size=1,
-                                      n_epochs=3,
-                                      n_runs=1,
-                                      random_state=random_state,
-                                      alpha=.1,
-                                      memory=mem,
-                                      debug_folder=
-                                      expanduser(
-                                          '~/test_recommender_output'))
+
+        # recommender = SPCARecommender(n_components=50,
+        #                               batch_size=1,
+        #                               n_epochs=3,
+        #                               n_runs=1,
+        #                               random_state=random_state,
+        #                               alpha=.1,
+        #                               memory=mem,
+        #                               debug_folder=
+        #                               expanduser(
+        #                                   '~/test_recommender_output'))
+        recommender = SPCARecommenderCV(n_components=50,
+                                        n_epochs=5,
+                                        n_runs=1,
+                                        n_jobs=4,
+                                        random_state=random_state,
+                                        alphas=alphas,
+                                        batch_size=1,
+                                        memory=mem)
         recommender.fit(X_train)
         score = recommender.score(X_test)
         print("RMSE: %.2f" % score)
