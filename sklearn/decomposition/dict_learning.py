@@ -135,7 +135,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                 else:
                     raise NotImplementedError
                 if len(idx) != 0:
-                    clf.set_params(alpha=clf.apha * len(idx) / n_features)
+                    clf.set_params(alpha=clf.alpha * len(idx) / n_features)
                     clf.fit(dictionary.T[idx],
                             X.data[X.indptr[i]:X.indptr[i + 1]])
                     new_code[i] = clf.coef_
@@ -433,7 +433,7 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
         # R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            scale = code[k, k]  # * np.max(weights)
+            scale = code[k, k] # * np.max(weights)
         else:
             scale = np.sum(code[k, :] ** 2)  # * np.max(weights)
         if scale < threshold:
@@ -904,10 +904,16 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
                        radius=radius,
                        inplace=True)
+
+    if subsets is None:
+        subsets = gen_cycling_subsets(n_features, n_features / feature_ratio,
+                                      random=(feature_ratio > 1))
     total_time = 0
 
-    for ii, batch in zip(range(iter_offset, iter_offset + n_iter),
-                         batches):
+
+
+    for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
+                                 batches, subsets):
         t0 = time.time()
         if shuffle:
             this_X = X[permutation[batch]]
@@ -931,7 +937,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
                 print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
-
 
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
@@ -966,6 +971,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
         ones = np.ones(len(subset))
         t0 = time.time()
+        # dictionary_copy = subset_dictionary.copy()
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A,
@@ -975,6 +981,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
+        # print(dictionary_copy - dictionary[subset])
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
@@ -996,9 +1003,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
         # XXX to remove
         if return_debug_info:
-            debug_info['values'].append(
-                (dictionary[:, 0] / sqrt(np.sum(dictionary[:, 0] ** 2)))
-                [recorded_features])
+            debug_info['values'].append((dictionary[:, 0][recorded_features]))
             debug_info['density'].append(
                 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary))
             debug_info['residuals'].append(current_cost)
@@ -1611,7 +1616,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
         if not deprecated:
             # Doing one pass on the data, ignoring self.n_iter
-            n_iter = (len(X) - 1) // self.batch_size + 1
+            n_iter = (X.shape[0] - 1) // self.batch_size + 1
             batch_size = self.batch_size
         else:
             n_iter = self.n_iter
