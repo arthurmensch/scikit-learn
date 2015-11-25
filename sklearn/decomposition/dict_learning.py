@@ -930,6 +930,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             if verbose > 10 or ii % ceil(100. / verbose) == 0:
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
+                print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
+
 
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
@@ -973,7 +975,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
