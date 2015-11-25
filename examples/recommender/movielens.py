@@ -413,8 +413,7 @@ def run():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
-    X = mem.cache(fetch_dataset)()
-        # datafile='/home/parietal/amensch/ml-20m/ratings.csv')
+    X = mem.cache(fetch_dataset)(expanduser('~/ml-20m/ratings.csv'))
     X = X[:100]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
