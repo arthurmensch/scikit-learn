@@ -358,7 +358,6 @@ def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
         yield X_train, X_test
 
 def csr_inplace_center_data(X):
-    Y = X.todense()
     m_col = np.zeros(X.shape[1])
     m_row = np.zeros(X.shape[0])
     for i in range(3):
@@ -408,11 +407,8 @@ def run():
     X = mem.cache(fetch_dataset)(
         datafile='/home/arthur/data/own/ml-20m/ratings.csv')
     print("Done loading dataset")
-    X = X[:10000, :10000]
-    X = X[X.getnnz(1) > 0]
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
-    alphas = np.array([1, 10, 100])
     for i, (X_train, X_test) in enumerate(splits):
         # if i == 0:
         # recommender = SPCARecommenderCV(n_components=50,
@@ -424,7 +420,7 @@ def run():
         #                                 memory=mem)
         # alpha = recommender.alpha_
         # else:
-        recommender = SPCARecommender(n_components=20,
+        recommender = SPCARecommender(n_components=50,
                                       batch_size=1,
                                       n_epochs=3,
                                       n_runs=1,
