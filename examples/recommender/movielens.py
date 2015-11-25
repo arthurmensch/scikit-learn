@@ -271,6 +271,7 @@ class SPCARecommenderCV(BaseEstimator):
         self.n_epochs = n_epochs
         self.n_jobs = n_jobs
         self.memory = memory
+        self.batch_size = batch_size
 
     def fit(self, X, y=None):
         scorer = functools.partial(recommender_scorer,
@@ -281,6 +282,7 @@ class SPCARecommenderCV(BaseEstimator):
             n_components=self.n_components,
             n_runs=self.n_runs,
             n_epochs=self.n_epochs,
+            batch_size=self.batch_size,
             n_jobs=1,
             memory=self.memory
         )
