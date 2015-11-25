@@ -249,8 +249,7 @@ def grid_point_fit(recommender, X, scorer, alpha, root_debug):
     this_recommender = clone(recommender)
     this_recommender.memory = recommender.memory
     try:
-        os.makedirs(join(recommender.debug_folder,
-                                             str(alpha)))
+        os.makedirs(join(root_debug, str(alpha).replace('.', '_')))
     except:
         pass
     recommender.set_params(alpha=alpha,
@@ -414,8 +413,8 @@ def run():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
-    X = mem.cache(fetch_dataset)(
-        datafile='/home/parietal/amensch/ml-20m/ratings.csv')
+    X = mem.cache(fetch_dataset)()
+        # datafile='/home/parietal/amensch/ml-20m/ratings.csv')
     X = X[:100]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
