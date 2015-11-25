@@ -255,7 +255,7 @@ def grid_point_fit(recommender, X, scorer, alpha, root_debug):
         pass
     recommender.set_params(alpha=alpha,
                            debug_folder=join(root_debug,
-                                             str(alpha)))
+                                             str(alpha).replace('.', '_')))
     return scorer(recommender, X)
 
 
