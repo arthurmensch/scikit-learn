@@ -415,7 +415,7 @@ def run():
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_dataset)(
-        datafile='/home/arthur/data/own/ml-20m/ratings.csv')
+        datafile='/home/parietal/amensch/ml-20m/ratings.csv')
     X = X[:100]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
