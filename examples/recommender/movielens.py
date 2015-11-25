@@ -1,3 +1,4 @@
+import os
 from os.path import expanduser, join
 import functools
 
@@ -24,7 +25,7 @@ def draw_stats(debug_folder):
     values = np.load(join(debug_folder, 'values.npy'))
     dictionary = np.load(join(debug_folder, 'dictionary.npy'))
     code = np.load(join(debug_folder, 'code.npy'))
-    probe_score = np.load(join(debug_folder, 'probe_score.npy'))
+    # probe_score = np.load(join(debug_folder, 'probe_score.npy'))
 
     fig = plt.figure()
     plt.plot(np.arange(len(residuals)), residuals)
@@ -41,10 +42,10 @@ def draw_stats(debug_folder):
     plt.savefig(join(debug_folder, 'density.pdf'))
     plt.close(fig)
 
-    fig = plt.figure()
-    plt.plot(np.arange(len(probe_score)), probe_score)
-    plt.savefig(join(debug_folder, 'probe_score.pdf'))
-    plt.close(fig)
+    # fig = plt.figure()
+    # plt.plot(np.arange(len(probe_score)), probe_score)
+    # plt.savefig(join(debug_folder, 'probe_score.pdf'))
+    # plt.close(fig)
 
     fig = plt.figure(figsize=(10, 10))
     plt.matshow(dictionary[:1000])
@@ -244,10 +245,17 @@ class SPCARecommender(BaseEstimator):
         return csr_rmse(X, X_pred)
 
 
-def grid_point_fit(recommender, X, scorer, alpha):
+def grid_point_fit(recommender, X, scorer, alpha, root_debug):
     this_recommender = clone(recommender)
     this_recommender.memory = recommender.memory
-    recommender.set_params(alpha=alpha)
+    try:
+        os.makedirs(join(recommender.debug_folder,
+                                             str(alpha)))
+    except:
+        pass
+    recommender.set_params(alpha=alpha,
+                           debug_folder=join(root_debug,
+                                             str(alpha)))
     return scorer(recommender, X)
 
 
@@ -273,7 +281,6 @@ class SPCARecommenderCV(BaseEstimator):
             random_state=self.random_state,
             n_components=self.n_components,
             n_runs=self.n_runs,
-            debug_folder=self.debug_folder,
             n_epochs=self.n_epochs,
             n_jobs=1,
             memory=self.memory
@@ -282,7 +289,9 @@ class SPCARecommenderCV(BaseEstimator):
                           verbose=10)(delayed(grid_point_fit)(recommender,
                                                               X,
                                                               scorer,
-                                                              alpha) for alpha
+                                                              alpha,
+                                                              self.debug_folder)
+                                      for alpha
                                       in self.alphas)
         scores = np.array(scores)
         self.alpha_ = self.alphas[np.argmax(scores)]
@@ -407,7 +416,7 @@ def run():
     print("Loading dataset")
     X = mem.cache(fetch_dataset)(
         datafile='/home/arthur/data/own/ml-20m/ratings.csv')
-    X = X[:1000]
+    X = X[:10000]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
@@ -431,7 +440,8 @@ def run():
                                         random_state=random_state,
                                         alphas=alphas,
                                         batch_size=1,
-                                        memory=mem)
+                                        memory=mem,
+                                        debug_folder=expanduser('~/test_recommender_output'))
         recommender.fit(X_train)
         score = recommender.score(X_test)
         print("RMSE: %.2f" % score)
