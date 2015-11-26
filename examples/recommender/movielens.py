@@ -419,7 +419,7 @@ def run():
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
-    alphas = [.01, .1, 1, 10]
+    alphas = [.001, .01, .1, 1, 10, 100]
     for i, (X_train, X_test) in enumerate(splits):
 
         # recommender = SPCARecommender(n_components=50,
