@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
+from sklearn.linear_model import ridge_regression
 from sklearn.utils import check_random_state, gen_batches
 import matplotlib.pyplot as plt
 
@@ -19,13 +20,15 @@ def csr_rmse(y, y_pred):
                            y_pred.data) ** 2) / y.nnz)
 
 
+
+
 def draw_stats(debug_folder):
     residuals = np.load(join(debug_folder, 'residuals.npy'))
     density = np.load(join(debug_folder, 'density.npy'))
     values = np.load(join(debug_folder, 'values.npy'))
     dictionary = np.load(join(debug_folder, 'dictionary.npy'))
     code = np.load(join(debug_folder, 'code.npy'))
-    # probe_score = np.load(join(debug_folder, 'probe_score.npy'))
+    probe_score = np.load(join(debug_folder, 'probe_score.npy'))
 
     fig = plt.figure()
     plt.plot(np.arange(len(residuals)), residuals)
@@ -42,13 +45,13 @@ def draw_stats(debug_folder):
     plt.savefig(join(debug_folder, 'density.pdf'))
     plt.close(fig)
 
-    # fig = plt.figure()
-    # plt.plot(np.arange(len(probe_score)), probe_score)
-    # plt.savefig(join(debug_folder, 'probe_score.pdf'))
-    # plt.close(fig)
+    fig = plt.figure()
+    plt.plot(np.arange(len(probe_score)), probe_score)
+    plt.savefig(join(debug_folder, 'probe_score.pdf'))
+    plt.close(fig)
 
     fig = plt.figure(figsize=(10, 10))
-    plt.matshow(dictionary[:1000])
+    plt.matshow(dictionary[:, :1000])
     plt.colorbar()
     plt.savefig(join(debug_folder, 'dictionary.pdf'))
     plt.close(fig)
@@ -115,13 +118,44 @@ def _fit_spca_recommender_(X, incr_spca, seed=None):
            np.array(density)[:, np.newaxis]
 
 
+class ALSRecommender(BaseEstimator):
+    def __init__(self, alpha_dict=1, alpha_code=1, n_components=10,
+                 n_iter=10):
+        alpha_dict = alpha_dict
+        alpha_code = alpha_code
+        n_components = n_components
+        n_iter = n_iter
+
+
+    def fit(self, X, y=None):
+        X = X.copy()
+        print("Centering data")
+        _, self.global_mean_, \
+        self.user_mean_, \
+        self.movie_mean = csr_inplace_center_data(X)
+
+        dictionary = np.zeros((X.shape[0], self.n_components))
+        code = np.zeros((self.n_components, X.shape[1]))
+
+        for i in range(self.n_iter):
+            for j in range(X.shape[0]):
+                data = X.data[X.indptr[i]:X.indptr[i]]
+                indices = X.data[X.indices[i]:X.indptr[i]]
+                dictionary[j] = ridge_regression(code, data, alpha=self.alpha_code)
+                dictionary[j] = ridge_regression(code, data, alpha=self.alpha_code)
+
+
+
+
 class SPCARecommender(BaseEstimator):
     def __init__(self, random_state=None, n_components=10, n_runs=1,
                  alpha=1, debug_folder=None, n_epochs=1,
                  n_jobs=1,
                  batch_size=10,
+                 dict_penalty=0,
                  memory=Memory(cachedir=None)):
         self.alpha = alpha
+        self.dict_penalty = dict_penalty
         self.n_components = n_components
         self.n_runs = n_runs
         self.batch_size = batch_size
@@ -142,8 +176,9 @@ class SPCARecommender(BaseEstimator):
                                      size=[self.n_runs])
         n_iter = X.shape[0] * self.n_epochs // self.batch_size
         self._incr_spca = IncrementalSparsePCA(n_components=self.n_components,
+                                               dict_penalty=self.dict_penalty,
                                          alpha=self.alpha,
-                                         l1_ratio=1,
+                                         l1_ratio=1.,
                                          batch_size=self.batch_size,
                                          n_iter=n_iter,
                                          missing_values=0,
@@ -416,24 +451,26 @@ def run():
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_dataset)(expanduser('~/ml-20m/ratings.csv'))
+    X = X[:10000]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
-    alphas = [.001, .01, .1, 1, 10, 100]
+    alphas = [.1, 1, 10, 100]
     for i, (X_train, X_test) in enumerate(splits):
-
+        X_test = X_test
         # recommender = SPCARecommender(n_components=50,
-        #                               batch_size=1,
-        #                               n_epochs=3,
+        #                               batch_size=10,
+        #                               dict_penalty=1,
+        #                               n_epochs=4,
         #                               n_runs=1,
         #                               random_state=random_state,
-        #                               alpha=.1,
+        #                               alpha=10,
         #                               memory=mem,
         #                               debug_folder=
         #                               expanduser(
         #                                   '~/test_recommender_output'))
         recommender = SPCARecommenderCV(n_components=50,
-                                        n_epochs=2,
+                                        n_epochs=20,
                                         n_runs=1,
                                         n_jobs=4,
                                         random_state=random_state,
@@ -441,7 +478,7 @@ def run():
                                         batch_size=10,
                                         memory=mem,
                                         debug_folder=expanduser('~/test_recommender_output'))
-        recommender.fit(X_train)
+        recommender.fit(X_train, probe=[X_test])
         score = recommender.score(X_test)
         print("RMSE: %.2f" % score)
 

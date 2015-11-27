@@ -291,6 +291,7 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
         The sparse codes
 
     See also
+    See also
     --------
     sklearn.linear_model.lars_path
     sklearn.linear_model.orthogonal_mp
@@ -366,7 +367,8 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
     return code
 
 
-def _update_dict(dictionary, Y, code, weights=None, verbose=False,
+def _update_dict(dictionary, Y, code,
+                 weights=None, verbose=False,
                  return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
@@ -674,7 +676,9 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
         return code, dictionary, errors
 
 
-def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
+def dict_learning_online(X, n_components=2, alpha=1,
+                         dict_penalty=0,
+                         l1_ratio=0.0,
                          update_scheme='exp_decay',
                          forget_rate=1., n_iter=100,
                          return_code=True, dict_init=None,
@@ -898,9 +902,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     # If n_iter is zero, we need to return zero.
     ii = iter_offset - 1
     radius = sqrt(n_features)
-
+    dict_penalty *= radius ** 2
     if n_iter != 0:
-        if inner_stats is None and l1_ratio != 0.:
+        if inner_stats is None:
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
                        radius=radius,
                        inplace=True)
@@ -974,7 +978,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         # dictionary_copy = subset_dictionary.copy()
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
-            B[subset], A,
+            B[subset], A + dict_penalty * np.eye(n_components),
             verbose=verbose,
             l1_ratio=l1_ratio,
             weights=ones,
@@ -1494,7 +1498,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
     """
 
-    def __init__(self, n_components=None, alpha=1, l1_ratio=0.0,
+    def __init__(self, n_components=None, alpha=1, dict_penalty=0,
+                 l1_ratio=0.0,
                  n_iter=1000, fit_algorithm='lars', n_jobs=1,
                  batch_size=3, tol=0., shuffle=True, dict_init=None,
                  transform_algorithm='omp',
@@ -1509,6 +1514,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                                        transform_n_nonzero_coefs,
                                        transform_alpha, split_sign, n_jobs)
         self.alpha = alpha
+        self.dict_penalty = dict_penalty
         self.l1_ratio = l1_ratio
         self.n_iter = n_iter
         self.fit_algorithm = fit_algorithm
@@ -1546,6 +1552,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
         res = dict_learning_online(
             X, self.n_components, self.alpha,
+            dict_penalty=dict_penalty,
             l1_ratio=self.l1_ratio,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
