@@ -355,6 +355,18 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
     random_state = check_random_state(random_state)
     while True:
         if random:
+            permutation = random_state.permutation(n)
+        else:
+            permutation = np.arange(n)
+        batches = gen_batches(n, batch_size)
+        for batch in batches:
+            yield permutation[batch]
+
+
+def gen_cycling_subsets_pathologic(n, batch_size, random=True, random_state=None):
+    random_state = check_random_state(random_state)
+    while True:
+        if random:
             p = 1 / (1 + np.arange(n, dtype='float'))
             p /= np.sum(p)
             permutation = random_state.choice(np.arange(n), p=p, size=[n])

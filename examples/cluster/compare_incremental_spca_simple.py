@@ -6,6 +6,7 @@ from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn import datasets
 from sklearn.base import clone
 from sklearn.externals.joblib import Parallel, delayed, Memory
+from sklearn.utils import check_random_state
 
 
 def single_run(estimator, data):
@@ -27,7 +28,6 @@ def single_run(estimator, data):
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
     second_time = estimator.debug_info_['total_time'] - first_time
-    feature_ratio = estimator.feature_ratio
     this_data = this_data[:3]
     code = estimator.transform(this_data)
     reconstruction = code.dot(estimator.components_)
@@ -44,9 +44,9 @@ def run():
     # Learn the dictionary of images
 
     print('Learning the dictionary... ')
-    rng = 30
+    rng = check_random_state(31)
     estimators = []
-    for feature_ratio in np.linspace(1, 10, 5):
+    for feature_ratio in [8]:
         estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.01,
                                                n_iter=100000,
                                                random_state=rng, verbose=2,
@@ -97,12 +97,15 @@ def run():
     plt.figure(figsize=(8, 8))
     for estimator, compute_time in zip(estimators, compute_times):
         residuals = estimator.debug_info_['residuals']
-        plt.plot(np.concatenate((np.linspace(0, compute_time[0], len(residuals) // 2, endpoint=False),
-                                 np.linspace(compute_time[0], compute_time[0] + compute_time[1],
-                                             len(residuals) // 2))), residuals,
+        # plt.plot(np.concatenate((np.linspace(0, compute_time[0], len(residuals) // 2, endpoint=False),
+        #                          np.linspace(compute_time[0], compute_time[0] + compute_time[1],
+        #                                      len(residuals) // 2))), residuals,
+        #          label='ratio %.2f' % estimator.feature_ratio)
+        print(len(residuals))
+        plt.plot(np.arange(len(residuals)), residuals,
                  label='ratio %.2f' % estimator.feature_ratio)
-        plt.ylim([1500, 1900])
-        plt.scatter(compute_time[0], residuals[len(residuals) // 2 - 1])
+        # plt.ylim([1500, 1900])
+        plt.scatter(len(residuals) // 9 - 1, residuals[len(residuals) // 9 - 1])
         plt.legend()
     plt.savefig(expanduser('~/output/incr_spca/residuals.pdf'))
 

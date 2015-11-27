@@ -26,7 +26,7 @@ def run():
 
     t0 = time.time()
 
-    for i in range(300):
+    for i in range(30):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)
@@ -38,7 +38,7 @@ def run():
 
     ###############################################################################
     # Plot the results
-    plt.figure(figsize=(4.2, 4))
+    plt.figure()
     for i, component in enumerate(incr_spca.components_):
         if np.sum(component > 0) < np.sum(component < 0):
             component *= -1
@@ -63,7 +63,7 @@ def run():
     # reconstruction *= np.std(this_data, axis=0)
     # reconstruction += np.std(this_data, axis=0)
 
-    plt.figure(figsize=(4.2, 4))
+    plt.figure()
     for i, (reconstructed_img, img) in enumerate(zip(reconstruction, this_data)):
         plt.subplot(n_imgs, 2, 2 * i + 1)
         plt.imshow(img.reshape(faces.images[0].shape), cmap=plt.cm.gray,
@@ -78,7 +78,7 @@ def run():
 
     residuals = incr_spca.debug_info_['residuals']
 
-    plt.figure(figsize=(4.2, 4))
+    plt.figure()
     plt.plot(np.arange(len(residuals)), residuals, label='Residuals')
     plt.plot(np.arange(len(residuals)), incr_spca.debug_info_['norm_cost'], label='Norm cost')
     plt.plot(np.arange(len(residuals)), incr_spca.debug_info_['objective_cost'], label='Objective cost')

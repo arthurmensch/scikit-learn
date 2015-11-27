@@ -6,32 +6,30 @@ from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn import datasets
 from sklearn.base import clone
 from sklearn.externals.joblib import Parallel, delayed, Memory
+from sklearn.utils import check_random_state
 
 
 def single_run(estimator, data):
-    for i in range(30):
+    warmup_estimator = clone(estimator)
+    for i in range(10):
         print('Epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
-        estimator.partial_fit(this_data, deprecated=False)
-    first_time = estimator.debug_info_['total_time']
-    feature_ratio = estimator.feature_ratio
-    delattr(estimator, 'inner_stats_')
-    estimator.set_params(feature_ratio=1)
+        warmup_estimator.partial_fit(this_data, deprecated=False)
+    estimator.set_params(dict_init=warmup_estimator.components_)
     for i in range(200):
         print('New epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
         this_data /= np.std(this_data, axis=0)
         estimator.partial_fit(this_data, deprecated=False)
-    second_time = estimator.debug_info_['total_time'] - first_time
-    estimator.set_params(feature_ratio=feature_ratio)
+    compute_time = estimator.debug_info_['total_time']
     this_data = this_data[:3]
     code = estimator.transform(this_data)
     reconstruction = code.dot(estimator.components_)
     estimator.subsets_ = None
-    return estimator, reconstruction, (first_time, second_time)
+    return estimator, reconstruction, compute_time
 
 
 def run():
@@ -43,7 +41,7 @@ def run():
     # Learn the dictionary of images
 
     print('Learning the dictionary... ')
-    rng = 30
+    rng = check_random_state(30)
     estimators = []
     for feature_ratio in np.linspace(1, 10, 5):
         estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.01,
@@ -67,43 +65,62 @@ def run():
 
     ###############################################################################
     # Plot the results
-    plt.figure(figsize=(4.2, 4))
+    fig = plt.figure()
     for j, estimator in enumerate(estimators):
         for i, component in enumerate(estimator.components_[:3]):
             if np.sum(component > 0) < np.sum(component < 0):
                 component *= -1
-            plt.subplot(10, 3, 3 * j + i + 1)
-            plt.imshow(component.reshape(faces.images[0].shape), cmap=plt.cm.gray,
+            ax = fig.add_subplot(len(estimators), 4, 4 * j + i + 1)
+            ax.imshow(component.reshape(faces.images[0].shape), cmap=plt.cm.gray,
                        interpolation='nearest')
-            plt.xticks(())
-            plt.yticks(())
+            ax.set_xticks(())
+            ax.set_yticks(())
+        ax = fig.add_subplot(len(estimators), 4, 4 * j + 4)
+        ax.text(.5, .5,
+                  'ratio: %.2f' % estimator.feature_ratio,
+                  ha='center', va='center', transform=ax.transAxes)
+        ax.set_xticks(())
+        ax.set_yticks(())
+        ax.axis('off')
+    plt.tight_layout(pad=0.4, w_pad=0.1, h_pad=0.5)
+    plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pdf'))
+    # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
 
-    plt.suptitle('Patches of faces\nTrain time %.1fs on %d patches' %
-                 (dt, 10 * len(faces.images)), fontsize=16)
-    plt.subplots_adjust(0.08, 0.02, 0.92, 0.85, 0.08, 0.23)
-    plt.savefig(expanduser('~/output/incr_spca/components.pdf'))
-
-    plt.figure(figsize=(4.2, 4))
-    for j, (estimator, reconstruction) in enumerate(zip(estimators, reconstructions)):
-        for i, img in enumerate(reconstruction):
-            plt.subplot(10, 3, 3 * j + i + 1)
+    fig = plt.figure()
+    for j, (estimator, reconstruction) in enumerate(zip(estimators,
+                                                        reconstructions)):
+        for i, img in enumerate(reconstruction[:3]):
+            if np.sum(component > 0) < np.sum(component < 0):
+                component *= -1
+            ax = fig.add_subplot(len(estimators), 4, 4 * j + i + 1)
             plt.imshow(img.reshape(faces.images[0].shape), cmap=plt.cm.gray,
                        interpolation='nearest')
-            plt.xticks(())
-            plt.yticks(())
-    plt.savefig(expanduser('~/output/incr_spca/reconstruction.pdf'))
+            ax.set_xticks(())
+            ax.set_yticks(())
+        ax = fig.add_subplot(len(estimators), 4, 4 * j + 4)
+        ax.text(.5, .5,
+                  'ratio: %.2f' % estimator.feature_ratio,
+                  ha='center', va='center', transform=ax.transAxes)
+        ax.set_xticks(())
+        ax.set_yticks(())
+        ax.axis('off')
+    plt.tight_layout(pad=0.4, w_pad=0.1, h_pad=0.5)
+    plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/reconstruction.pdf'))
+    # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
 
-    plt.figure(figsize=(8, 8))
+
+    plt.figure()
     for estimator, compute_time in zip(estimators, compute_times):
         residuals = estimator.debug_info_['residuals']
-        plt.plot(np.concatenate((np.linspace(0, compute_time[0], len(residuals) // 2, endpoint=False),
-                                 np.linspace(compute_time[0], compute_time[0] + compute_time[1],
-                                             len(residuals) // 2))), residuals,
+        plt.plot(np.linspace(0, compute_time, len(residuals)), residuals,
                  label='ratio %.2f' % estimator.feature_ratio)
-        plt.ylim([1500, 1700])
-        plt.scatter(compute_time[0], residuals[len(residuals) // 2 - 1])
-        plt.legend()
-    plt.savefig(expanduser('~/output/incr_spca/residuals.pdf'))
+        plt.xlabel('Time (s)')
+        plt.ylabel('Objective value')
+        plt.ylim([1650, 1800])
+        plt.legend(ncol=2)
+    plt.tight_layout(pad=0.4)
+    plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/residuals.pdf'))
+    # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
 
 
 if __name__ == '__main__':

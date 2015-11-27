@@ -364,7 +364,10 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
-    R = np.asfortranarray(R * weights[:, np.newaxis])
+    if weights is not None:
+        R = np.asfortranarray(R * weights[:, np.newaxis])
+    else:
+        R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
@@ -415,8 +418,12 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
         else:
             dictionary[:, k] /= sqrt(atom_norm_square)
         # R <- -1.0 * U_k * V_k^T + R
-        R = ger(1.0, (old_atom - dictionary[:, k]) * weights, code[k, :],
-                a=R, overwrite_a=True)
+        if weights is not None:
+            R = ger(1.0, (old_atom - dictionary[:, k]) * weights, code[k, :],
+                    a=R, overwrite_a=True)
+        else:
+            R = ger(1.0, old_atom - dictionary[:, k], code[k, :],
+                    a=R, overwrite_a=True)
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -910,7 +917,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             B[subset], A,
             verbose=verbose,
             l1_ratio=l1_ratio,
-            weights=ones,
+            weights=None,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
@@ -956,7 +963,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
     residual_stat = (last_cost, norm_cost, penalty_cost, n_seen_samples,
                      count_seen_features)
-    debug_info['total_time'] = total_time
+    if return_debug_info:
+        debug_info['total_time'] = total_time
 
     if return_inner_stats:
         if return_n_iter:
@@ -1486,14 +1494,14 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             subsets=self.subsets_)
 
         if self.debug_info:
-            (U, (A, B, self.inner_stats_), n_iter), debug_info = res
+            (U, self.inner_stats_, n_iter), debug_info = res
             if not hasattr(self, 'debug_info_'):
                 self.debug_info_ = debug_info
             else:
                 for key in self.debug_info_:
                     self.debug_info_[key] += debug_info[key]
         else:
-            U, (A, B, self.inner_stats_), n_iter = res
+            U, self.inner_stats_, n_iter = res
 
         self.n_iter_ = n_iter
         self.components_ = U
