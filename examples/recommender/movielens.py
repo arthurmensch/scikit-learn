@@ -176,15 +176,15 @@ class SPCARecommender(BaseEstimator):
                                      size=[self.n_runs])
         n_iter = X.shape[0] * self.n_epochs // self.batch_size
         self._incr_spca = IncrementalSparsePCA(n_components=self.n_components,
-                                               dict_penalty=self.dict_penalty,
-                                         alpha=self.alpha,
-                                         l1_ratio=1.,
-                                         batch_size=self.batch_size,
-                                         n_iter=n_iter,
-                                         missing_values=0,
-                                         verbose=10,
-                                         transform_alpha=self.alpha,
-                                         debug_info=True)
+                                               # dict_penalty=self.dict_penalty,
+                                             alpha=self.alpha,
+                                             l1_ratio=1.,
+                                             batch_size=self.batch_size,
+                                             n_iter=n_iter,
+                                             missing_values=0,
+                                             verbose=10,
+                                             transform_alpha=self.alpha,
+                                             debug_info=True)
         # self._incr_spca = MiniBatchDictionaryLearning(
         #     n_components=self.n_components, alpha=self.alpha,
         #     batch_size=batch_size, fit_algorithm='cd',
