@@ -457,26 +457,26 @@ def run():
     alphas = [.1, 1, 10, 100]
     for i, (X_train, X_test) in enumerate(splits):
         X_test = X_test
-        # recommender = SPCARecommender(n_components=50,
-        #                               batch_size=10,
-        #                               dict_penalty=1,
-        #                               n_epochs=4,
-        #                               n_runs=1,
-        #                               random_state=random_state,
-        #                               alpha=10,
-        #                               memory=mem,
-        #                               debug_folder=
-        #                               expanduser(
-        #                                   '~/test_recommender_output'))
-        recommender = SPCARecommenderCV(n_components=50,
-                                        n_epochs=20,
-                                        n_runs=1,
-                                        n_jobs=4,
-                                        random_state=random_state,
-                                        alphas=alphas,
-                                        batch_size=10,
-                                        memory=mem,
-                                        debug_folder=expanduser('~/test_recommender_output'))
+        recommender = SPCARecommender(n_components=50,
+                                      batch_size=10,
+                                      dict_penalty=1,
+                                      n_epochs=20,
+                                      n_runs=1,
+                                      random_state=random_state,
+                                      alpha=10,
+                                      memory=mem,
+                                      debug_folder=
+                                      expanduser(
+                                          '~/test_recommender_output'))
+        # recommender = SPCARecommenderCV(n_components=50,
+        #                                 n_epochs=20,
+        #                                 n_runs=1,
+        #                                 n_jobs=4,
+        #                                 random_state=random_state,
+        #                                 alphas=alphas,
+        #                                 batch_size=10,
+        #                                 memory=mem,
+        #                                 debug_folder=expanduser('~/test_recommender_output'))
         recommender.fit(X_train, probe=[X_test])
         score = recommender.score(X_test)
         print("RMSE: %.2f" % score)
