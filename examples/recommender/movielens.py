@@ -2,6 +2,7 @@ import os
 from os.path import expanduser, join
 import functools
 
+from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, delayed, Parallel
 from sklearn.base import clone
 from scipy.sparse import csr_matrix
@@ -12,6 +13,7 @@ from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn.linear_model import ridge_regression
 from sklearn.utils import check_random_state, gen_batches
 import matplotlib.pyplot as plt
+
 
 def csr_rmse(y, y_pred):
     if np.isnan(y_pred.data).any():
@@ -55,19 +57,22 @@ def draw_stats(debug_folder):
     plt.close(fig)
 
     fig = plt.figure(figsize=(10, 10))
-    plt.matshow(code[:1000])
+    plt.matshow(code[:1000].reshape((-1, code.shape[1] * 5)))
     plt.colorbar()
     plt.savefig(join(debug_folder, 'code.pdf'))
     plt.close(fig)
+
 
 def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=100,
                           n_epochs=1):
     incr_spca = clone(incr_spca)
     this_random_state = check_random_state(seed)
-    dict_init = (this_random_state.binomial(1, 0.5,
-                                            size=(incr_spca.n_components,
-                                                  X.shape[1])
-                                            ) - .5) * 2
+    # dict_init = (this_random_state.binomial(1, 0.5,
+    #                                         size=(incr_spca.n_components,
+    #                                               X.shape[1])
+    #                                         ) - .5) * 2
+    dict_init = this_random_state.randn(incr_spca.n_components,
+                                        X.shape[1])
     incr_spca.set_params(dict_init=dict_init, random_state=seed)
     print("Learning dictionary")
     last_seen = 0
@@ -89,16 +94,20 @@ def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=100,
             density = incr_spca.debug_info_['density']
             values = incr_spca.debug_info_['values']
             print("Computing probe score")
-            yield dictionary, code, np.array(residuals)[:, np.newaxis], density, values,\
+            yield dictionary, code, np.array(residuals)[:,
+                                    np.newaxis], density, values, \
                   last_seen
+
 
 def _fit_spca_recommender_(X, incr_spca, seed=None):
     incr_spca = clone(incr_spca)
     this_random_state = check_random_state(seed)
-    dict_init = (this_random_state.binomial(1, 0.5,
-                                            size=(incr_spca.n_components,
-                                                  X.shape[1])
-                                            ) - .5) * 2
+    # dict_init = (this_random_state.binomial(1, 0.5,
+    #                                         size=(incr_spca.n_components,
+    #                                               X.shape[1])
+    #                                         ) - .5) * 2
+    dict_init = this_random_state.randn(incr_spca.n_components,
+                                        X.shape[1])
     incr_spca.set_params(dict_init=dict_init, random_state=seed)
     print("Learning dictionary")
     incr_spca.fit(X)
@@ -110,9 +119,9 @@ def _fit_spca_recommender_(X, incr_spca, seed=None):
     residuals = incr_spca.debug_info_['residuals']
     density = incr_spca.debug_info_['density']
     values = incr_spca.debug_info_['values']
-    return dictionary, code,\
-           np.array(residuals)[:, np.newaxis],\
-           values,\
+    return dictionary, code, \
+           np.array(residuals)[:, np.newaxis], \
+           values, \
            np.array(density)[:, np.newaxis]
 
 
@@ -149,7 +158,6 @@ class ALSRecommender(BaseRecommender):
         n_components = n_components
         n_iter = n_iter
 
-
     def fit(self, X, y=None):
         BaseRecommender.fit(self, X)
 
@@ -159,13 +167,15 @@ class ALSRecommender(BaseRecommender):
         for i in range(self.n_iter):
             for j in range(X.shape[0]):
                 data = X.data[X.indptr[i]:X.indptr[i]]
-                dictionary[j] = ridge_regression(code, data, alpha=self.alpha_code)
-                dictionary[j] = ridge_regression(code, data, alpha=self.alpha_code)
+                dictionary[j] = ridge_regression(code, data,
+                                                 alpha=self.alpha_code)
+                dictionary[j] = ridge_regression(code, data,
+                                                 alpha=self.alpha_code)
 
 
 class SPCARecommender(BaseEstimator):
     def __init__(self, random_state=None, n_components=10, n_runs=1,
-                 alpha=1, debug_folder=None, n_epochs=1,
+                 alpha=1., debug_folder=None, n_epochs=1,
                  n_jobs=1,
                  batch_size=10,
                  dict_penalty=0,
@@ -192,6 +202,18 @@ class SPCARecommender(BaseEstimator):
         seeds = random_state.randint(0, np.iinfo(np.uint32).max,
                                      size=[self.n_runs])
         n_iter = X.shape[0] * self.n_epochs // self.batch_size
+        self._incr_spca = MiniBatchDictionaryLearning(n_components=
+                                                     self.n_components,
+                                                     fit_algorithm='cd',
+                                                     alpha=self.alpha,
+                                                     l1_ratio=0.,
+                                                     batch_size=self.batch_size,
+                                                     n_iter=n_iter,
+                                                     missing_values=0,
+                                                     verbose=10,
+                                                     debug_info=True,
+                                                     transform_algorithm='lasso_cd',
+                                                     transform_alpha=self.alpha)
         self._incr_spca = IncrementalSparsePCA(n_components=self.n_components,
                                                alpha=self.alpha,
                                                l1_ratio=1.,
@@ -201,11 +223,15 @@ class SPCARecommender(BaseEstimator):
                                                verbose=10,
                                                transform_alpha=self.alpha,
                                                debug_info=True)
+
+
         if probe is None:
             res = Parallel(n_jobs=self.n_jobs, verbose=10)(delayed(self.memory.
-            cache(_fit_spca_recommender_))(
-            X, self._incr_spca, seed=seed) for seed in seeds)
-            self.dictionary_, this_code, these_residuals, this_density, self.values_ = zip(*res)
+                                                                   cache(
+                _fit_spca_recommender_))(
+                X, self._incr_spca, seed=seed) for seed in seeds)
+            self.dictionary_, this_code, these_residuals, this_density, self.values_ = zip(
+                *res)
             self.code_ = np.concatenate(this_code, axis=1)
             self.dictionary_ = np.concatenate(self.dictionary_, axis=0)
             self.residuals_ = np.concatenate(these_residuals, axis=1)
@@ -213,7 +239,7 @@ class SPCARecommender(BaseEstimator):
             self.values_ = self.values_[0]
             if self.debug_folder is not None:
                 np.save(join(self.debug_folder, 'code'),
-                        self.code_)
+                          self.code_)
                 np.save(join(self.debug_folder, 'dictionary'),
                         self.dictionary_)
                 np.save(join(self.debug_folder, 'residuals'),
@@ -221,15 +247,15 @@ class SPCARecommender(BaseEstimator):
                 np.save(join(self.debug_folder, 'density'),
                         self.density_)
                 np.save(join(self.debug_folder, 'values'),
-                            self.values_)
+                        self.values_)
                 draw_stats(self.debug_folder)
         else:
             self.probe_score_ = []
             print(self.n_epochs)
-            for dictionary, code, residuals, density, values, last_seen\
+            for dictionary, code, residuals, density, values, last_seen \
                     in _fit_spca_recommender(
-                    X, self._incr_spca, seed=seeds[0], n_epochs=self.n_epochs,
-                    probe=probe, probe_freq=100):
+                X, self._incr_spca, seed=seeds[0], n_epochs=self.n_epochs,
+                probe=probe, probe_freq=100):
                 self.dictionary_ = dictionary
                 self.code_ = code
                 self.residuals_ = residuals
@@ -384,7 +410,6 @@ def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K'):
             df = pd.read_csv(datafile)
 
 
-
 def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
                                  random_state=None):
     if train_size is None:
@@ -412,6 +437,7 @@ def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
         X_test = csr_matrix((X.data[test_mask],
                              X.indices[test_mask], test_indptr))
         yield X_train, X_test
+
 
 def csr_inplace_center_data(X):
     m_col = np.zeros(X.shape[1])
@@ -447,6 +473,7 @@ def csr_inplace_row_center_data(X):
             X_mean[i] = 0
     return X, X_mean
 
+
 def csr_inplace_column_center_data(X):
     """
     X: csc sparse matrix
@@ -465,34 +492,34 @@ def run():
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
-    for i, (X_train, X_test) in enumerate(splits):
-        recommender = BaseRecommender()
-        recommender.fit(X_train)
-        score = recommender.score(X_test)
-        print("Unbiasing RMSE: %.2f" % score)
-        recommender = SPCARecommender(n_components=50,
-                                      batch_size=10,
-                                      n_epochs=2,
-                                      n_runs=1,
-                                      random_state=random_state,
-                                      alpha=10,
-                                      memory=mem,
-                                      debug_folder=
-                                      expanduser(
-                                          '~/test_recommender_output_3'))
-        # recommender = SPCARecommenderCV(n_components=50,
-        #                                 n_epochs=20,
-        #                                 n_runs=1,
-        #                                 n_jobs=4,
-        #                                 random_state=random_state,
-        #                                 alphas=alphas,
-        #                                 batch_size=10,
-        #                                 memory=mem,
-        #                                 debug_folder=expanduser('~/test_recommender_output'))
-        recommender.fit(X_train, probe=[X_test])
-        score = recommender.score(X_test)
-        print("RMSE: %.2f" % score)
+    X_train, X_test = splits[0]
 
+    recommender = BaseRecommender()
+    recommender.fit(X_train)
+    score = recommender.score(X_test)
+    print("Unbiasing RMSE: %.2f" % score)
+    recommender = SPCARecommender(n_components=100,
+                                  batch_size=50,
+                                  n_epochs=1,
+                                  n_runs=1,
+                                  random_state=random_state,
+                                  alpha=1,
+                                  memory=mem,
+                                  debug_folder=
+                                  expanduser(
+                                      '~/test_recommender_output_2'))
+    # recommender = SPCARecommenderCV(n_components=50,
+    #                                 n_epochs=20,
+    #                                 n_runs=1,
+    #                                 n_jobs=4,
+    #                                 random_state=random_state,
+    #                                 alphas=alphas,
+    #                                 batch_size=10,
+    #                                 memory=mem,
+    #                                 debug_folder=expanduser('~/test_recommender_output'))
+    recommender.fit(X_train, probe=[X_test])
+    score = recommender.score(X_test)
+    print("RMSE: %.2f" % score)
 
 
 if __name__ == '__main__':

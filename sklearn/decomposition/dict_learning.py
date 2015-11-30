@@ -135,7 +135,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                 else:
                     raise NotImplementedError
                 if len(idx) != 0:
-                    clf.set_params(alpha=clf.alpha * len(idx) / n_features)
+                    clf.set_params(alpha=clf.alpha)
                     clf.fit(dictionary.T[idx],
                             X.data[X.indptr[i]:X.indptr[i + 1]])
                     new_code[i] = clf.coef_
@@ -367,8 +367,7 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
     return code
 
 
-def _update_dict(dictionary, Y, code,
-                 weights=None, verbose=False,
+def _update_dict(dictionary, Y, code, verbose=False,
                  return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
@@ -421,31 +420,28 @@ def _update_dict(dictionary, Y, code,
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
-    R = np.asfortranarray(R * weights[:, np.newaxis])
+    R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
         component_range = random_state.permutation(n_components)
     else:
         component_range = np.arange(n_components)
-    old_atom = np.empty(n_features)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
-        old_atom[:] = dictionary[:, k]
-        # R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            scale = code[k, k] # * np.max(weights)
+            dictionary[:, k] = R[:, k]
+            scale = code[k, k]
         else:
-            scale = np.sum(code[k, :] ** 2)  # * np.max(weights)
+            dictionary[:, k] = np.dot(R, code[k, :].T)
+            scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
             # Trigger cleaning
             dictionary[:, k] = 0
         else:
-            if online:
-                dictionary[:, k] += R[:, k] / scale
-            else:
-                dictionary[:, k] += np.dot(R, code[k, :].T) / scale
+            dictionary[:, k] /= scale
 
         # Cleaning small atoms
         atom_norm_square = np.sum(dictionary[:, k] ** 2)
@@ -459,7 +455,7 @@ def _update_dict(dictionary, Y, code,
             atom_norm_square = np.sum(dictionary[:, k] ** 2)
             if l1_ratio != 0.:
                 # Normalizating new random atom before enet projection
-                dictionary[:, k] /= sqrt(atom_norm_square)
+                dictionary[:, k] /= sqrt(atom_norm_square / radius[k])
             # Setting corresponding coefs to 0
             code[k, :] = 0.0
 
@@ -470,9 +466,9 @@ def _update_dict(dictionary, Y, code,
                                                l1_ratio=l1_ratio,
                                                check_input=False)
         else:
-            dictionary[:, k] /= sqrt(atom_norm_square) / radius[k]
+            dictionary[:, k] /= sqrt(atom_norm_square / radius[k])
         # R <- -1.0 * U_k * V_k^T + R
-        R = ger(1.0, (old_atom - dictionary[:, k]) * weights, code[k, :],
+        R = ger(-1.0, dictionary[:, k], code[k, :],
                 a=R, overwrite_a=True)
     if return_r2:
         if online:
@@ -940,9 +936,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
             if verbose > 10 or ii % ceil(100. / verbose) == 0:
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
-                print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
-                print("Enet norm: %s" % (enet_norm(dictionary.T,
-                                                  l1_ratio=l1_ratio) / radius))
+                # print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
+                # print("Enet norm: %s" % (enet_norm(dictionary.T,
+                #                                   l1_ratio=l1_ratio) / radius))
 
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
@@ -959,6 +955,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             missing_values=missing_values,
             n_jobs=1,
             check_input=False,
+            max_iter=3000,
             random_state=random_state).T
 
         A *= 1 - len_batch / n_seen_samples
@@ -975,21 +972,19 @@ def dict_learning_online(X, n_components=2, alpha=1,
         B_ref += safe_sparse_dot(this_X.T, this_code.T) / n_seen_samples
         # Update dictionary
 
-        ones = np.ones(len(subset))
         t0 = time.time()
-        # dictionary_copy = subset_dictionary.copy()
+        old_dict = dictionary.copy()
         dictionary[subset], objective_cost = _update_dict(
             subset_dictionary,
             B[subset], A + dict_penalty * np.eye(n_components),
             verbose=verbose,
             l1_ratio=l1_ratio,
-            weights=ones,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
-        # print(dictionary_copy - dictionary[subset])
+        # print(np.sum((dictionary - old_dict) ** 2, axis = 0))
         total_time += time.time() - t0
-
+        total_time += time.time() - t0
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
         objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
