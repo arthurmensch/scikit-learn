@@ -263,11 +263,10 @@ class SPCARecommender(BaseEstimator):
         infered_rel = self.code_[i].dot(self.dictionary_[:, indices])
         if np.isnan(infered_rel.data).any():
             raise ValueError
-        # infered_rel -= infered_rel.mean()
         X.data[X.indptr[i]: X.indptr[i + 1]] += infered_rel
 
-        X.data[X.indptr[i]: X.indptr[i + 1]] = np.minimum(X.data[X.indptr[i]: X.indptr[i + 1]], 5)
-        X.data[X.indptr[i]: X.indptr[i + 1]] = np.maximum(X.data[X.indptr[i]: X.indptr[i + 1]], 1)
+        X.data[X.indptr[i]: X.indptr[i + 1]] = np.minimum(X.data[X.indptr[i]:X.indptr[i + 1]], 5)
+        X.data[X.indptr[i]: X.indptr[i + 1]] = np.maximum(X.data[X.indptr[i]:X.indptr[i + 1]], 1)
         return X
 
     def score(self, X):
