@@ -1,6 +1,9 @@
+import datetime
 import os
 from os.path import expanduser, join
 import functools
+
+import json
 
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, delayed, Parallel
@@ -63,7 +66,7 @@ def draw_stats(debug_folder):
     plt.close(fig)
 
 
-def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=100,
+def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=500,
                           n_epochs=1):
     incr_spca = clone(incr_spca)
     this_random_state = check_random_state(seed)
@@ -175,12 +178,13 @@ class ALSRecommender(BaseRecommender):
 
 class SPCARecommender(BaseEstimator):
     def __init__(self, random_state=None, n_components=10, n_runs=1,
-                 alpha=1., debug_folder=None, n_epochs=1,
+                 alpha=1., l1_ratio=1, debug_folder=None, n_epochs=1,
                  n_jobs=1,
                  batch_size=10,
                  dict_penalty=0,
                  memory=Memory(cachedir=None)):
         self.alpha = alpha
+        self.l1_ratio = l1_ratio
         self.dict_penalty = dict_penalty
         self.n_components = n_components
         self.n_runs = n_runs
@@ -202,21 +206,21 @@ class SPCARecommender(BaseEstimator):
         seeds = random_state.randint(0, np.iinfo(np.uint32).max,
                                      size=[self.n_runs])
         n_iter = X.shape[0] * self.n_epochs // self.batch_size
-        self._incr_spca = MiniBatchDictionaryLearning(n_components=
-                                                     self.n_components,
-                                                     fit_algorithm='cd',
-                                                     alpha=self.alpha,
-                                                     l1_ratio=0.,
-                                                     batch_size=self.batch_size,
-                                                     n_iter=n_iter,
-                                                     missing_values=0,
-                                                     verbose=10,
-                                                     debug_info=True,
-                                                     transform_algorithm='lasso_cd',
-                                                     transform_alpha=self.alpha)
+        # self._incr_spca = MiniBatchDictionaryLearning(n_components=
+        #                                               self.n_components,
+        #                                               fit_algorithm='cd',
+        #                                               alpha=self.alpha,
+        #                                               l1_ratio=0.,
+        #                                               batch_size=self.batch_size,
+        #                                               n_iter=n_iter,
+        #                                               missing_values=0,
+        #                                               verbose=10,
+        #                                               debug_info=True,
+        #                                               transform_algorithm='lasso_cd',
+        #                                               transform_alpha=self.alpha)
         self._incr_spca = IncrementalSparsePCA(n_components=self.n_components,
                                                alpha=self.alpha,
-                                               l1_ratio=1.,
+                                               l1_ratio=self.l1_ratio,
                                                batch_size=self.batch_size,
                                                n_iter=n_iter,
                                                missing_values=0,
@@ -224,10 +228,9 @@ class SPCARecommender(BaseEstimator):
                                                transform_alpha=self.alpha,
                                                debug_info=True)
 
-
         if probe is None:
             res = Parallel(n_jobs=self.n_jobs, verbose=10)(delayed(self.memory.
-                                                                   cache(
+                cache(
                 _fit_spca_recommender_))(
                 X, self._incr_spca, seed=seed) for seed in seeds)
             self.dictionary_, this_code, these_residuals, this_density, self.values_ = zip(
@@ -239,7 +242,7 @@ class SPCARecommender(BaseEstimator):
             self.values_ = self.values_[0]
             if self.debug_folder is not None:
                 np.save(join(self.debug_folder, 'code'),
-                          self.code_)
+                        self.code_)
                 np.save(join(self.debug_folder, 'dictionary'),
                         self.dictionary_)
                 np.save(join(self.debug_folder, 'residuals'),
@@ -321,70 +324,71 @@ def grid_point_fit(recommender, X, scorer, alpha, root_debug):
     return scorer(recommender, X)
 
 
-class SPCARecommenderCV(BaseEstimator):
-    def __init__(self, random_state=None, n_components=10, n_runs=1,
-                 alphas=[1], debug_folder=None, batch_size=10,
-                 n_epochs=1, n_jobs=1,
-                 memory=Memory(cachedir=None)):
-        self.alphas = alphas
-        self.n_components = n_components
-        self.n_runs = n_runs
-        self.random_state = random_state
-        self.debug_folder = debug_folder
-        self.n_epochs = n_epochs
-        self.n_jobs = n_jobs
-        self.memory = memory
-        self.batch_size = batch_size
+# class SPCARecommenderCV(BaseEstimator):
+#     def __init__(self, random_state=None, n_components=10, n_runs=1,
+#                  alphas=[1], debug_folder=None, batch_size=10,
+#                  n_epochs=1, n_jobs=1,
+#                  memory=Memory(cachedir=None)):
+#         self.alphas = alphas
+#         self.n_components = n_components
+#         self.n_runs = n_runs
+#         self.random_state = random_state
+#         self.debug_folder = debug_folder
+#         self.n_epochs = n_epochs
+#         self.n_jobs = n_jobs
+#         self.memory = memory
+#         self.batch_size = batch_size
+#
+#     def fit(self, X, y=None):
+#         scorer = functools.partial(recommender_scorer,
+#                                    n_splits=1, test_size=0.2,
+#                                    random_state=0)
+#         recommender = SPCARecommender(
+#             random_state=self.random_state,
+#             n_components=self.n_components,
+#             n_runs=self.n_runs,
+#             n_epochs=self.n_epochs,
+#             batch_size=self.batch_size,
+#             n_jobs=1,
+#             memory=self.memory
+#         )
+#         scores = Parallel(n_jobs=self.n_jobs,
+#                           verbose=10)(delayed(grid_point_fit)(recommender,
+#                                                               X,
+#                                                               scorer,
+#                                                               alpha,
+#                                                               self.debug_folder)
+#                                       for alpha
+#                                       in self.alphas)
+#         scores = np.array(scores)
+#         self.alpha_ = self.alphas[np.argmax(scores)]
+#         recommender.set_params(alpha=self.alpha_)
+#         self.recommender_ = recommender
+#         self.recommender_.fit(X)
+#
+#     def transform(self, X, y=None):
+#         return self.recommender_.transform(self, X)
+#
+#     def score(self, X):
+#         return self.recommender_.score(X)
+#
+#
+# def recommender_scorer(estimator, X, y=None, n_splits=1, test_size=0.2,
+#                        random_state=0):
+#     splits = CsrRowStratifiedShuffleSplit(X, test_size=test_size,
+#                                           n_splits=n_splits,
+#                                           random_state=random_state)
+#     score = 0
+#     for X_train, X_test in splits:
+#         estimator.fit(X_train)
+#         score += estimator.score(X_test)
+#     return score / n_splits
 
-    def fit(self, X, y=None):
-        scorer = functools.partial(recommender_scorer,
-                                   n_splits=1, test_size=0.2,
-                                   random_state=0)
-        recommender = SPCARecommender(
-            random_state=self.random_state,
-            n_components=self.n_components,
-            n_runs=self.n_runs,
-            n_epochs=self.n_epochs,
-            batch_size=self.batch_size,
-            n_jobs=1,
-            memory=self.memory
-        )
-        scores = Parallel(n_jobs=self.n_jobs,
-                          verbose=10)(delayed(grid_point_fit)(recommender,
-                                                              X,
-                                                              scorer,
-                                                              alpha,
-                                                              self.debug_folder)
-                                      for alpha
-                                      in self.alphas)
-        scores = np.array(scores)
-        self.alpha_ = self.alphas[np.argmax(scores)]
-        recommender.set_params(alpha=self.alpha_)
-        self.recommender_ = recommender
-        self.recommender_.fit(X)
-
-    def transform(self, X, y=None):
-        return self.recommender_.transform(self, X)
-
-    def score(self, X):
-        return self.recommender_.score(X)
 
 
-def recommender_scorer(estimator, X, y=None, n_splits=1, test_size=0.2,
-                       random_state=0):
-    splits = CsrRowStratifiedShuffleSplit(X, test_size=test_size,
-                                          n_splits=n_splits,
-                                          random_state=random_state)
-    score = 0
-    for X_train, X_test in splits:
-        estimator.fit(X_train)
-        score += estimator.score(X_test)
-    return score / n_splits
-
-
-def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv',
+def fetch_dataset(datadir='/home/arthur/data/own/ml-20m',
                   n_users=None, n_movies=None):
-    df = pd.read_csv(datafile)
+    df = pd.read_csv(join(datadir, 'ratings.csv'))
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
 
@@ -403,11 +407,26 @@ def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv',
     return X[:n_users, :n_movies]
 
 
-def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K'):
-    for filename in ['ra', 'rb']:
-        for extension in ['test', 'train']:
-            datafile = join(datadir, filename + '.' + extension)
-            df = pd.read_csv(datafile)
+def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
+                 n_users=None, n_movies=None):
+    df = pd.read_csv(join(datadir, 'ratings.dat'), sep="::", header=None)
+    df.rename(columns={0: 'userId', 1: 'movieId', 2: 'rating', 3: 'timestamp'},
+              inplace=True)
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+
+    df.reset_index(drop=True, inplace=True)
+    df.set_index(['userId', 'movieId'], inplace=True)
+    df.sort_index(level=['userId', 'movieId'], inplace=True)
+
+    ratings = df['rating']
+
+    full_n_users = ratings.index.get_level_values(0).max()
+    full_n_movies = ratings.index.get_level_values(1).max()
+
+    X = csr_matrix((ratings, (ratings.index.get_level_values(0) - 1,
+                              ratings.index.get_level_values(1) - 1)),
+                   shape=(full_n_users, full_n_movies))
+    return X
 
 
 def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
@@ -483,12 +502,25 @@ def csr_inplace_column_center_data(X):
     return X, X_mean
 
 
-def run():
+def fit_and_dump(recommender, X_train, X_test):
+    result_dict = {'n_components': recommender.n_components,
+                   'l1_ratio': recommender.l1_ratio,
+                   'alpha': recommender.alpha,
+                   'batch_size': recommender.batch_size}
+    with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
+        json.dump(result_dict, f)
+    recommender.fit(X_train, probe=[X_test])
+    score = recommender.score(X_test)
+    result_dict['score'] = score
+    with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
+        json.dump(result_dict, f)
+
+
+def run(n_jobs=1):
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
-    X = mem.cache(fetch_dataset)(expanduser('~/ml-20m/ratings.csv'))
-    X = X[:10000]
+    X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'))
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
@@ -498,29 +530,31 @@ def run():
     recommender.fit(X_train)
     score = recommender.score(X_test)
     print("Unbiasing RMSE: %.2f" % score)
-    recommender = SPCARecommender(n_components=100,
-                                  batch_size=10,
-                                  n_epochs=1,
-                                  n_runs=1,
-                                  random_state=random_state,
-                                  alpha=10,
-                                  memory=mem,
-                                  debug_folder=
-                                  expanduser(
-                                      '~/test_recommender_output_2'))
-    # recommender = SPCARecommenderCV(n_components=50,
-    #                                 n_epochs=20,
-    #                                 n_runs=1,
-    #                                 n_jobs=4,
-    #                                 random_state=random_state,
-    #                                 alphas=alphas,
-    #                                 batch_size=10,
-    #                                 memory=mem,
-    #                                 debug_folder=expanduser('~/test_recommender_output'))
+    output_dir = expanduser(join('~/output/movielens/',
+                            datetime.datetime.now().strftime('%Y-%m-%d_%H'
+                                                             '-%M-%S')))
+    os.makedirs(output_dir)
+    recommenders = [SPCARecommender(n_components=100,
+                                    batch_size=10,
+                                    n_epochs=3,
+                                    n_runs=1,
+                                    alpha=alpha,
+                                    memory=mem,
+                                    l1_ratio=l1_ratio,
+                                    random_state=random_state)
+                    for l1_ratio in np.linspace(0, 1, 5)
+                    for alpha in np.logspace(10e-3, 10e3, 7)]
+    for i, recommender in enumerate(recommenders):
+        path = join(output_dir, "experiment_%i" % i)
+        recommender.set_params(debug_folder=join(path))
+        os.makedirs(path)
+    Parallel(n_jobs=n_jobs)(
+        delayed(fit_and_dump)(recommender, X_train, X_test)
+        for recommender in recommenders)
     recommender.fit(X_train, probe=[X_test])
     score = recommender.score(X_test)
     print("RMSE: %.2f" % score)
 
 
 if __name__ == '__main__':
-    run()
+    run(n_jobs=32)
