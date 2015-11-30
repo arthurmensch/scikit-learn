@@ -376,7 +376,13 @@ def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv',
                    shape=(full_n_users, full_n_movies))
     return X[:n_users, :n_movies]
 
-def fetch_ml_10m(datadir='')
+
+def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K'):
+    for filename in ['ra', 'rb']:
+        for extension in ['test', 'train']:
+            datafile = join(datadir, filename + '.' + extension)
+            df = pd.read_csv(datafile)
+
 
 
 def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
@@ -466,14 +472,14 @@ def run():
         print("Unbiasing RMSE: %.2f" % score)
         recommender = SPCARecommender(n_components=50,
                                       batch_size=10,
-                                      n_epochs=1,
+                                      n_epochs=2,
                                       n_runs=1,
                                       random_state=random_state,
-                                      alpha=1,
+                                      alpha=10,
                                       memory=mem,
                                       debug_folder=
                                       expanduser(
-                                          '~/test_recommender_output_2'))
+                                          '~/test_recommender_output_3'))
         # recommender = SPCARecommenderCV(n_components=50,
         #                                 n_epochs=20,
         #                                 n_runs=1,
