@@ -145,6 +145,9 @@ class ALSRecommender(BaseEstimator):
                 dictionary[j] = ridge_regression(code, data, alpha=self.alpha_code)
 
 
+class BiasRecommender(BaseEstimator):
+
+
 
 
 class SPCARecommender(BaseEstimator):
@@ -479,6 +482,7 @@ def run():
         recommender.fit(X_train, probe=[X_test])
         score = recommender.score(X_test)
         print("RMSE: %.2f" % score)
+
 
 
 if __name__ == '__main__':
