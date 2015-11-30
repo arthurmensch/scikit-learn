@@ -499,11 +499,11 @@ def run():
     score = recommender.score(X_test)
     print("Unbiasing RMSE: %.2f" % score)
     recommender = SPCARecommender(n_components=100,
-                                  batch_size=50,
+                                  batch_size=10,
                                   n_epochs=1,
                                   n_runs=1,
                                   random_state=random_state,
-                                  alpha=1,
+                                  alpha=10,
                                   memory=mem,
                                   debug_folder=
                                   expanduser(
