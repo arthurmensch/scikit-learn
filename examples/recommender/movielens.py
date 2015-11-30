@@ -20,8 +20,6 @@ def csr_rmse(y, y_pred):
                            y_pred.data) ** 2) / y.nnz)
 
 
-
-
 def draw_stats(debug_folder):
     residuals = np.load(join(debug_folder, 'residuals.npy'))
     density = np.load(join(debug_folder, 'density.npy'))
@@ -74,7 +72,7 @@ def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=100,
     print("Learning dictionary")
     last_seen = 0
     for i in range(n_epochs):
-        batches = gen_batches(X.shape[0], probe_freq)
+        batches = gen_batches(X.shape[0], probe_freq * incr_spca.batch_size)
         for batch in batches:
             last_seen = max(batch.stop, last_seen)
             incr_spca.partial_fit(X[batch], deprecated=False)
@@ -118,7 +116,32 @@ def _fit_spca_recommender_(X, incr_spca, seed=None):
            np.array(density)[:, np.newaxis]
 
 
-class ALSRecommender(BaseEstimator):
+class BaseRecommender(BaseEstimator):
+    def __init__(self):
+        pass
+
+    def fit(self, X):
+        X = X.copy()
+        print("Centering data")
+        _, self.global_mean_, \
+        self.user_mean_, \
+        self.movie_mean_ = csr_inplace_center_data(X)
+
+    def transform(self, X):
+        X = X.copy()
+        X.data[:] = self.global_mean_
+        for i in range(X.shape[0]):
+            if X.indptr[i] < X.indptr[i + 1]:
+                X.data[X.indptr[i]:X.indptr[i + 1]] += self.user_mean_[i]
+        X.data += self.movie_mean_.take(X.indices, mode='clip')
+        return X
+
+    def score(self, X):
+        X_pred = self.transform(X)
+        return csr_rmse(X, X_pred)
+
+
+class ALSRecommender(BaseRecommender):
     def __init__(self, alpha_dict=1, alpha_code=1, n_components=10,
                  n_iter=10):
         alpha_dict = alpha_dict
@@ -128,11 +151,7 @@ class ALSRecommender(BaseEstimator):
 
 
     def fit(self, X, y=None):
-        X = X.copy()
-        print("Centering data")
-        _, self.global_mean_, \
-        self.user_mean_, \
-        self.movie_mean = csr_inplace_center_data(X)
+        BaseRecommender.fit(self, X)
 
         dictionary = np.zeros((X.shape[0], self.n_components))
         code = np.zeros((self.n_components, X.shape[1]))
@@ -140,14 +159,8 @@ class ALSRecommender(BaseEstimator):
         for i in range(self.n_iter):
             for j in range(X.shape[0]):
                 data = X.data[X.indptr[i]:X.indptr[i]]
-                indices = X.data[X.indices[i]:X.indptr[i]]
                 dictionary[j] = ridge_regression(code, data, alpha=self.alpha_code)
                 dictionary[j] = ridge_regression(code, data, alpha=self.alpha_code)
-
-
-class BiasRecommender(BaseEstimator):
-
-
 
 
 class SPCARecommender(BaseEstimator):
@@ -173,28 +186,21 @@ class SPCARecommender(BaseEstimator):
         print("Centering data")
         _, self.global_mean_, \
         self.user_mean_, \
-        self.movie_mean = csr_inplace_center_data(X)
+        self.movie_mean_ = csr_inplace_center_data(X)
+
         random_state = check_random_state(self.random_state)
         seeds = random_state.randint(0, np.iinfo(np.uint32).max,
                                      size=[self.n_runs])
         n_iter = X.shape[0] * self.n_epochs // self.batch_size
         self._incr_spca = IncrementalSparsePCA(n_components=self.n_components,
-                                               # dict_penalty=self.dict_penalty,
-                                             alpha=self.alpha,
-                                             l1_ratio=1.,
-                                             batch_size=self.batch_size,
-                                             n_iter=n_iter,
-                                             missing_values=0,
-                                             verbose=10,
-                                             transform_alpha=self.alpha,
-                                             debug_info=True)
-        # self._incr_spca = MiniBatchDictionaryLearning(
-        #     n_components=self.n_components, alpha=self.alpha,
-        #     batch_size=batch_size, fit_algorithm='cd',
-        #     transform_algorithm='lasso_cd', n_iter=n_iter,
-        #     missing_values=0, verbose=10, transform_alpha=self.alpha,
-        #     debug_info=True)
-        #
+                                               alpha=self.alpha,
+                                               l1_ratio=1.,
+                                               batch_size=self.batch_size,
+                                               n_iter=n_iter,
+                                               missing_values=0,
+                                               verbose=10,
+                                               transform_alpha=self.alpha,
+                                               debug_info=True)
         if probe is None:
             res = Parallel(n_jobs=self.n_jobs, verbose=10)(delayed(self.memory.
             cache(_fit_spca_recommender_))(
@@ -223,7 +229,7 @@ class SPCARecommender(BaseEstimator):
             for dictionary, code, residuals, density, values, last_seen\
                     in _fit_spca_recommender(
                     X, self._incr_spca, seed=seeds[0], n_epochs=self.n_epochs,
-                    probe=probe, probe_freq=20):
+                    probe=probe, probe_freq=100):
                 self.dictionary_ = dictionary
                 self.code_ = code
                 self.residuals_ = residuals
@@ -252,24 +258,18 @@ class SPCARecommender(BaseEstimator):
                             self.values_)
                     draw_stats(self.debug_folder)
 
-
     def transform(self, X):
-        # Use only X sparsity structure
         X = X.copy()
         X.data[:] = self.global_mean_
         for i in range(X.shape[0]):
             if X.indptr[i] < X.indptr[i + 1]:
-                indices = X.indices[X.indptr[i]:X.indptr[i + 1]]
                 X.data[X.indptr[i]:X.indptr[i + 1]] += self.user_mean_[i]
-        X.data += self.movie_mean.take(X.indices, mode='clip')
-
-        infered_rel = self.code_[i].dot(self.dictionary_[:, indices])
-        if np.isnan(infered_rel.data).any():
-            raise ValueError
-        X.data[X.indptr[i]: X.indptr[i + 1]] += infered_rel
-
-        X.data[X.indptr[i]: X.indptr[i + 1]] = np.minimum(X.data[X.indptr[i]:X.indptr[i + 1]], 5)
-        X.data[X.indptr[i]: X.indptr[i + 1]] = np.maximum(X.data[X.indptr[i]:X.indptr[i + 1]], 1)
+                indices = X.indices[X.indptr[i]:X.indptr[i + 1]]
+                interaction = self.code_[i].dot(self.dictionary_[:, indices])
+                if np.isnan(interaction.data).any():
+                    raise ValueError
+                X.data[X.indptr[i]:X.indptr[i + 1]] += interaction
+        X.data += self.movie_mean_.take(X.indices, mode='clip')
         return X
 
     def score(self, X):
@@ -376,6 +376,8 @@ def fetch_dataset(datafile='/home/arthur/data/own/ml-20m/ratings.csv',
                    shape=(full_n_users, full_n_movies))
     return X[:n_users, :n_movies]
 
+def fetch_ml_10m(datadir='')
+
 
 def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
                                  random_state=None):
@@ -453,23 +455,25 @@ def run():
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_dataset)(expanduser('~/ml-20m/ratings.csv'))
+    X = X[:10000]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
-    alphas = [.1, 1, 10, 100]
     for i, (X_train, X_test) in enumerate(splits):
-        X_test = X_test
+        recommender = BaseRecommender()
+        recommender.fit(X_train)
+        score = recommender.score(X_test)
+        print("Unbiasing RMSE: %.2f" % score)
         recommender = SPCARecommender(n_components=50,
                                       batch_size=10,
-                                      dict_penalty=1,
-                                      n_epochs=20,
+                                      n_epochs=1,
                                       n_runs=1,
                                       random_state=random_state,
-                                      alpha=10,
+                                      alpha=1,
                                       memory=mem,
                                       debug_folder=
                                       expanduser(
-                                          '~/test_recommender_output'))
+                                          '~/test_recommender_output_2'))
         # recommender = SPCARecommenderCV(n_components=50,
         #                                 n_epochs=20,
         #                                 n_runs=1,

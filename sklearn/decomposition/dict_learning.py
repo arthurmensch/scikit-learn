@@ -470,7 +470,7 @@ def _update_dict(dictionary, Y, code,
                                                l1_ratio=l1_ratio,
                                                check_input=False)
         else:
-            dictionary[:, k] /= sqrt(atom_norm_square)
+            dictionary[:, k] /= sqrt(atom_norm_square) / radius[k]
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(1.0, (old_atom - dictionary[:, k]) * weights, code[k, :],
                 a=R, overwrite_a=True)
@@ -650,7 +650,7 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
                                              online=False,
                                              shuffle=False,
                                              random_state=random_state,
-                                             l1_ratio=0.)
+                                             l1_ratio=l1_ratio)
         dictionary = dictionary.T
 
         # Cost function
@@ -941,6 +941,8 @@ def dict_learning_online(X, n_components=2, alpha=1,
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
                 print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
+                print("Enet norm: %s" % (enet_norm(dictionary.T,
+                                                  l1_ratio=l1_ratio) / radius))
 
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
@@ -993,7 +995,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
         # Residual computation
         norm_cost *= 1 - len_batch / n_seen_samples
         if sp.issparse(this_X):
-            norm_cost += .5 * np.sum(this_X.data ** 2) / n_seen_samples
+            norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(subset) / n_seen_samples
         else:
             norm_cost += .5 * np.sum(this_X ** 2) / n_seen_samples
 
@@ -1552,7 +1554,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
         res = dict_learning_online(
             X, self.n_components, self.alpha,
-            dict_penalty=dict_penalty,
+            dict_penalty=self.dict_penalty,
             l1_ratio=self.l1_ratio,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
