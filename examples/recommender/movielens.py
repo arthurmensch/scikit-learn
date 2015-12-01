@@ -1,4 +1,5 @@
 import datetime
+import fnmatch
 import os
 from os.path import expanduser, join
 import functools
@@ -519,6 +520,27 @@ def fit_and_dump(recommender, X_train, X_test):
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
 
+def gather_results(output_dir):
+    full_dict_list = []
+    for dirpath, dirname, filenames in os.walk(output_dir):
+        for filename in fnmatch.filter(filenames, 'results.json'):
+            with open(join(dirpath, filename), 'r') as f:
+                exp_dict = json.load(f)
+                exp_dict['path'] = dirpath
+                full_dict_list.append(exp_dict)
+    results = pd.DataFrame(full_dict_list, columns=['path', 'n_components',
+                                                    'l1_ratio',
+                                                    'reduction_method',
+                                                    'alpha',
+                                                    'batch_size',
+                                                    'score'])
+
+    results.sort_values(by=['path',
+                            'n_components', 'l1_ratio', 'reduction_method',
+                            'alpha', 'batch_size',
+                            'score'], inplace=True)
+    results.to_csv(join(output_dir, 'results.csv'))
+
 
 def run(n_jobs=1):
     random_state = check_random_state(0)
@@ -526,7 +548,6 @@ def run(n_jobs=1):
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'))
     print("Done loading dataset")
-    X = X[:100]
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
     X_train, X_test = splits[0]
@@ -539,23 +560,23 @@ def run(n_jobs=1):
                             datetime.datetime.now().strftime('%Y-%m-%d_%H'
                                                              '-%M-%S')))
     os.makedirs(output_dir)
-    recommenders = [SPCARecommender(n_components=n_components,
-                                    batch_size=10,
-                                    n_epochs=1,
-                                    n_runs=1,
-                                    alpha=alpha,
-                                    memory=mem,
-                                    l1_ratio=l1_ratio,
-                                    random_state=random_state)
-                    for n_components in [50]
-                    for l1_ratio in np.linspace(0, 1, 3)
-                    for alpha in np.logspace(-2, 2, 5)]
-    # recommenders = [SPCARecommender(n_components=20,
-    #                                 batch_size=1,
-    #                                 alpha=1,
+    # recommenders = [SPCARecommender(n_components=n_components,
+    #                                 batch_size=10,
     #                                 n_epochs=1,
-    #                                 l1_ratio=1,
-    #                                 random_state=random_state)]
+    #                                 n_runs=1,
+    #                                 alpha=alpha,
+    #                                 memory=mem,
+    #                                 l1_ratio=l1_ratio,
+    #                                 random_state=random_state)
+    #                 for n_components in [50]
+    #                 for l1_ratio in np.linspace(0, 1, 3)
+    #                 for alpha in np.logspace(-2, 2, 5)]
+    recommenders = [SPCARecommender(n_components=50,
+                                    batch_size=1,
+                                    alpha=1,
+                                    n_epochs=1,
+                                    l1_ratio=1,
+                                    random_state=random_state)]
     for i, recommender in enumerate(recommenders):
         path = join(output_dir, "experiment_%i" % i)
         recommender.set_params(debug_folder=join(path))
@@ -567,5 +588,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    run(n_jobs=15)
-
+    # run(n_jobs=15)
+    gather_results('/volatile/arthur/output/movielens/2015-12-01_13-59-00')

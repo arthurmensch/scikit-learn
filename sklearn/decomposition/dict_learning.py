@@ -1034,6 +1034,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
                      count_seen_features)
     if return_debug_info:
         debug_info['total_time'] = total_time
+        debug_info['count_seen_features'] = count_seen_features
 
     if return_inner_stats:
         if return_n_iter:
