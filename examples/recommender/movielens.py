@@ -274,8 +274,8 @@ class SPCARecommender(BaseEstimator):
                 X.data[X.indptr[i]:X.indptr[i + 1]] += self.user_mean_[i]
                 indices = X.indices[X.indptr[i]:X.indptr[i + 1]]
                 interaction = self.code_[i].dot(self.dictionary_[:, indices])
-                inter_mean += interaction.mean() ** 2
-                interaction -= interaction.mean()
+                # inter_mean += interaction.mean() ** 2
+                # interaction -= interaction.mean()
                 X.data[X.indptr[i]:X.indptr[i + 1]] += interaction
         # inter_mean /= X.shape[0]
         # inter_mean = sqrt(inter_mean)
