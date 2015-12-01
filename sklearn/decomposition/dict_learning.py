@@ -944,8 +944,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
         n_seen_samples += len_batch
         count_seen_features[subset] += len_batch
 
-        subset_dictionary = check_array(dictionary[subset], order='F',
-                                        copy=True)
         # Dictionary while be subscripted within sparse_encode
         this_code = sparse_encode(
             this_X,
@@ -957,7 +955,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
             check_input=False,
             max_iter=3000,
             random_state=random_state).T
-
         A *= 1 - len_batch / n_seen_samples
         A += np.dot(this_code, this_code.T) / n_seen_samples
         B[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
@@ -966,35 +963,43 @@ def dict_learning_online(X, n_components=2, alpha=1,
                                                                         np.newaxis]
 
         total_time += time.time() - t0
-        A_ref *= 1 - len_batch / n_seen_samples
+        A_ref *= (1 - len_batch / n_seen_samples)
         A_ref += np.dot(this_code, this_code.T) / n_seen_samples
-        B_ref *= 1 - len_batch / n_seen_samples
+        B_ref *= (1 - len_batch / n_seen_samples)
         B_ref += safe_sparse_dot(this_X.T, this_code.T) / n_seen_samples
         # Update dictionary
 
         t0 = time.time()
-        old_dict = dictionary.copy()
         dictionary[subset], objective_cost = _update_dict(
-            subset_dictionary,
-            B[subset], A + dict_penalty * np.eye(n_components),
+            check_array(dictionary[subset], order='F'),
+            B[subset], A,
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=True,
             online=True, shuffle=shuffle)
+        # support = np.any(dictionary != 0, axis=1)
+        # dictionary[support], objective_cost = _update_dict(
+        #     dictionary[support],
+        #     B[support], A,
+        #     verbose=verbose,
+        #     l1_ratio=l1_ratio,
+        #     random_state=random_state,
+        #     return_r2=True,
+        #     online=True, shuffle=shuffle)
         # print(np.sum((dictionary - old_dict) ** 2, axis = 0))
         total_time += time.time() - t0
         total_time += time.time() - t0
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
         objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
-        norm_cost *= 1 - len_batch / n_seen_samples
+        norm_cost *= (1 - len_batch / n_seen_samples)
         if sp.issparse(this_X):
             norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(subset) / n_seen_samples
         else:
             norm_cost += .5 * np.sum(this_X ** 2) / n_seen_samples
 
-        penalty_cost *= 1 - len_batch / n_seen_samples
+        penalty_cost *= (1 - len_batch / n_seen_samples)
         if method in ('lasso_lars', 'lasso_cd'):
             penalty_cost += alpha * np.sum(
                 np.abs(this_code)) / n_seen_samples

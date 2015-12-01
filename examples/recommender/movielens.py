@@ -5,6 +5,8 @@ import functools
 
 import json
 
+from math import sqrt
+
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, delayed, Parallel
 from sklearn.base import clone
@@ -21,7 +23,7 @@ import matplotlib.pyplot as plt
 def csr_rmse(y, y_pred):
     if np.isnan(y_pred.data).any():
         raise ValueError
-    return np.sqrt(np.sum((y.data -
+    return sqrt(np.sum((y.data -
                            y_pred.data) ** 2) / y.nnz)
 
 
@@ -64,6 +66,8 @@ def draw_stats(debug_folder):
     plt.colorbar()
     plt.savefig(join(debug_folder, 'code.pdf'))
     plt.close(fig)
+
+    plt.close('all')
 
 
 def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=500,
@@ -522,6 +526,7 @@ def run(n_jobs=1):
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'))
     print("Done loading dataset")
+    X = X[:100]
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
     X_train, X_test = splits[0]
@@ -534,27 +539,33 @@ def run(n_jobs=1):
                             datetime.datetime.now().strftime('%Y-%m-%d_%H'
                                                              '-%M-%S')))
     os.makedirs(output_dir)
-    recommenders = [SPCARecommender(n_components=100,
+    recommenders = [SPCARecommender(n_components=n_components,
                                     batch_size=10,
-                                    n_epochs=3,
+                                    n_epochs=1,
                                     n_runs=1,
                                     alpha=alpha,
                                     memory=mem,
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
-                    for l1_ratio in np.linspace(0, 1, 5)
-                    for alpha in np.logspace(10e-3, 10e3, 7)]
+                    for n_components in [50]
+                    for l1_ratio in np.linspace(0, 1, 3)
+                    for alpha in np.logspace(-2, 2, 5)]
+    # recommenders = [SPCARecommender(n_components=20,
+    #                                 batch_size=1,
+    #                                 alpha=1,
+    #                                 n_epochs=1,
+    #                                 l1_ratio=1,
+    #                                 random_state=random_state)]
     for i, recommender in enumerate(recommenders):
         path = join(output_dir, "experiment_%i" % i)
         recommender.set_params(debug_folder=join(path))
         os.makedirs(path)
-    Parallel(n_jobs=n_jobs)(
+    print(n_jobs)
+    Parallel(n_jobs=n_jobs, verbose=10, max_nbytes=0)(
         delayed(fit_and_dump)(recommender, X_train, X_test)
         for recommender in recommenders)
-    recommender.fit(X_train, probe=[X_test])
-    score = recommender.score(X_test)
-    print("RMSE: %.2f" % score)
 
 
 if __name__ == '__main__':
-    run(n_jobs=32)
+    run(n_jobs=15)
+
