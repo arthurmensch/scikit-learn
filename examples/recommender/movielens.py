@@ -3,11 +3,8 @@ import fnmatch
 import os
 from os.path import expanduser, join
 import functools
-
 import json
-
 from math import sqrt
-
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, delayed, Parallel
 from sklearn.base import clone
@@ -25,7 +22,7 @@ def csr_rmse(y, y_pred):
     if np.isnan(y_pred.data).any():
         raise ValueError
     return sqrt(np.sum((y.data -
-                           y_pred.data) ** 2) / y.nnz)
+                        y_pred.data) ** 2) / y.nnz)
 
 
 def draw_stats(debug_folder):
@@ -35,6 +32,8 @@ def draw_stats(debug_folder):
     dictionary = np.load(join(debug_folder, 'dictionary.npy'))
     code = np.load(join(debug_folder, 'code.npy'))
     probe_score = np.load(join(debug_folder, 'probe_score.npy'))
+    count_seen_features = np.load(join(debug_folder,
+                                       'count_seen_features.npy'))
 
     fig = plt.figure()
     plt.plot(np.arange(len(residuals)), residuals)
@@ -66,6 +65,11 @@ def draw_stats(debug_folder):
     plt.matshow(code[:1000].reshape((-1, code.shape[1] * 5)))
     plt.colorbar()
     plt.savefig(join(debug_folder, 'code.pdf'))
+    plt.close(fig)
+
+    fig = plt.figure(figsize=(10, 10))
+    plt.plot(np.arange(len(count_seen_features)), count_seen_features)
+    plt.savefig(join(debug_folder, 'count_seen_features.pdf'))
     plt.close(fig)
 
     plt.close('all')
@@ -101,10 +105,11 @@ def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=500,
             residuals = incr_spca.debug_info_['residuals']
             density = incr_spca.debug_info_['density']
             values = incr_spca.debug_info_['values']
+            count_seen_features = incr_spca.debug_info_['count_seen_features']
             print("Computing probe score")
             yield dictionary, code, np.array(residuals)[:,
                                     np.newaxis], density, values, \
-                  last_seen
+                  count_seen_features, last_seen
 
 
 def _fit_spca_recommender_(X, incr_spca, seed=None):
@@ -184,7 +189,6 @@ class ALSRecommender(BaseRecommender):
 class SPCARecommender(BaseEstimator):
     def __init__(self, random_state=None, n_components=10, n_runs=1,
                  alpha=1., l1_ratio=1, debug_folder=None, n_epochs=1,
-                 n_jobs=1,
                  batch_size=10,
                  dict_penalty=0,
                  memory=Memory(cachedir=None)):
@@ -197,7 +201,6 @@ class SPCARecommender(BaseEstimator):
         self.random_state = random_state
         self.n_epochs = n_epochs
         self.memory = memory
-        self.n_jobs = n_jobs
         self.debug_folder = debug_folder
 
     def fit(self, X, y=None, probe=None):
@@ -211,19 +214,7 @@ class SPCARecommender(BaseEstimator):
         seeds = random_state.randint(0, np.iinfo(np.uint32).max,
                                      size=[self.n_runs])
         n_iter = X.shape[0] * self.n_epochs // self.batch_size
-        # self._incr_spca = MiniBatchDictionaryLearning(n_components=
-        #                                               self.n_components,
-        #                                               fit_algorithm='cd',
-        #                                               alpha=self.alpha,
-        #                                               l1_ratio=0.,
-        #                                               batch_size=self.batch_size,
-        #                                               n_iter=n_iter,
-        #                                               missing_values=0,
-        #                                               verbose=10,
-        #                                               debug_info=True,
-        #                                               transform_algorithm='lasso_cd',
-        #                                               transform_alpha=self.alpha)
-        self._incr_spca = IncrementalSparsePCA(n_components=self.n_components,
+        incr_spca = IncrementalSparsePCA(n_components=self.n_components,
                                                alpha=self.alpha,
                                                l1_ratio=self.l1_ratio,
                                                batch_size=self.batch_size,
@@ -232,77 +223,63 @@ class SPCARecommender(BaseEstimator):
                                                verbose=10,
                                                transform_alpha=self.alpha,
                                                debug_info=True)
+        self.probe_score_ = []
+        probe_freq = 100
+        self.code_ = np.zeros((X.shape[0], self.n_components))
+        last_seen = 0
+        for i in range(self.n_epochs):
+            batches = gen_batches(X.shape[0],
+                                  probe_freq * incr_spca.batch_size)
+            for batch in batches:
+                last_seen = max(batch.stop, last_seen)
+                incr_spca.partial_fit(X[batch], deprecated=False)
 
-        if probe is None:
-            res = Parallel(n_jobs=self.n_jobs, verbose=10)(delayed(self.memory.
-                cache(
-                _fit_spca_recommender_))(
-                X, self._incr_spca, seed=seed) for seed in seeds)
-            self.dictionary_, this_code, these_residuals, this_density, self.values_ = zip(
-                *res)
-            self.code_ = np.concatenate(this_code, axis=1)
-            self.dictionary_ = np.concatenate(self.dictionary_, axis=0)
-            self.residuals_ = np.concatenate(these_residuals, axis=1)
-            self.density_ = np.concatenate(this_density, axis=1)
-            self.values_ = self.values_[0]
-            if self.debug_folder is not None:
-                np.save(join(self.debug_folder, 'code'),
-                        self.code_)
-                np.save(join(self.debug_folder, 'dictionary'),
-                        self.dictionary_)
-                np.save(join(self.debug_folder, 'residuals'),
-                        self.residuals_)
-                np.save(join(self.debug_folder, 'density'),
-                        self.density_)
-                np.save(join(self.debug_folder, 'values'),
-                        self.values_)
-                draw_stats(self.debug_folder)
-        else:
-            self.probe_score_ = []
-            print(self.n_epochs)
-            for dictionary, code, residuals, density, values, last_seen \
-                    in _fit_spca_recommender(
-                X, self._incr_spca, seed=seeds[0], n_epochs=self.n_epochs,
-                probe=probe, probe_freq=100):
-                self.dictionary_ = dictionary
-                self.code_ = code
-                self.residuals_ = residuals
-                self.density_ = density
-                self.values_ = values
-                probe_score = []
-                print(np.abs(self.dictionary_).max())
-                print(np.abs(self.code_).max())
-                for this_probe in probe:
-                    probe_score.append(self.score(this_probe[:last_seen]))
-                self.probe_score_.append(probe_score)
-                for score in self.probe_score_[-1]:
-                    print('RMSE: %.3f' % score)
-                if self.debug_folder is not None:
-                    np.save(join(self.debug_folder, 'code'),
-                            self.code_)
-                    np.save(join(self.debug_folder, 'dictionary'),
-                            self.dictionary_)
-                    np.save(join(self.debug_folder, 'residuals'),
-                            self.residuals_)
-                    np.save(join(self.debug_folder, 'probe_score'),
-                            np.array(self.probe_score_))
-                    np.save(join(self.debug_folder, 'density'),
-                            self.density_)
-                    np.save(join(self.debug_folder, 'values'),
-                            self.values_)
-                    draw_stats(self.debug_folder)
+                self.code_[:last_seen] = incr_spca.transform(X[:last_seen])
+                self.dictionary_ = incr_spca.components_
+                self.residuals_ = incr_spca.debug_info_['residuals']
+                self.density_ = incr_spca.debug_info_['density']
+                self.values_ = incr_spca.debug_info_['values']
+                self.count_seen_features_ = incr_spca.debug_info_[
+                    'count_seen_features']
+                if probe is not None:
+                    probe_score = []
+                    for this_probe in probe:
+                        probe_score.append(self.score(this_probe[0:100]))
+                    self.probe_score_.append(probe_score)
+                    for score in self.probe_score_[-1]:
+                        print('RMSE: %.3f' % score)
+                    if self.debug_folder is not None:
+                        np.save(join(self.debug_folder, 'code'),
+                                self.code_)
+                        np.save(join(self.debug_folder, 'dictionary'),
+                                self.dictionary_)
+                        np.save(join(self.debug_folder, 'residuals'),
+                                self.residuals_)
+                        np.save(join(self.debug_folder, 'probe_score'),
+                                np.array(self.probe_score_))
+                        np.save(join(self.debug_folder, 'density'),
+                                self.density_)
+                        np.save(join(self.debug_folder, 'values'),
+                                self.values_)
+                        np.save(join(self.debug_folder, 'count_seen_features'),
+                                self.count_seen_features_)
+                        draw_stats(self.debug_folder)
 
     def transform(self, X):
         X = X.copy()
         X.data[:] = self.global_mean_
+        # inter_mean = 0
         for i in range(X.shape[0]):
             if X.indptr[i] < X.indptr[i + 1]:
                 X.data[X.indptr[i]:X.indptr[i + 1]] += self.user_mean_[i]
                 indices = X.indices[X.indptr[i]:X.indptr[i + 1]]
                 interaction = self.code_[i].dot(self.dictionary_[:, indices])
-                if np.isnan(interaction.data).any():
-                    raise ValueError
+                inter_mean += interaction.mean() ** 2
+                interaction -= interaction.mean()
                 X.data[X.indptr[i]:X.indptr[i + 1]] += interaction
+        # inter_mean /= X.shape[0]
+        # inter_mean = sqrt(inter_mean)
+        # print(inter_mean)
         X.data += self.movie_mean_.take(X.indices, mode='clip')
         return X
 
@@ -413,7 +390,7 @@ def fetch_dataset(datadir='/home/arthur/data/own/ml-20m',
 
 
 def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
-                 n_users=None, n_movies=None):
+                 n_users=None, n_movies=None, remove_empty=True):
     df = pd.read_csv(join(datadir, 'ratings.dat'), sep="::", header=None)
     df.rename(columns={0: 'userId', 1: 'movieId', 2: 'rating', 3: 'timestamp'},
               inplace=True)
@@ -431,6 +408,12 @@ def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
     X = csr_matrix((ratings, (ratings.index.get_level_values(0) - 1,
                               ratings.index.get_level_values(1) - 1)),
                    shape=(full_n_users, full_n_movies))
+    if remove_empty:
+        rated_movies = (X.getnnz(axis=0) != 0)
+        X = X[:, rated_movies]
+        print(np.where((X.getnnz(axis=0) == 0)))
+        rating_users = (X.getnnz(axis=1) != 0)
+        X = X[rating_users, :]
     return X
 
 
@@ -464,23 +447,29 @@ def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
 
 
 def csr_inplace_center_data(X):
-    m_col = np.zeros(X.shape[1])
-    m_row = np.zeros(X.shape[0])
-    for i in range(3):
-        row_nnz = X.getnnz(axis=1)
-        col_nnz = X.getnnz(axis=0)
-        row_nnz[row_nnz == 0] = 1
-        col_nnz[col_nnz == 0] = 1
-        m_col = X.sum(axis=1).A[:, 0] / row_nnz - m_row.mean()
-        m_row = X.sum(axis=0).A[0, :] / col_nnz - m_col.mean()
-        m_global = m_col.mean() + m_row.mean()
-        m_row -= m_row.mean()
-        m_col -= m_col.mean()
-    for i, (left, right) in enumerate(zip(X.indptr[:-1], X.indptr[1:])):
-        if left < right:
-            X.data[left:right] -= m_col[i]
-    X.data -= m_row.take(X.indices, mode='clip')
-    return X, m_global, m_col, m_row
+    w_global = 0
+
+    acc_u = np.zeros(X.shape[0])
+    acc_m = np.zeros(X.shape[1])
+
+    n_u = X.getnnz(axis=1)
+    n_m = X.getnnz(axis=0)
+    n_u[n_u == 0] = 1
+    n_m[n_m == 0] = 1
+    for i in range(10):
+        # Y = X.copy()
+        # Y.data[:] -= w_global
+        # w_global = w_u.mean() + w_m.mean()
+        w_u = X.sum(axis=1).A[:, 0] / n_u
+        for i, (left, right) in enumerate(zip(X.indptr[:-1], X.indptr[1:])):
+            X.data[left:right] -= w_u[i]
+        w_m = X.sum(axis=0).A[0] / n_m
+        X.data -= w_m.take(X.indices, mode='clip')
+
+        acc_u += w_u
+        acc_m += w_m
+
+    return X, w_global, acc_u, acc_m
 
 
 def csr_inplace_row_center_data(X):
@@ -514,11 +503,12 @@ def fit_and_dump(recommender, X_train, X_test):
                    'batch_size': recommender.batch_size}
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
-    recommender.fit(X_train, probe=[X_test])
+    recommender.fit(X_train, probe=[X_test, X_train])
     score = recommender.score(X_test)
     result_dict['score'] = score
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
+
 
 def gather_results(output_dir):
     full_dict_list = []
@@ -546,7 +536,8 @@ def run(n_jobs=1):
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
-    X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'))
+    X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
+                                remove_empty=True, n_users=1000)
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
@@ -557,26 +548,26 @@ def run(n_jobs=1):
     score = recommender.score(X_test)
     print("Unbiasing RMSE: %.2f" % score)
     output_dir = expanduser(join('~/output/movielens/',
-                            datetime.datetime.now().strftime('%Y-%m-%d_%H'
-                                                             '-%M-%S')))
+                                 datetime.datetime.now().strftime('%Y-%m-%d_%H'
+                                                                  '-%M-%S')))
     os.makedirs(output_dir)
-    # recommenders = [SPCARecommender(n_components=n_components,
-    #                                 batch_size=10,
-    #                                 n_epochs=1,
-    #                                 n_runs=1,
-    #                                 alpha=alpha,
-    #                                 memory=mem,
-    #                                 l1_ratio=l1_ratio,
-    #                                 random_state=random_state)
-    #                 for n_components in [50]
-    #                 for l1_ratio in np.linspace(0, 1, 3)
-    #                 for alpha in np.logspace(-2, 2, 5)]
-    recommenders = [SPCARecommender(n_components=50,
-                                    batch_size=1,
-                                    alpha=1,
+    recommenders = [SPCARecommender(n_components=n_components,
+                                    batch_size=10,
                                     n_epochs=1,
-                                    l1_ratio=1,
-                                    random_state=random_state)]
+                                    n_runs=1,
+                                    alpha=alpha,
+                                    memory=mem,
+                                    l1_ratio=l1_ratio,
+                                    random_state=random_state)
+                    for n_components in [20, 50, 100]
+                    for l1_ratio in np.linspace(0, 1, 3)
+                    for alpha in np.logspace(-2, 2, 5)]
+    # recommenders = [SPCARecommender(n_components=20,
+    #                                 batch_size=1,
+    #                                 alpha=0.1,
+    #                                 n_epochs=1,
+    #                                 l1_ratio=1,
+    #                                 random_state=random_state)]
     for i, recommender in enumerate(recommenders):
         path = join(output_dir, "experiment_%i" % i)
         recommender.set_params(debug_folder=join(path))
@@ -588,5 +579,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    # run(n_jobs=15)
-    gather_results('/volatile/arthur/output/movielens/2015-12-01_13-59-00')
+    run(n_jobs=1)
+    # gather_results('/volatile/arthur/output/movielens/2015-12-01_13-59-00')

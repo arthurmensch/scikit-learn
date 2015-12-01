@@ -838,9 +838,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
                       'penalty_cost': [],
                       'objective_cost': []}
         size_values = min(n_features, 100)
-        recorded_features = np.floor(np.linspace(0, n_features - 1,
-                                                 size_values)).astype('int')
-
+        # recorded_features = np.floor(np.linspace(0, n_features - 1,
+        #                                          size_values)).astype('int')
+        recorded_features = np.arange(size_values)
     # Init V with SVD of X
     if dict_init is not None:
         dictionary = dict_init
