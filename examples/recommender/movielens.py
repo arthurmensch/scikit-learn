@@ -579,5 +579,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    run(n_jobs=1)
+    run(n_jobs=32)
     # gather_results('/volatile/arthur/output/movielens/2015-12-01_13-59-00')
