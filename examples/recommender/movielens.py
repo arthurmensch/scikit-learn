@@ -207,7 +207,7 @@ class SPCARecommender(BaseEstimator):
     def fit(self, X, y=None, probe=None, probe_freq=100):
         X = X.copy()
         print("Centering data")
-        _, self.global_mean_, \
+        X, self.global_mean_, \
         self.user_mean_, \
         self.movie_mean_ = csr_inplace_center_data(X)
 
@@ -242,7 +242,7 @@ class SPCARecommender(BaseEstimator):
                 self.count_seen_features_ = incr_spca.debug_info_[
                     'count_seen_features']
                 if probe is not None:
-                    probe_score = [batch.stop + i * self.n_epochs]
+                    probe_score = [batch.stop + i * X.shape_[0]]
                     for this_probe in probe:
                             probe_score.append(self.score(this_probe))
                     self.probe_score_.append(probe_score)
