@@ -537,7 +537,7 @@ def run(n_jobs=1):
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True   )
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
@@ -579,5 +579,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    run(n_jobs=32)
-    # gather_results('/volatile/arthur/output/movielens/2015-12-01_13-59-00')
+    # run(n_jobs=32)
+    gather_results('/volatile/arthur/output/movielens/2015-12-01_19-11-09')
