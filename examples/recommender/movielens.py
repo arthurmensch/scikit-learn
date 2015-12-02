@@ -203,7 +203,7 @@ class SPCARecommender(BaseEstimator):
         self.memory = memory
         self.debug_folder = debug_folder
 
-    def fit(self, X, y=None, probe=None):
+    def fit(self, X, y=None, probe=None, probe_freq=100):
         X = X.copy()
         print("Centering data")
         _, self.global_mean_, \
@@ -224,7 +224,6 @@ class SPCARecommender(BaseEstimator):
                                                transform_alpha=self.alpha,
                                                debug_info=True)
         self.probe_score_ = []
-        probe_freq = 500
         self.code_ = np.zeros((X.shape[0], self.n_components))
         last_seen = 0
         for i in range(self.n_epochs):
@@ -252,10 +251,12 @@ class SPCARecommender(BaseEstimator):
                         np.save(join(self.debug_folder, 'code'),
                                 self.code_)
                         with open(join(self.debug_folder, 'results.json'),
-                                  'r+') as f:
+                                  'r') as f:
                             results = json.load(f)
-                            results['test_score'] = probe_score[0]
-                            results['train_score'] = probe_score[1]
+                        results['test_score'] = probe_score[0]
+                        results['train_score'] = probe_score[1]
+                        with open(join(self.debug_folder, 'results.json'),
+                                  'w+') as f:
                             json.dump(results, f)
                         np.save(join(self.debug_folder, 'dictionary'),
                                 self.dictionary_)
@@ -509,7 +510,7 @@ def fit_and_dump(recommender, X_train, X_test):
                    'batch_size': recommender.batch_size}
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
-    recommender.fit(X_train, probe=[X_test, X_train])
+    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=500)
     score = recommender.score(X_test)
     result_dict['final_score'] = score
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
