@@ -552,7 +552,7 @@ def run(n_jobs=1):
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True, n_users=10000)
+                                remove_empty=True)
     X = X[random_state.permutation(X.shape[0])]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
@@ -568,7 +568,7 @@ def run(n_jobs=1):
                                                                   '-%M-%S')))
     os.makedirs(output_dir)
     recommenders = [SPCARecommender(n_components=n_components,
-                                    batch_size=20,
+                                    batch_size=batch_size,
                                     n_epochs=6,
                                     n_runs=1,
                                     alpha=alpha,
@@ -576,6 +576,7 @@ def run(n_jobs=1):
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
                     for n_components in [50]
+                    for batch_size in [1, 10, 100]
                     for l1_ratio in np.linspace(0, 1, 3)
                     for alpha in np.logspace(-2, 2, 5)]
     # recommenders = [SPCARecommender(n_components=20,
