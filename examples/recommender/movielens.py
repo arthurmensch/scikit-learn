@@ -272,6 +272,7 @@ class SPCARecommender(BaseEstimator):
                         np.save(join(self.debug_folder, 'count_seen_features'),
                                 self.count_seen_features_)
                         draw_stats(self.debug_folder)
+                incr_spca.inner_stats_ = None
 
     def transform(self, X):
         X = X.copy()
