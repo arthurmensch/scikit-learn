@@ -251,7 +251,8 @@ class SPCARecommender(BaseEstimator):
                     if self.debug_folder is not None:
                         np.save(join(self.debug_folder, 'code'),
                                 self.code_)
-                        with open('results.json', 'r+') as f:
+                        with open(join(self.debug_folder, 'results.json'),
+                                  'r+') as f:
                             results = json.load(f)
                             results['test_score'] = probe_score[2]
                             results['train_score'] = probe_score[1]
