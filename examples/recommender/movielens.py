@@ -254,7 +254,7 @@ class SPCARecommender(BaseEstimator):
                         with open(join(self.debug_folder, 'results.json'),
                                   'r+') as f:
                             results = json.load(f)
-                            results['test_score'] = probe_score[2]
+                            results['test_score'] = probe_score[0]
                             results['train_score'] = probe_score[1]
                             json.dump(results, f)
                         np.save(join(self.debug_folder, 'dictionary'),
