@@ -415,6 +415,7 @@ def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
     X = csr_matrix((ratings, (ratings.index.get_level_values(0) - 1,
                               ratings.index.get_level_values(1) - 1)),
                    shape=(full_n_users, full_n_movies))
+    X = X[:n_users, :n_movies]
     if remove_empty:
         rated_movies = (X.getnnz(axis=0) != 0)
         X = X[:, rated_movies]
@@ -572,7 +573,7 @@ def run(n_jobs=1):
                                     memory=mem,
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
-                    for n_components in [20, 50, 100]
+                    for n_components in [50]
                     for l1_ratio in np.linspace(0, 1, 3)
                     for alpha in np.logspace(-2, 2, 5)]
     # recommenders = [SPCARecommender(n_components=20,
