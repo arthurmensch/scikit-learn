@@ -595,5 +595,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    run(n_jobs=16)
+    run(n_jobs=24)
     # gather_results(expanduser('~/output/movielens/2015-12-02_14-38-20'))
