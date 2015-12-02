@@ -566,8 +566,8 @@ def run(n_jobs=1):
                                                                   '-%M-%S')))
     os.makedirs(output_dir)
     recommenders = [SPCARecommender(n_components=n_components,
-                                    batch_size=10,
-                                    n_epochs=3,
+                                    batch_size=20,
+                                    n_epochs=6,
                                     n_runs=1,
                                     alpha=alpha,
                                     memory=mem,
