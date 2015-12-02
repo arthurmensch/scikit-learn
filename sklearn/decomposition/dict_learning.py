@@ -871,9 +871,11 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
     # The covariance of the dictionary
     if inner_stats is None:
+        Ap = np.zeros((n_components, n_components))
         A = np.zeros((n_components, n_components))
         A_ref = np.zeros((n_components, n_components))
         # The data approximation
+        Bp = np.zeros_like(dictionary)
         B = np.zeros_like(dictionary)
         B_ref = np.zeros_like(dictionary)
         last_cost = np.inf
@@ -884,14 +886,16 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
     else:
         A = inner_stats[0].copy()
+        Ap = inner_stats[2].copy()
         B = inner_stats[1].copy()
-        A_ref = inner_stats[3].copy()
-        B_ref = inner_stats[4].copy()
-        last_cost = inner_stats[2][0]
-        norm_cost = inner_stats[2][1]
-        penalty_cost = inner_stats[2][2]
-        n_seen_samples = inner_stats[2][3]
-        count_seen_features = inner_stats[2][4]
+        Bp = inner_stats[3].copy()
+        A_ref = inner_stats[5].copy()
+        B_ref = inner_stats[6].copy()
+        last_cost = inner_stats[4][0]
+        norm_cost = inner_stats[4][1]
+        penalty_cost = inner_stats[4][2]
+        n_seen_samples = inner_stats[4][3]
+        count_seen_features = inner_stats[4][4]
     # For tolerance computation
     patience = 0
 
@@ -959,6 +963,13 @@ def dict_learning_online(X, n_components=2, alpha=1,
         A += np.dot(this_code, this_code.T) / n_seen_samples
         B[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
+                                     this_code.T) / count_seen_features[subset,
+                                                                        np.newaxis]
+
+        Ap *= 1 - len_batch / n_seen_samples
+        Ap += np.dot(this_code, this_code.T) / n_seen_samples
+        Bp[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
+        Bp[subset] += safe_sparse_dot(this_X[:, subset].T,
                                      this_code.T) / count_seen_features[subset,
                                                                         np.newaxis]
 
@@ -1039,9 +1050,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
     if return_inner_stats:
         if return_n_iter:
             res = dictionary.T, (
-                A, B, residual_stat, A_ref, B_ref), ii - iter_offset + 1
+                A, B, Ap, Bp, residual_stat, A_ref, B_ref), ii - iter_offset + 1
         else:
-            res = dictionary.T, (A, B, residual_stat, A_ref, B_ref)
+            res = dictionary.T, (A, B, Ap, Bp, residual_stat, A_ref, B_ref)
     elif return_code:
         if verbose > 1:
             print('Learning code...', end=' ')

@@ -273,7 +273,9 @@ class SPCARecommender(BaseEstimator):
                         np.save(join(self.debug_folder, 'count_seen_features'),
                                 self.count_seen_features_)
                         draw_stats(self.debug_folder)
-            # incr_spca.inner_stats_ = None
+            (A, B, Ap, Bp, residual_stat, A_ref, B_ref) = incr_spca.inner_stats_
+            incr_spca.inner_stats_ = (Ap, Bp, np.zeros_like(A), np.zeros_like(B),
+                                      residual_stat, A_ref, B_ref)
 
     def transform(self, X):
         X = X.copy()
@@ -514,7 +516,7 @@ def fit_and_dump(recommender, X_train, X_test):
                    'batch_size': recommender.batch_size}
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
-    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=2000)
+    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=200)
     score = recommender.score(X_test)
     with open(join(recommender.debug_folder, 'results.json'), 'r') as f:
         result_dict = json.load(f)
@@ -553,7 +555,7 @@ def run(n_jobs=1):
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True, n_users=1000)
     X = X[random_state.permutation(X.shape[0])]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
