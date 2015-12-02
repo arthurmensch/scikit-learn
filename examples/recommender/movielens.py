@@ -538,7 +538,7 @@ def run(n_jobs=1):
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
                                 remove_empty=True   )
-    X = X[random_state.permutation(X.shape(0))]
+    X = X[random_state.permutation(X.shape[0])]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
