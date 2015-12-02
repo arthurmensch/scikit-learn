@@ -244,13 +244,18 @@ class SPCARecommender(BaseEstimator):
                 if probe is not None:
                     probe_score = []
                     for this_probe in probe:
-                            probe_score.append(self.score(this_probe[0:1000]))
+                            probe_score.append(self.score(this_probe))
                     self.probe_score_.append(probe_score)
                     for score in self.probe_score_[-1]:
                         print('RMSE: %.3f' % score)
                     if self.debug_folder is not None:
                         np.save(join(self.debug_folder, 'code'),
                                 self.code_)
+                        with open('results.json', 'r+') as f:
+                            results = json.load(f)
+                            results['test_score'] = probe_score[2]
+                            results['train_score'] = probe_score[1]
+                            json.dump(results, f)
                         np.save(join(self.debug_folder, 'dictionary'),
                                 self.dictionary_)
                         np.save(join(self.debug_folder, 'residuals'),
@@ -505,7 +510,7 @@ def fit_and_dump(recommender, X_train, X_test):
         json.dump(result_dict, f)
     recommender.fit(X_train, probe=[X_test, X_train])
     score = recommender.score(X_test)
-    result_dict['score'] = score
+    result_dict['final_score'] = score
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
 
@@ -560,7 +565,7 @@ def run(n_jobs=1):
                                     memory=mem,
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
-                    for n_components in [50]
+                    for n_components in [20, 50, 100]
                     for l1_ratio in np.linspace(0, 1, 3)
                     for alpha in np.logspace(-2, 2, 5)]
     # recommenders = [SPCARecommender(n_components=20,
