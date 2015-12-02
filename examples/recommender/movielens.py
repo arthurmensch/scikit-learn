@@ -51,7 +51,7 @@ def draw_stats(debug_folder):
     plt.close(fig)
 
     fig = plt.figure()
-    plt.plot(np.arange(len(probe_score)), probe_score)
+    plt.plot(probe_score[:, 0], probe_score[:, 1:], marker='o')
     plt.savefig(join(debug_folder, 'probe_score.pdf'))
     plt.close(fig)
 
@@ -230,7 +230,6 @@ class SPCARecommender(BaseEstimator):
         for i in range(self.n_epochs):
             batches = gen_batches(X.shape[0],
                                   probe_freq)
-            print(i)
             for batch in batches:
                 last_seen = max(batch.stop, last_seen)
                 incr_spca.partial_fit(X[batch], deprecated=False)
@@ -243,7 +242,7 @@ class SPCARecommender(BaseEstimator):
                 self.count_seen_features_ = incr_spca.debug_info_[
                     'count_seen_features']
                 if probe is not None:
-                    probe_score = []
+                    probe_score = [last_seen + i * X.shape[0]]
                     for this_probe in probe:
                             probe_score.append(self.score(this_probe))
                     self.probe_score_.append(probe_score)
@@ -255,8 +254,8 @@ class SPCARecommender(BaseEstimator):
                         with open(join(self.debug_folder, 'results.json'),
                                   'r') as f:
                             results = json.load(f)
-                        results['test_score'] = probe_score[0]
-                        results['train_score'] = probe_score[1]
+                        results['test_score'] = probe_score[1]
+                        results['train_score'] = probe_score[2]
                         with open(join(self.debug_folder, 'results.json'),
                                   'w+') as f:
                             json.dump(results, f)
@@ -576,8 +575,8 @@ def run(n_jobs=1):
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
                     for n_components in [50]
-                    for batch_size in [1, 10, 100]
-                    for l1_ratio in np.linspace(0, 1, 3)
+                    for batch_size in [20]
+                    for l1_ratio in [0.5]
                     for alpha in np.logspace(-2, 2, 5)]
     # recommenders = [SPCARecommender(n_components=20,
     #                                 batch_size=1,
