@@ -242,7 +242,7 @@ class SPCARecommender(BaseEstimator):
                 self.count_seen_features_ = incr_spca.debug_info_[
                     'count_seen_features']
                 if probe is not None:
-                    probe_score = [batch.stop + i * X.shape_[0]]
+                    probe_score = [batch.stop + i * X.shape[0]]
                     for this_probe in probe:
                             probe_score.append(self.score(this_probe))
                     self.probe_score_.append(probe_score)
