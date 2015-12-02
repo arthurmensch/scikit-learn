@@ -529,11 +529,14 @@ def gather_results(output_dir):
                                                     'reduction_method',
                                                     'alpha',
                                                     'batch_size',
+                                                    'test_score',
+                                                    'train_score',
                                                     'score'])
 
     results.sort_values(by=['path',
                             'n_components', 'l1_ratio', 'reduction_method',
                             'alpha', 'batch_size',
+                            'test_score', 'train_score',
                             'score'], inplace=True)
     results.to_csv(join(output_dir, 'results.csv'))
 
