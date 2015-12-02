@@ -62,7 +62,7 @@ def draw_stats(debug_folder):
     plt.close(fig)
 
     fig = plt.figure(figsize=(10, 10))
-    plt.matshow(code[:1000].reshape((-1, code.shape[1] * 5)))
+    plt.matshow(code[:1000].reshape((-1, code.shape[1] * 2)))
     plt.colorbar()
     plt.savefig(join(debug_folder, 'code.pdf'))
     plt.close(fig)
@@ -75,67 +75,68 @@ def draw_stats(debug_folder):
     plt.close('all')
 
 
-def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=500,
-                          n_epochs=1):
-    incr_spca = clone(incr_spca)
-    this_random_state = check_random_state(seed)
-    # dict_init = (this_random_state.binomial(1, 0.5,
-    #                                         size=(incr_spca.n_components,
-    #                                               X.shape[1])
-    #                                         ) - .5) * 2
-    dict_init = this_random_state.randn(incr_spca.n_components,
-                                        X.shape[1])
-    incr_spca.set_params(dict_init=dict_init, random_state=seed)
-    print("Learning dictionary")
-    last_seen = 0
-    for i in range(n_epochs):
-        batches = gen_batches(X.shape[0], probe_freq * incr_spca.batch_size)
-        for batch in batches:
-            last_seen = max(batch.stop, last_seen)
-            incr_spca.partial_fit(X[batch], deprecated=False)
-            dictionary = incr_spca.components_
-            if np.isnan(dictionary).any():
-                raise ValueError
-            print("Done learning dictionary")
-            print("Learning code")
-            code = incr_spca.transform(X[:last_seen])
-            if np.isnan(code).any():
-                raise ValueError
-            print("Done learning code")
-            residuals = incr_spca.debug_info_['residuals']
-            density = incr_spca.debug_info_['density']
-            values = incr_spca.debug_info_['values']
-            count_seen_features = incr_spca.debug_info_['count_seen_features']
-            print("Computing probe score")
-            yield dictionary, code, np.array(residuals)[:,
-                                    np.newaxis], density, values, \
-                  count_seen_features, last_seen
-
-
-def _fit_spca_recommender_(X, incr_spca, seed=None):
-    incr_spca = clone(incr_spca)
-    this_random_state = check_random_state(seed)
-    # dict_init = (this_random_state.binomial(1, 0.5,
-    #                                         size=(incr_spca.n_components,
-    #                                               X.shape[1])
-    #                                         ) - .5) * 2
-    dict_init = this_random_state.randn(incr_spca.n_components,
-                                        X.shape[1])
-    incr_spca.set_params(dict_init=dict_init, random_state=seed)
-    print("Learning dictionary")
-    incr_spca.fit(X)
-    dictionary = incr_spca.components_
-    print("Done learning dictionary")
-    print("Learning code")
-    code = incr_spca.transform(X)
-    print("Done learning code")
-    residuals = incr_spca.debug_info_['residuals']
-    density = incr_spca.debug_info_['density']
-    values = incr_spca.debug_info_['values']
-    return dictionary, code, \
-           np.array(residuals)[:, np.newaxis], \
-           values, \
-           np.array(density)[:, np.newaxis]
+# def _fit_spca_recommender(X, incr_spca, seed=None, probe=None, probe_freq=100,
+#                           n_epochs=1):
+#     incr_spca = clone(incr_spca)
+#     this_random_state = check_random_state(seed)
+#     # dict_init = (this_random_state.binomial(1, 0.5,
+#     #                                         size=(incr_spca.n_components,
+#     #                                               X.shape[1])
+#     #                                         ) - .5) * 2
+#     dict_init = this_random_state.randn(incr_spca.n_components,
+#                                         X.shape[1])
+#     incr_spca.set_params(dict_init=dict_init, random_state=seed)
+#     print("Learning dictionary")
+#     last_seen = 0
+#     for i in range(n_epochs):
+#         print(i)
+#         batches = gen_batches(X.shape[0], probe_freq * incr_spca.batch_size)
+#         for batch in batches:
+#             last_seen = max(batch.stop, last_seen)
+#             incr_spca.partial_fit(X[batch], deprecated=False)
+#             dictionary = incr_spca.components_
+#             if np.isnan(dictionary).any():
+#                 raise ValueError
+#             print("Done learning dictionary")
+#             print("Learning code")
+#             code = incr_spca.transform(X[:last_seen])
+#             if np.isnan(code).any():
+#                 raise ValueError
+#             print("Done learning code")
+#             residuals = incr_spca.debug_info_['residuals']
+#             density = incr_spca.debug_info_['density']
+#             values = incr_spca.debug_info_['values']
+#             count_seen_features = incr_spca.debug_info_['count_seen_features']
+#             print("Computing probe score")
+#             yield dictionary, code, np.array(residuals)[:,
+#                                     np.newaxis], density, values, \
+#                   count_seen_features, last_seen
+#
+#
+# def _fit_spca_recommender_(X, incr_spca, seed=None):
+#     incr_spca = clone(incr_spca)
+#     this_random_state = check_random_state(seed)
+#     # dict_init = (this_random_state.binomial(1, 0.5,
+#     #                                         size=(incr_spca.n_components,
+#     #                                               X.shape[1])
+#     #                                         ) - .5) * 2
+#     dict_init = this_random_state.randn(incr_spca.n_components,
+#                                         X.shape[1])
+#     incr_spca.set_params(dict_init=dict_init, random_state=seed)
+#     print("Learning dictionary")
+#     incr_spca.fit(X)
+#     dictionary = incr_spca.components_
+#     print("Done learning dictionary")
+#     print("Learning code")
+#     code = incr_spca.transform(X)
+#     print("Done learning code")
+#     residuals = incr_spca.debug_info_['residuals']
+#     density = incr_spca.debug_info_['density']
+#     values = incr_spca.debug_info_['values']
+#     return dictionary, code, \
+#            np.array(residuals)[:, np.newaxis], \
+#            values, \
+#            np.array(density)[:, np.newaxis]
 
 
 class BaseRecommender(BaseEstimator):
@@ -229,6 +230,7 @@ class SPCARecommender(BaseEstimator):
         for i in range(self.n_epochs):
             batches = gen_batches(X.shape[0],
                                   probe_freq * incr_spca.batch_size)
+            print(i)
             for batch in batches:
                 last_seen = max(batch.stop, last_seen)
                 incr_spca.partial_fit(X[batch], deprecated=False)
@@ -550,7 +552,7 @@ def run(n_jobs=1):
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True, n_users=1000)
+                                remove_empty=True, n_users=10000)
     X = X[random_state.permutation(X.shape[0])]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
@@ -593,5 +595,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    # run(n_jobs=16)
-    gather_results(expanduser('~/output/movielens/2015-12-02_14-38-20'))
+    run(n_jobs=16)
+    # gather_results(expanduser('~/output/movielens/2015-12-02_14-38-20'))
