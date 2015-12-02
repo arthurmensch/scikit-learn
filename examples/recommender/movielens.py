@@ -242,7 +242,7 @@ class SPCARecommender(BaseEstimator):
                 self.count_seen_features_ = incr_spca.debug_info_[
                     'count_seen_features']
                 if probe is not None:
-                    probe_score = [last_seen + i * X.shape[0]]
+                    probe_score = [batch.stop + i * self.n_epochs]
                     for this_probe in probe:
                             probe_score.append(self.score(this_probe))
                     self.probe_score_.append(probe_score)
@@ -551,7 +551,7 @@ def run(n_jobs=1):
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True, n_users=100)
     X = X[random_state.permutation(X.shape[0])]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
