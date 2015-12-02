@@ -592,5 +592,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    run(n_jobs=16)
-    # gather_results('/volatile/arthur/output/movielens/2015-12-01_19-11-09')
+    # run(n_jobs=16)
+    gather_results(expanduser('~/output/movielens/2015-12-02_14-38-20'))
