@@ -229,7 +229,7 @@ class SPCARecommender(BaseEstimator):
         last_seen = 0
         for i in range(self.n_epochs):
             batches = gen_batches(X.shape[0],
-                                  probe_freq * incr_spca.batch_size)
+                                  probe_freq)
             print(i)
             for batch in batches:
                 last_seen = max(batch.stop, last_seen)
@@ -513,7 +513,7 @@ def fit_and_dump(recommender, X_train, X_test):
                    'batch_size': recommender.batch_size}
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
-    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=200)
+    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=2000)
     score = recommender.score(X_test)
     with open(join(recommender.debug_folder, 'results.json'), 'r') as f:
         result_dict = json.load(f)
@@ -589,7 +589,6 @@ def run(n_jobs=1):
         path = join(output_dir, "experiment_%i" % i)
         recommender.set_params(debug_folder=join(path))
         os.makedirs(path)
-    print(n_jobs)
     Parallel(n_jobs=n_jobs, verbose=10, max_nbytes=0)(
             delayed(fit_and_dump)(recommender, X_train, X_test)
         for recommender in recommenders)
