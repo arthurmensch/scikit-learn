@@ -560,7 +560,7 @@ def run(n_jobs=1):
                                     memory=mem,
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
-                    for n_components in [20, 50, 100]
+                    for n_components in [50]
                     for l1_ratio in np.linspace(0, 1, 3)
                     for alpha in np.logspace(-2, 2, 5)]
     # recommenders = [SPCARecommender(n_components=20,
@@ -580,5 +580,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    # run(n_jobs=32)
-    gather_results('/volatile/arthur/output/movielens/2015-12-01_19-11-09')
+    run(n_jobs=15)
+    # gather_results('/volatile/arthur/output/movielens/2015-12-01_19-11-09')
