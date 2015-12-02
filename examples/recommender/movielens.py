@@ -216,14 +216,15 @@ class SPCARecommender(BaseEstimator):
                                      size=[self.n_runs])
         n_iter = X.shape[0] * self.n_epochs // self.batch_size
         incr_spca = IncrementalSparsePCA(n_components=self.n_components,
-                                               alpha=self.alpha,
-                                               l1_ratio=self.l1_ratio,
-                                               batch_size=self.batch_size,
-                                               n_iter=n_iter,
-                                               missing_values=0,
-                                               verbose=10,
-                                               transform_alpha=self.alpha,
-                                               debug_info=True)
+                                         alpha=self.alpha,
+                                         l1_ratio=self.l1_ratio,
+                                         batch_size=self.batch_size,
+                                         shuffle=True,
+                                         n_iter=n_iter,
+                                         missing_values=0,
+                                         verbose=10,
+                                         transform_alpha=self.alpha,
+                                         debug_info=True)
         self.probe_score_ = []
         self.code_ = np.zeros((X.shape[0], self.n_components))
         last_seen = 0
@@ -244,7 +245,7 @@ class SPCARecommender(BaseEstimator):
                 if probe is not None:
                     probe_score = [batch.stop + i * X.shape[0]]
                     for this_probe in probe:
-                            probe_score.append(self.score(this_probe))
+                        probe_score.append(self.score(this_probe))
                     self.probe_score_.append(probe_score)
                     for score in self.probe_score_[-1]:
                         print('RMSE: %.3f' % score)
@@ -552,7 +553,7 @@ def run(n_jobs=1):
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True, n_users=1000)
+                                remove_empty=True, n_users=10000)
     X = X[random_state.permutation(X.shape[0])]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
@@ -590,7 +591,7 @@ def run(n_jobs=1):
         recommender.set_params(debug_folder=join(path))
         os.makedirs(path)
     Parallel(n_jobs=n_jobs, verbose=10, max_nbytes=0)(
-            delayed(fit_and_dump)(recommender, X_train, X_test)
+        delayed(fit_and_dump)(recommender, X_train, X_test)
         for recommender in recommenders)
 
 
