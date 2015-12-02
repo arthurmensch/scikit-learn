@@ -514,7 +514,7 @@ def fit_and_dump(recommender, X_train, X_test):
                    'batch_size': recommender.batch_size}
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
-    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=200)
+    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=2000)
     score = recommender.score(X_test)
     with open(join(recommender.debug_folder, 'results.json'), 'r') as f:
         result_dict = json.load(f)
