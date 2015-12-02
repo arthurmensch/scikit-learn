@@ -970,9 +970,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
         # Update dictionary
 
         t0 = time.time()
-        dictionary, objective_cost = _update_dict(
-            check_array(dictionary, order='F'),
-            B, A,
+        dictionary[subset], objective_cost = _update_dict(
+            check_array(dictionary[subset], order='F'),
+            B[subset], A,
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
