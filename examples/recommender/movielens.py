@@ -512,6 +512,8 @@ def fit_and_dump(recommender, X_train, X_test):
         json.dump(result_dict, f)
     recommender.fit(X_train, probe=[X_test, X_train], probe_freq=500)
     score = recommender.score(X_test)
+    with open(join(recommender.debug_folder, 'results.json'), 'r') as f:
+        result_dict = json.load(f)
     result_dict['final_score'] = score
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
@@ -532,13 +534,13 @@ def gather_results(output_dir):
                                                     'batch_size',
                                                     'test_score',
                                                     'train_score',
-                                                    'score'])
+                                                    'final_score'])
 
     results.sort_values(by=['path',
                             'n_components', 'l1_ratio', 'reduction_method',
                             'alpha', 'batch_size',
                             'test_score', 'train_score',
-                            'score'], inplace=True)
+                            'final_score'], inplace=True)
     results.to_csv(join(output_dir, 'results.csv'))
 
 
@@ -564,7 +566,7 @@ def run(n_jobs=1):
     os.makedirs(output_dir)
     recommenders = [SPCARecommender(n_components=n_components,
                                     batch_size=10,
-                                    n_epochs=1,
+                                    n_epochs=3,
                                     n_runs=1,
                                     alpha=alpha,
                                     memory=mem,
