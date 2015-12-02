@@ -224,7 +224,7 @@ class SPCARecommender(BaseEstimator):
                                                transform_alpha=self.alpha,
                                                debug_info=True)
         self.probe_score_ = []
-        probe_freq = 100
+        probe_freq = 500
         self.code_ = np.zeros((X.shape[0], self.n_components))
         last_seen = 0
         for i in range(self.n_epochs):
@@ -244,7 +244,7 @@ class SPCARecommender(BaseEstimator):
                 if probe is not None:
                     probe_score = []
                     for this_probe in probe:
-                        probe_score.append(self.score(this_probe[0:100]))
+                            probe_score.append(self.score(this_probe[0:1000]))
                     self.probe_score_.append(probe_score)
                     for score in self.probe_score_[-1]:
                         print('RMSE: %.3f' % score)
@@ -538,6 +538,7 @@ def run(n_jobs=1):
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
                                 remove_empty=True   )
+    X = X[random_state.permutation(X.shape(0))]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
                                                random_state=random_state))
@@ -574,7 +575,7 @@ def run(n_jobs=1):
         os.makedirs(path)
     print(n_jobs)
     Parallel(n_jobs=n_jobs, verbose=10, max_nbytes=0)(
-        delayed(fit_and_dump)(recommender, X_train, X_test)
+            delayed(fit_and_dump)(recommender, X_train, X_test)
         for recommender in recommenders)
 
 
