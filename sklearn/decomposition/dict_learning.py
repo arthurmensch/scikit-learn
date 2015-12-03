@@ -964,13 +964,13 @@ def dict_learning_online(X, n_components=2, alpha=1,
                                      this_code.T) / count_seen_features[subset,
                                                                         np.newaxis]
 
-        Ap *= 1 - len_batch / n_seen_samples
-        Ap += np.dot(this_code, this_code.T) / n_seen_samples
-        Bp[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
-        Bp[subset] += safe_sparse_dot(this_X[:, subset].T,
-                                      this_code.T) / count_seen_features[
-                          subset,
-                          np.newaxis]
+        # Ap *= 1 - len_batch / n_seen_samples
+        # Ap += np.dot(this_code, this_code.T) / n_seen_samples
+        # Bp[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
+        # Bp[subset] += safe_sparse_dot(this_X[:, subset].T,
+        #                               this_code.T) / count_seen_features[
+        #                   subset,
+        #                   np.newaxis]
 
         total_time += time.time() - t0
         A_ref *= (1 - len_batch / n_seen_samples)

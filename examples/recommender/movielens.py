@@ -15,6 +15,9 @@ from sklearn.linear_model import ridge_regression
 from sklearn.utils import check_random_state, gen_batches
 import matplotlib.pyplot as plt
 
+from sklearn.utils.sparsefuncs_fast import csr_row_norms
+from sklearn.utils.sparsefuncs import inplace_csr_row_scale
+
 
 def csr_rmse(y, y_pred):
     if np.isnan(y_pred.data).any():
@@ -208,7 +211,10 @@ class SPCARecommender(BaseEstimator):
         X, self.global_mean_, \
         self.user_mean_, \
         self.movie_mean_ = csr_inplace_center_data(X)
-
+        # self.norms_ = csr_row_norms(X)
+        # print(self.norms_)
+        # self.norms_[self.norms_ == 0] = 1
+        # inplace_csr_row_scale(X, 1 / self.norms_)
         random_state = check_random_state(self.random_state)
         seeds = random_state.randint(0, np.iinfo(np.uint32).max,
                                      size=[self.n_runs])
@@ -271,9 +277,9 @@ class SPCARecommender(BaseEstimator):
                         np.save(join(self.debug_folder, 'count_seen_features'),
                                 self.count_seen_features_)
                         draw_stats(self.debug_folder)
-            (A, B, Ap, Bp, residual_stat, A_ref, B_ref) = incr_spca.inner_stats_
-            incr_spca.inner_stats_ = (Ap, Bp, np.zeros_like(A), np.zeros_like(B),
-                                      residual_stat, A_ref, B_ref)
+            # (A, B, Ap, Bp, residual_stat, A_ref, B_ref) = incr_spca.inner_stats_
+            # incr_spca.inner_stats_ = (Ap, Bp, np.zeros_like(A), np.zeros_like(B),
+            #                           residual_stat, A_ref, B_ref)
 
     def transform(self, X):
         X = X.copy()
@@ -286,10 +292,7 @@ class SPCARecommender(BaseEstimator):
                 interaction = self.code_[i].dot(self.dictionary_[:, indices])
                 # inter_mean += interaction.mean() ** 2
                 # interaction -= interaction.mean()
-                X.data[X.indptr[i]:X.indptr[i + 1]] += interaction
-        # inter_mean /= X.shape[0]
-        # inter_mean = sqrt(inter_mean)
-        # print(inter_mean)
+                X.data[X.indptr[i]:X.indptr[i + 1]] += interaction # * self.norms_[i]
         X.data += self.movie_mean_.take(X.indices, mode='clip')
         return X
 
@@ -477,6 +480,7 @@ def csr_inplace_center_data(X):
         w_m = X.sum(axis=0).A[0] / n_m
         X.data -= w_m.take(X.indices, mode='clip')
 
+
         acc_u += w_u
         acc_m += w_m
 
@@ -576,10 +580,10 @@ def run(n_jobs=1):
                                     memory=mem,
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
-                    for n_components in [75]
+                    for n_components in [50]
                     for batch_size in [10]
-                    for l1_ratio in [0.5]
-                    for alpha in [100, 200]]
+                    for l1_ratio in [0]
+                    for alpha in np.logspace(1, 3, num=5)]
     # recommenders = [SPCARecommender(n_components=20,
     #                                 batch_size=1,
     #                                 alpha=0.1,
