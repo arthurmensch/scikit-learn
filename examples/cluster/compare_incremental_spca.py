@@ -58,7 +58,7 @@ def run():
     mem = Memory(cachedir=expanduser('~/sklearn_cache'), verbose=10)
     cached_single_run = mem.cache(single_run)
 
-    res = Parallel(n_jobs=1, verbose=10)(delayed(cached_single_run)(
+    res = Parallel(n_jobs=2, verbose=10)(delayed(cached_single_run)(
         estimator, data) for estimator in estimators)
     estimators, reconstructions, compute_times = zip(*res)
     dt = time.time() - t0
@@ -114,11 +114,11 @@ def run():
     plt.figure()
     for estimator, compute_time in zip(estimators, compute_times):
         residuals = estimator.debug_info_['residuals']
-        plt.plot(np.linspace(0, compute_time, len(residuals)), residuals,
+        plt.plot(np.linspace(0, 1, len(residuals)), residuals,
                  label='ratio %.2f' % estimator.feature_ratio)
         plt.xlabel('Time (s)')
         plt.ylabel('Objective value')
-        plt.ylim([1650, 1800])
+        plt.ylim([0, 1800])
         plt.legend(ncol=2)
     plt.tight_layout(pad=0.4)
     plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/residuals.pdf'))

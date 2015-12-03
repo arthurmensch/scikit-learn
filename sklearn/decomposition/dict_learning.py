@@ -338,18 +338,18 @@ def _simpler_update_dict(dictionary, B, A, subset,
             grad = - B[this_subset, k] + dictionary[this_subset].dot(A[:, k])
             dictionary[this_subset, k] -= grad / scale
 
-        atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
+        atom_norm_square = np.sum(dictionary[:, k] ** 2)
         if atom_norm_square < threshold:
             if verbose == 1:
                 sys.stdout.write("+")
                 sys.stdout.flush()
             elif verbose:
                 print("Adding new random atom")
-            dictionary[this_subset, k] = random_state.randn(len(this_subset))
+            dictionary[:, k] = random_state.randn(n_features)
             if l1_ratio != 0.:
                 # Normalizating new random atom before enet projection
-                dictionary[this_subset, k] /= sqrt(atom_norm_square) / radius
-            atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
+                dictionary[:, k] /= sqrt(atom_norm_square) / radius
+            atom_norm_square = np.sum(dictionary[:, k] ** 2)
             # Setting corresponding coefs to 0
             A[k, :] = 0.0
             A[:, k] = 0.0
@@ -807,8 +807,6 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     :param update_scheme:
 
     """
-    print(support)
-
     if n_components is None:
         n_components = X.shape[1]
 
