@@ -198,7 +198,7 @@ def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                 if len(idx) != 0:
                     new_code[i] = ridge_regression(dictionary.T[idx],
                                                    X.data[X.indptr[i]:
-                                                          X.indptr[i + 1]],
+                                                   X.indptr[i + 1]],
                                                    alpha=alpha * len(idx) /
                                                          n_features,
                                                    solver='cholesky')
@@ -914,8 +914,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
                                       random=(feature_ratio > 1))
     total_time = 0
 
-
-
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
                                  batches, subsets):
         t0 = time.time()
@@ -970,8 +968,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
         Ap += np.dot(this_code, this_code.T) / n_seen_samples
         Bp[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
         Bp[subset] += safe_sparse_dot(this_X[:, subset].T,
-                                     this_code.T) / count_seen_features[subset,
-                                                                        np.newaxis]
+                                      this_code.T) / count_seen_features[
+                          subset,
+                          np.newaxis]
 
         total_time += time.time() - t0
         A_ref *= (1 - len_batch / n_seen_samples)
@@ -1006,7 +1005,8 @@ def dict_learning_online(X, n_components=2, alpha=1,
         # Residual computation
         norm_cost *= (1 - len_batch / n_seen_samples)
         if sp.issparse(this_X):
-            norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(subset) / n_seen_samples
+            norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(
+                subset) / n_seen_samples
         else:
             norm_cost += .5 * np.sum(this_X ** 2) / n_seen_samples
 
@@ -1050,7 +1050,8 @@ def dict_learning_online(X, n_components=2, alpha=1,
     if return_inner_stats:
         if return_n_iter:
             res = dictionary.T, (
-                A, B, Ap, Bp, residual_stat, A_ref, B_ref), ii - iter_offset + 1
+                A, B, Ap, Bp, residual_stat, A_ref,
+                B_ref), ii - iter_offset + 1
         else:
             res = dictionary.T, (A, B, Ap, Bp, residual_stat, A_ref, B_ref)
     elif return_code:

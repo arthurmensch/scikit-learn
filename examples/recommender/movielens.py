@@ -2,10 +2,8 @@ import datetime
 import fnmatch
 import os
 from os.path import expanduser, join
-import functools
 import json
 from math import sqrt
-from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, delayed, Parallel
 from sklearn.base import clone
 from scipy.sparse import csr_matrix
@@ -516,7 +514,7 @@ def fit_and_dump(recommender, X_train, X_test):
                    'batch_size': recommender.batch_size}
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
-    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=2000)
+    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=10000)
     score = recommender.score(X_test)
     with open(join(recommender.debug_folder, 'results.json'), 'r') as f:
         result_dict = json.load(f)
@@ -578,10 +576,10 @@ def run(n_jobs=1):
                                     memory=mem,
                                     l1_ratio=l1_ratio,
                                     random_state=random_state)
-                    for n_components in [50]
+                    for n_components in [75]
                     for batch_size in [10]
-                    for l1_ratio in [0.]
-                    for alpha in [100]]
+                    for l1_ratio in [0.5]
+                    for alpha in [100, 200]]
     # recommenders = [SPCARecommender(n_components=20,
     #                                 batch_size=1,
     #                                 alpha=0.1,
