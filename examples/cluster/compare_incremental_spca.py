@@ -10,6 +10,7 @@ from sklearn.utils import check_random_state
 
 
 def single_run(estimator, data):
+    print('')
     warmup_estimator = clone(estimator)
     for i in range(10):
         print('Epoch %i' % i)
@@ -43,20 +44,21 @@ def run():
     print('Learning the dictionary... ')
     rng = check_random_state(30)
     estimators = []
-    for feature_ratio in np.linspace(1, 10, 5):
-        estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.01,
+    for support in [False, True]:
+        estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.0001,
                                                n_iter=100000,
                                                random_state=rng, verbose=2,
                                                batch_size=20,
                                                debug_info=True,
-                                               feature_ratio=feature_ratio))
+                                               support=support,
+                                               feature_ratio=10))
 
     t0 = time.time()
 
     mem = Memory(cachedir=expanduser('~/sklearn_cache'), verbose=10)
     cached_single_run = mem.cache(single_run)
 
-    res = Parallel(n_jobs=2, verbose=10)(delayed(cached_single_run)(
+    res = Parallel(n_jobs=1, verbose=10)(delayed(cached_single_run)(
         estimator, data) for estimator in estimators)
     estimators, reconstructions, compute_times = zip(*res)
     dt = time.time() - t0

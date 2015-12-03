@@ -23,7 +23,7 @@ def enet_projection(v, radius=1., l1_ratio=0.1, check_input=True):
 
 
 def enet_norm(v, l1_ratio=0.1):
-    v = check_array(v, dtype=np.float64, order='C', copy=False)
+    v = check_array(v, dtype=np.float64, order='C', ensure_2d=False, copy=False)
     if v.ndim == 1:
         return c_enet_norm(v, l1_ratio)
     else:

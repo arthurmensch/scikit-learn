@@ -311,7 +311,64 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
     return code
 
 
-def _update_dict(dictionary, Y, code, weights=None, verbose=False,
+def _simpler_update_dict(dictionary, B, A, subset,
+                         return_r2=False,
+                         l1_ratio=0.,
+                         verbose=False,
+                         shuffle=False,
+                         random_state=None):
+    threshold = 1e-20
+    n_components = len(A)
+    n_features = B.shape[0]
+    random_state = check_random_state(random_state)
+
+    if shuffle:
+        component_range = random_state.permutation(n_components)
+    else:
+        component_range = np.arange(n_components)
+
+    for k in component_range:
+        radius = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
+        scale = A[k, k]
+        support = np.where(dictionary[:, k] != 0)[0]
+        this_subset = np.union1d(subset, support)
+        if scale < threshold:
+            dictionary[this_subset, k] = 0
+        else:
+            grad = - B[this_subset, k] + dictionary[this_subset].dot(A[:, k])
+            dictionary[this_subset, k] -= grad / scale
+
+        atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
+        if atom_norm_square < threshold:
+            if verbose == 1:
+                sys.stdout.write("+")
+                sys.stdout.flush()
+            elif verbose:
+                print("Adding new random atom")
+            dictionary[this_subset, k] = random_state.randn(len(this_subset))
+            if l1_ratio != 0.:
+                # Normalizating new random atom before enet projection
+                dictionary[this_subset, k] /= sqrt(atom_norm_square) / radius
+            atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
+            # Setting corresponding coefs to 0
+            A[k, :] = 0.0
+            A[:, k] = 0.0
+        # Projecting onto the norm ball
+        if l1_ratio != 0.:
+            dictionary[this_subset, k] = enet_projection(
+                dictionary[this_subset, k],
+                radius=radius,
+                l1_ratio=l1_ratio,
+                check_input=False)
+        else:
+            dictionary[this_subset, k] /= sqrt(atom_norm_square) / radius
+    if return_r2:
+        return dictionary, 0
+    else:
+        return dictionary
+
+
+def _update_dict(dictionary, Y, code, verbose=False,
                  return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
                  random_state=None):
@@ -364,34 +421,29 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
     R += Y
-    if weights is not None:
-        R = np.asfortranarray(R * weights[:, np.newaxis])
-    else:
-        R = np.asfortranarray(R)
+    R = np.asfortranarray(R)
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
         component_range = random_state.permutation(n_components)
     else:
         component_range = np.arange(n_components)
-    old_atom = np.empty(n_features)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
-        old_atom[:] = dictionary[:, k]
-        # R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
+        R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            scale = code[k, k] # * np.max(weights)
+            scale = code[k, k]
         else:
-            scale = np.sum(code[k, :] ** 2)  # * np.max(weights)
+            scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
             # Trigger cleaning
             dictionary[:, k] = 0
         else:
             if online:
-                dictionary[:, k] += R[:, k] / scale
+                dictionary[:, k] = R[:, k] / scale
             else:
-                dictionary[:, k] += np.dot(R, code[k, :].T) / scale
+                dictionary[:, k] = np.dot(R, code[k, :].T) / scale
 
         # Cleaning small atoms
         atom_norm_square = np.sum(dictionary[:, k] ** 2)
@@ -402,10 +454,10 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
             elif verbose:
                 print("Adding new random atom")
             dictionary[:, k] = random_state.randn(n_features)
-            atom_norm_square = np.sum(dictionary[:, k] ** 2)
             if l1_ratio != 0.:
                 # Normalizating new random atom before enet projection
-                dictionary[:, k] /= sqrt(atom_norm_square)
+                dictionary[:, k] /= sqrt(atom_norm_square) / radius[k]
+            atom_norm_square = np.sum(dictionary[:, k] ** 2)
             # Setting corresponding coefs to 0
             code[k, :] = 0.0
 
@@ -416,14 +468,10 @@ def _update_dict(dictionary, Y, code, weights=None, verbose=False,
                                                l1_ratio=l1_ratio,
                                                check_input=False)
         else:
-            dictionary[:, k] /= sqrt(atom_norm_square)
+            dictionary[:, k] /= sqrt(atom_norm_square) / radius[k]
         # R <- -1.0 * U_k * V_k^T + R
-        if weights is not None:
-            R = ger(1.0, (old_atom - dictionary[:, k]) * weights, code[k, :],
-                    a=R, overwrite_a=True)
-        else:
-            R = ger(1.0, old_atom - dictionary[:, k], code[k, :],
-                    a=R, overwrite_a=True)
+        R = ger(-1.0, dictionary[:, k], code[k, :],
+                a=R, overwrite_a=True)
     if return_r2:
         if online:
             # Y = B_t, code = A_t, dictionary = D in online setting
@@ -632,6 +680,7 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                          return_code=True, dict_init=None,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          method='lars',
+                         support=False,
                          iter_offset=0, tol=0.,
                          feature_ratio=1,
                          subsets=None,
@@ -758,6 +807,8 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
     :param update_scheme:
 
     """
+    print(support)
+
     if n_components is None:
         n_components = X.shape[1]
 
@@ -875,13 +926,11 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
             if verbose > 10 or ii % ceil(100. / verbose) == 0:
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
-
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
         count_seen_features[subset] += len_batch
 
-        subset_dictionary = check_array(dictionary[subset], order='F',
-                                        copy=True)
+        subset_dictionary = check_array(dictionary[subset], order='F')
 
         ratio = len(subset) / n_features
 
@@ -910,17 +959,28 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         B_ref += np.dot(this_X.T, this_code.T) / n_seen_samples
         # Update dictionary
 
-        ones = np.ones(len(subset))
         t0 = time.time()
-        dictionary[subset], objective_cost = _update_dict(
-            subset_dictionary,
-            B[subset], A,
-            verbose=verbose,
-            l1_ratio=l1_ratio,
-            weights=None,
-            random_state=random_state,
-            return_r2=True,
-            online=True, shuffle=shuffle)
+
+        if not support:
+            dictionary[subset], objective_cost = _update_dict(
+                subset_dictionary,
+                B[subset], A,
+                verbose=verbose,
+                l1_ratio=l1_ratio,
+                random_state=random_state,
+                return_r2=True,
+                shuffle=shuffle)
+            total_time += time.time() - t0
+        else:
+            dictionary, objective_cost = _simpler_update_dict(
+                dictionary,
+                B, A,
+                subset,
+                verbose=verbose,
+                l1_ratio=l1_ratio,
+                random_state=random_state,
+                return_r2=True,
+                shuffle=shuffle)
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
@@ -1433,6 +1493,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                  transform_algorithm='omp',
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
+                 support=False,
                  random_state=None,
                  debug_info=False,
                  feature_ratio=1):
@@ -1450,6 +1511,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.split_sign = split_sign
         self.random_state = random_state
         self.tol = tol
+        self.support = support
         self.debug_info = debug_info
         self.feature_ratio = feature_ratio
 
@@ -1482,6 +1544,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             method=self.fit_algorithm,
             update_scheme='mean',
             forget_rate=1,
+            support=self.support,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=self.random_state_,
@@ -1557,6 +1620,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             tol=0,
             update_scheme='mean',
             forget_rate=1.,
+            support=self.support,
             feature_ratio=self.feature_ratio,
             subsets=self.subsets_,
             method=self.fit_algorithm,
