@@ -516,7 +516,7 @@ def fit_and_dump(recommender, X_train, X_test):
                    'batch_size': recommender.batch_size}
     with open(join(recommender.debug_folder, 'results.json'), 'w+') as f:
         json.dump(result_dict, f)
-    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=200)
+    recommender.fit(X_train, probe=[X_test, X_train], probe_freq=2000)
     score = recommender.score(X_test)
     with open(join(recommender.debug_folder, 'results.json'), 'r') as f:
         result_dict = json.load(f)
@@ -555,7 +555,7 @@ def run(n_jobs=1):
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     print("Loading dataset")
     X = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True, n_users=10000)
+                                remove_empty=True)
     X = X[random_state.permutation(X.shape[0])]
     print("Done loading dataset")
     splits = list(CsrRowStratifiedShuffleSplit(X, test_size=0.1, n_splits=1,
@@ -580,8 +580,8 @@ def run(n_jobs=1):
                                     random_state=random_state)
                     for n_components in [50]
                     for batch_size in [10]
-                    for l1_ratio in [1.]
-                    for alpha in [1]]
+                    for l1_ratio in [0.]
+                    for alpha in [100]]
     # recommenders = [SPCARecommender(n_components=20,
     #                                 batch_size=1,
     #                                 alpha=0.1,
@@ -598,5 +598,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    run(n_jobs=1)
+    run(n_jobs=8)
     # gather_results(expanduser('~/output/movielens/2015-12-02_14-38-20'))
