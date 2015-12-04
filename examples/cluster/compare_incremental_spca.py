@@ -1,5 +1,7 @@
+import datetime
+import os
 import time
-from os.path import expanduser
+from os.path import expanduser, join, exists
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
@@ -78,7 +80,13 @@ def run():
     print(compute_times)
     print('done in %.2fs.' % dt)
 
-    ###############################################################################
+    output_dir = expanduser('~/output/incr_spca')
+    output_dir = ²join(output_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H'
+                                                       '-%M-%S'))
+    if not exists(output_dir):
+        os.makedirs(output_dir)
+
+    ###########################################################################
     # Plot the results
     fig = plt.figure()
     for j, estimator in enumerate(estimators):
@@ -100,8 +108,7 @@ def run():
         ax.axis('off')
     plt.tight_layout(pad=0.4, w_pad=0.1, h_pad=0.5)
     plt.savefig(
-        expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pdf'))
-    # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
+        expanduser(join(output_dir, 'components.pdf')))
 
     fig = plt.figure()
     for j, (estimator, reconstruction) in enumerate(zip(estimators,
@@ -122,9 +129,7 @@ def run():
         ax.set_yticks(())
         ax.axis('off')
     plt.tight_layout(pad=0.4, w_pad=0.1, h_pad=0.5)
-    plt.savefig(expanduser(
-        '~/work/papers/11_2015_sparse_pca/figures/reconstruction.pdf'))
-    # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
+    plt.savefig(join(output_dir, 'reconstruction.pdf'))
 
 
     plt.figure()
@@ -137,9 +142,7 @@ def run():
         plt.ylim([0, 2500])
         plt.legend(ncol=2)
     plt.tight_layout(pad=0.4)
-    plt.savefig(
-        expanduser('~/work/papers/11_2015_sparse_pca/figures/residuals.pdf'))
-    # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
+    plt.savefig(expanduser(join(output_dir, 'residuals.pdf')))
 
 
 if __name__ == '__main__':
