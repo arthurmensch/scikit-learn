@@ -81,7 +81,7 @@ def run():
     print('done in %.2fs.' % dt)
 
     output_dir = expanduser('~/output/incr_spca')
-    output_dir = ²join(output_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H'
+    output_dir = join(output_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H'
                                                        '-%M-%S'))
     if not exists(output_dir):
         os.makedirs(output_dir)
