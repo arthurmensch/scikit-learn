@@ -12,7 +12,8 @@ from . import check_array
 
 def enet_projection(v, radius=1., l1_ratio=0.1, check_input=True):
     if check_input:
-        v = check_array(v, dtype=np.float64, order='C', copy=False)
+        v = check_array(v, dtype=np.float64, order='C', copy=False,
+                        ensure_2d=False,)
     b = np.zeros(v.shape, dtype=np.float64)
     if v.ndim == 1:
         enet_projection_inplace(v, b, radius, l1_ratio)

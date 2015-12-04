@@ -4,22 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn import datasets
-from sklearn.base import clone
 from sklearn.externals.joblib import Parallel, delayed, Memory
 from sklearn.utils import check_random_state
 
 
 def single_run(estimator, data):
-    print('')
-    warmup_estimator = clone(estimator)
-    for i in range(10):
-        print('Epoch %i' % i)
-        this_data = data.copy()
-        this_data -= np.mean(this_data, axis=0)
-        this_data /= np.std(this_data, axis=0)
-        warmup_estimator.partial_fit(this_data, deprecated=False)
-    estimator.set_params(dict_init=warmup_estimator.components_)
-    for i in range(200):
+    print('        ')
+    for i in range(30):
         print('New epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)
@@ -44,15 +35,37 @@ def run():
     print('Learning the dictionary... ')
     rng = check_random_state(30)
     estimators = []
+    warmup_estimator = IncrementalSparsePCA(n_components=30, alpha=0.01,
+                                         n_iter=100000,
+                                         random_state=rng,
+                                         batch_size=20,
+                                         debug_info=True,
+                                         support=False,
+                                         feature_ratio=1)
+    for i in range(10):
+        print('Epoch %i' % i)
+        this_data = data.copy()
+        this_data -= np.mean(this_data, axis=0)
+        this_data /= np.std(this_data, axis=0)
+        warmup_estimator.partial_fit(this_data, deprecated=False)
+    dict_init = warmup_estimator.components_
     for support in [False, True]:
-        estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.0001,
+        estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.01,
                                                n_iter=100000,
-                                               random_state=rng, verbose=2,
+                                               random_state=rng,
                                                batch_size=20,
                                                debug_info=True,
+                                               dict_init=dict_init,
                                                support=support,
                                                feature_ratio=10))
-
+    # estimators.append(IncrementalSparsePCA(n_components=30, alpha=0.01,
+    #                                        n_iter=100000,
+    #                                        random_state=rng,
+    #                                        batch_size=20,
+    #                                        debug_info=True,
+    #                                        dict_init=dict_init,
+    #                                        support=True,
+    #                                        feature_ratio=10))
     t0 = time.time()
 
     mem = Memory(cachedir=expanduser('~/sklearn_cache'), verbose=10)
@@ -73,19 +86,21 @@ def run():
             if np.sum(component > 0) < np.sum(component < 0):
                 component *= -1
             ax = fig.add_subplot(len(estimators), 4, 4 * j + i + 1)
-            ax.imshow(component.reshape(faces.images[0].shape), cmap=plt.cm.gray,
-                       interpolation='nearest')
+            ax.imshow(component.reshape(faces.images[0].shape),
+                      cmap=plt.cm.gray,
+                      interpolation='nearest')
             ax.set_xticks(())
             ax.set_yticks(())
         ax = fig.add_subplot(len(estimators), 4, 4 * j + 4)
         ax.text(.5, .5,
-                  'ratio: %.2f' % estimator.feature_ratio,
-                  ha='center', va='center', transform=ax.transAxes)
+                'ratio: %.2f' % estimator.feature_ratio,
+                ha='center', va='center', transform=ax.transAxes)
         ax.set_xticks(())
         ax.set_yticks(())
         ax.axis('off')
     plt.tight_layout(pad=0.4, w_pad=0.1, h_pad=0.5)
-    plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pdf'))
+    plt.savefig(
+        expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pdf'))
     # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
 
     fig = plt.figure()
@@ -101,13 +116,14 @@ def run():
             ax.set_yticks(())
         ax = fig.add_subplot(len(estimators), 4, 4 * j + 4)
         ax.text(.5, .5,
-                  'ratio: %.2f' % estimator.feature_ratio,
-                  ha='center', va='center', transform=ax.transAxes)
+                'ratio: %.2f' % estimator.feature_ratio,
+                ha='center', va='center', transform=ax.transAxes)
         ax.set_xticks(())
         ax.set_yticks(())
         ax.axis('off')
     plt.tight_layout(pad=0.4, w_pad=0.1, h_pad=0.5)
-    plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/reconstruction.pdf'))
+    plt.savefig(expanduser(
+        '~/work/papers/11_2015_sparse_pca/figures/reconstruction.pdf'))
     # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
 
 
@@ -118,10 +134,11 @@ def run():
                  label='ratio %.2f' % estimator.feature_ratio)
         plt.xlabel('Time (s)')
         plt.ylabel('Objective value')
-        plt.ylim([0, 1800])
+        plt.ylim([0, 2500])
         plt.legend(ncol=2)
     plt.tight_layout(pad=0.4)
-    plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/residuals.pdf'))
+    plt.savefig(
+        expanduser('~/work/papers/11_2015_sparse_pca/figures/residuals.pdf'))
     # plt.savefig(expanduser('~/work/papers/11_2015_sparse_pca/figures/components.pgf'))
 
 

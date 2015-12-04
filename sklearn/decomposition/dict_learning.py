@@ -312,8 +312,10 @@ def sparse_encode(X, dictionary, gram=None, cov=None, algorithm='lasso_lars',
 
 
 def _simpler_update_dict(dictionary, B, A, subset,
+                         seen=None,
                          return_r2=False,
                          l1_ratio=0.,
+                         update_support=False,
                          verbose=False,
                          shuffle=False,
                          random_state=None):
@@ -328,28 +330,33 @@ def _simpler_update_dict(dictionary, B, A, subset,
         component_range = np.arange(n_components)
 
     for k in component_range:
-        radius = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
         scale = A[k, k]
-        support = np.where(dictionary[:, k] != 0)[0]
-        this_subset = np.union1d(subset, support)
+        if update_support:
+            support = np.where(dictionary[:, k] != 0)[0]
+            if seen is not None:
+                support = np.intersect1d(support, seen, assume_unique=True)
+            this_subset = np.union1d(subset, support)
+        else:
+            this_subset = subset
+        radius = enet_norm(dictionary[this_subset, k], l1_ratio=l1_ratio)
         if scale < threshold:
             dictionary[this_subset, k] = 0
         else:
             grad = - B[this_subset, k] + dictionary[this_subset].dot(A[:, k])
             dictionary[this_subset, k] -= grad / scale
 
-        atom_norm_square = np.sum(dictionary[:, k] ** 2)
+        atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
         if atom_norm_square < threshold:
             if verbose == 1:
                 sys.stdout.write("+")
                 sys.stdout.flush()
             elif verbose:
                 print("Adding new random atom")
-            dictionary[:, k] = random_state.randn(n_features)
+            dictionary[this_subset, k] = random_state.randn(n_features)
             if l1_ratio != 0.:
                 # Normalizating new random atom before enet projection
-                dictionary[:, k] /= sqrt(atom_norm_square) / radius
-            atom_norm_square = np.sum(dictionary[:, k] ** 2)
+                dictionary[this_subset, k] /= sqrt(atom_norm_square) / radius
+            atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
             # Setting corresponding coefs to 0
             A[k, :] = 0.0
             A[:, k] = 0.0
@@ -359,7 +366,7 @@ def _simpler_update_dict(dictionary, B, A, subset,
                 dictionary[this_subset, k],
                 radius=radius,
                 l1_ratio=l1_ratio,
-                check_input=False)
+                check_input=True)
         else:
             dictionary[this_subset, k] /= sqrt(atom_norm_square) / radius
     if return_r2:
@@ -460,6 +467,7 @@ def _update_dict(dictionary, Y, code, verbose=False,
             atom_norm_square = np.sum(dictionary[:, k] ** 2)
             # Setting corresponding coefs to 0
             code[k, :] = 0.0
+            code[:, k] = 0.0
 
         # Projecting onto the norm ball
         if l1_ratio != 0.:
@@ -472,23 +480,23 @@ def _update_dict(dictionary, Y, code, verbose=False,
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(-1.0, dictionary[:, k], code[k, :],
                 a=R, overwrite_a=True)
-    if return_r2:
-        if online:
-            # Y = B_t, code = A_t, dictionary = D in online setting
-            R += Y
-            # residual = 1 / 2 Tr(D^T D A_t) - Tr(D^T B_t)
-            residual = -np.sum(dictionary * R) / 2
-        else:
-            R **= 2
-            # R is fortran-ordered. For numpy version < 1.6, sum does not
-            # follow the quick striding first, and is thus inefficient on
-            # fortran ordered data. We take a flat view of the data with no
-            # striding
-            R = as_strided(R, shape=(R.size,), strides=(R.dtype.itemsize,))
-            residual = np.sum(R)
+    # if return_r2:
+    #     if online:
+    #         # Y = B_t, code = A_t, dictionary = D in online setting
+    #         R += Y
+    #         # residual = 1 / 2 Tr(D^T D A_t) - Tr(D^T B_t)
+    #         residual = -np.sum(dictionary * R) / 2
+    #     else:
+    #         R **= 2
+    #         # R is fortran-ordered. For numpy version < 1.6, sum does not
+    #         # follow the quick striding first, and is thus inefficient on
+    #         # fortran ordered data. We take a flat view of the data with no
+    #         # striding
+    #         R = as_strided(R, shape=(R.size,), strides=(R.dtype.itemsize,))
+    #         residual = np.sum(R)
 
     if return_r2:
-        return dictionary, residual
+        return dictionary, 0
     else:
         return dictionary
 
@@ -949,16 +957,14 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
         B[subset] += np.dot(this_X[:, subset].T,
                             this_code.T) / count_seen_features[subset,
                                                                np.newaxis]
-
         total_time += time.time() - t0
+
         A_ref *= 1 - len_batch / n_seen_samples
         A_ref += np.dot(this_code, this_code.T) / n_seen_samples
         B_ref *= 1 - len_batch / n_seen_samples
         B_ref += np.dot(this_X.T, this_code.T) / n_seen_samples
         # Update dictionary
-
         t0 = time.time()
-
         if not support:
             dictionary[subset], objective_cost = _update_dict(
                 subset_dictionary,
@@ -968,17 +974,19 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 random_state=random_state,
                 return_r2=True,
                 shuffle=shuffle)
-            total_time += time.time() - t0
         else:
+            seen = np.where(count_seen_features > 0)[0]
             dictionary, objective_cost = _simpler_update_dict(
-                dictionary,
-                B, A,
-                subset,
-                verbose=verbose,
-                l1_ratio=l1_ratio,
-                random_state=random_state,
-                return_r2=True,
-                shuffle=shuffle)
+                    dictionary,
+                    B, A,
+                    subset,
+                    seen=seen,
+                    update_support=support,
+                    verbose=verbose,
+                    l1_ratio=l1_ratio,
+                    random_state=random_state,
+                    return_r2=True,
+                    shuffle=shuffle)
         total_time += time.time() - t0
 
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
