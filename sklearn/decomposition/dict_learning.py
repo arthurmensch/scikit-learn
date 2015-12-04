@@ -367,6 +367,75 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
     return code
 
 
+
+
+def _simpler_update_dict(dictionary, B, A, subset,
+                         seen=None,
+                         return_r2=False,
+                         l1_ratio=0.,
+                         update_support=False,
+                         verbose=False,
+                         shuffle=False,
+                         random_state=None):
+    threshold = 1e-20
+    n_components = len(A)
+    n_features = B.shape[0]
+    random_state = check_random_state(random_state)
+
+    if shuffle:
+        component_range = random_state.permutation(n_components)
+    else:
+        component_range = np.arange(n_components)
+
+    for k in component_range:
+        scale = A[k, k]
+        if update_support:
+            support = np.where(dictionary[:, k] != 0)[0]
+            if seen is not None:
+                support = np.intersect1d(support, seen, assume_unique=True)
+            this_subset = np.union1d(subset, support)
+        else:
+            this_subset = subset
+        radius = enet_norm(dictionary[this_subset, k], l1_ratio=l1_ratio)
+        if radius == 0:
+            radius = 1
+        if scale < threshold:
+            dictionary[this_subset, k] = 0
+        else:
+            grad = - B[this_subset, k] + dictionary[this_subset].dot(A[:, k])
+            dictionary[this_subset, k] -= grad / scale
+
+        atom_norm_square = np.sum(dictionary[this_subset, k] ** 2) / radius
+        if atom_norm_square == 0:
+            atom_norm_square = 1
+        # if atom_norm_square < threshold:
+        #     if verbose == 1:
+        #         sys.stdout.write("+")
+        #         sys.stdout.flush()
+        #     elif verbose:
+        #         print("Adding new random atom")
+        #     dictionary[this_subset, k] = random_state.randn(n_features)
+        #     if l1_ratio != 0.:
+        #         # Normalizating new random atom before enet projection
+        #         dictionary[this_subset, k] /= sqrt(atom_norm_square) / radius
+        #     atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
+        #     # Setting corresponding coefs to 0
+        #     A[k, :] = 0.0
+        #     A[:, k] = 0.0
+        # Projecting onto the norm ball
+        if l1_ratio != 0.:
+            dictionary[this_subset, k] = enet_projection(
+                dictionary[this_subset, k],
+                radius=radius,
+                l1_ratio=l1_ratio,
+                check_input=True)
+        else:
+            dictionary[this_subset, k] /= sqrt(atom_norm_square)
+    if return_r2:
+        return dictionary, 0
+    else:
+        return dictionary
+
 def _update_dict(dictionary, Y, code, verbose=False,
                  return_r2=False,
                  l1_ratio=0., online=False, shuffle=False,
@@ -980,24 +1049,18 @@ def dict_learning_online(X, n_components=2, alpha=1,
         # Update dictionary
 
         t0 = time.time()
-        dictionary[subset], objective_cost = _update_dict(
-            check_array(dictionary[subset], order='F'),
-            B[subset], A,
+        dictionary, objective_cost = _simpler_update_dict(
+            dictionary,
+
+            B, A,
+            subset,
+            seen=np.where(count_seen_features > 0)[0],
             verbose=verbose,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=True,
-            online=True, shuffle=shuffle)
-        # support = np.any(dictionary != 0, axis=1)
-        # dictionary[support], objective_cost = _update_dict(
-        #     dictionary[support],
-        #     B[support], A,
-        #     verbose=verbose,
-        #     l1_ratio=l1_ratio,
-        #     random_state=random_state,
-        #     return_r2=True,
-        #     online=True, shuffle=shuffle)
-        # print(np.sum((dictionary - old_dict) ** 2, axis = 0))
+            shuffle=shuffle)
+
         total_time += time.time() - t0
         total_time += time.time() - t0
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)

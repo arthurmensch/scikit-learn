@@ -15,10 +15,6 @@ from sklearn.linear_model import ridge_regression
 from sklearn.utils import check_random_state, gen_batches
 import matplotlib.pyplot as plt
 
-from sklearn.utils.sparsefuncs_fast import csr_row_norms
-from sklearn.utils.sparsefuncs import inplace_csr_row_scale
-
-
 def csr_rmse(y, y_pred):
     if np.isnan(y_pred.data).any():
         raise ValueError
@@ -145,11 +141,10 @@ class BaseRecommender(BaseEstimator):
         pass
 
     def fit(self, X):
-        X = X.copy()
         print("Centering data")
-        _, self.global_mean_, \
+        X, self.global_mean_, \
         self.user_mean_, \
-        self.movie_mean_ = csr_inplace_center_data(X)
+        self.movie_mean_ = csr_center_data(X)
 
     def transform(self, X):
         X = X.copy()
@@ -207,14 +202,8 @@ class SPCARecommender(BaseEstimator):
 
     def fit(self, X, y=None, probe=None, probe_freq=100):
         X = X.copy()
-        print("Centering data")
-        X, self.global_mean_, \
-        self.user_mean_, \
-        self.movie_mean_ = csr_inplace_center_data(X)
-        # self.norms_ = csr_row_norms(X)
-        # print(self.norms_)
-        # self.norms_[self.norms_ == 0] = 1
-        # inplace_csr_row_scale(X, 1 / self.norms_)
+        interaction = X.copy()
+        interaction.data[:] = 0
         random_state = check_random_state(self.random_state)
         seeds = random_state.randint(0, np.iinfo(np.uint32).max,
                                      size=[self.n_runs])
@@ -233,13 +222,29 @@ class SPCARecommender(BaseEstimator):
         self.code_ = np.zeros((X.shape[0], self.n_components))
         last_seen = 0
         for i in range(self.n_epochs):
+            print("Centering data")
+            X.data -= interaction.data
+            Xc, self.global_mean_, self.user_mean_, self.movie_mean_ = csr_center_data(X)
+            print(self.user_mean_)
+            X.data += interaction.data
+            Xc.data += interaction.data
+            # incr_spca = IncrementalSparsePCA(n_components=self.n_components,
+            #                                  alpha=self.alpha,
+            #                                  l1_ratio=self.l1_ratio,
+            #                                  batch_size=self.batch_size,
+            #                                  shuffle=True,
+            #                                  n_iter=n_iter,
+            #                                  missing_values=0,
+            #                                  verbose=10,
+            #                                  transform_alpha=self.alpha,
+            #                                  debug_info=True)
             batches = gen_batches(X.shape[0],
                                   probe_freq)
             for batch in batches:
                 last_seen = max(batch.stop, last_seen)
-                incr_spca.partial_fit(X[batch], deprecated=False)
+                incr_spca.partial_fit(Xc[batch], deprecated=False)
 
-                self.code_[:last_seen] = incr_spca.transform(X[:last_seen])
+                self.code_[:last_seen] = incr_spca.transform(Xc[:last_seen])
                 self.dictionary_ = incr_spca.components_
                 self.residuals_ = incr_spca.debug_info_['residuals']
                 self.density_ = incr_spca.debug_info_['density']
@@ -277,6 +282,12 @@ class SPCARecommender(BaseEstimator):
                         np.save(join(self.debug_folder, 'count_seen_features'),
                                 self.count_seen_features_)
                         draw_stats(self.debug_folder)
+            for i in range(X.shape[0]):
+                if X.indptr[i] < X.indptr[i + 1]:
+                    indices = X.indices[X.indptr[i]:X.indptr[i + 1]]
+                    interaction.data[X.indptr[i]:X.indptr[i + 1]] = \
+                        self.code_[i].dot(self.dictionary_[:, indices])
+            # incr_spca.inner_stats_ = None
             # (A, B, Ap, Bp, residual_stat, A_ref, B_ref) = incr_spca.inner_stats_
             # incr_spca.inner_stats_ = (Ap, Bp, np.zeros_like(A), np.zeros_like(B),
             #                           residual_stat, A_ref, B_ref)
@@ -292,7 +303,7 @@ class SPCARecommender(BaseEstimator):
                 interaction = self.code_[i].dot(self.dictionary_[:, indices])
                 # inter_mean += interaction.mean() ** 2
                 # interaction -= interaction.mean()
-                X.data[X.indptr[i]:X.indptr[i + 1]] += interaction # * self.norms_[i]
+                X.data[X.indptr[i]:X.indptr[i + 1]] += interaction
         X.data += self.movie_mean_.take(X.indices, mode='clip')
         return X
 
@@ -460,7 +471,9 @@ def CsrRowStratifiedShuffleSplit(X, n_splits=5, test_size=0.1, train_size=None,
         yield X_train, X_test
 
 
-def csr_inplace_center_data(X):
+def csr_center_data(X, inplace=False):
+    if not inplace:
+        X = X.copy()
     w_global = 0
 
     acc_u = np.zeros(X.shape[0])
@@ -574,7 +587,7 @@ def run(n_jobs=1):
     os.makedirs(output_dir)
     recommenders = [SPCARecommender(n_components=n_components,
                                     batch_size=batch_size,
-                                    n_epochs=6,
+                                    n_epochs=5,
                                     n_runs=1,
                                     alpha=alpha,
                                     memory=mem,
@@ -583,7 +596,7 @@ def run(n_jobs=1):
                     for n_components in [50]
                     for batch_size in [10]
                     for l1_ratio in [0]
-                    for alpha in np.logspace(1, 3, num=5)]
+                    for alpha in [100]]
     # recommenders = [SPCARecommender(n_components=20,
     #                                 batch_size=1,
     #                                 alpha=0.1,
@@ -600,5 +613,5 @@ def run(n_jobs=1):
 
 
 if __name__ == '__main__':
-    run(n_jobs=8)
+    run(n_jobs=1)
     # gather_results(expanduser('~/output/movielens/2015-12-02_14-38-20'))
