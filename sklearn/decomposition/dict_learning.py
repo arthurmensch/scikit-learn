@@ -19,7 +19,7 @@ from ..utils import (check_array, check_random_state, gen_even_slices,
                      gen_batches, _get_n_jobs, gen_cycling_subsets)
 from ..utils.extmath import randomized_svd, row_norms, safe_sparse_dot
 from ..utils.validation import check_is_fitted
-from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, Ridge, \
+from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, \
     ridge_regression
 from ..utils.enet_projection import enet_projection, enet_scale, enet_norm
 
@@ -1026,12 +1026,12 @@ def dict_learning_online(X, n_components=2, alpha=1,
             check_input=False,
             max_iter=3000,
             random_state=random_state).T
-        A *= 1 - len_batch / n_seen_samples
-        A += np.dot(this_code, this_code.T) / n_seen_samples
-        B[subset] *= 1 - len_batch / count_seen_features[subset, np.newaxis]
+        A *= 1 - len_batch / sqrt(n_seen_samples)
+        A += np.dot(this_code, this_code.T) / sqrt(n_seen_samples)
+        B[subset] *= 1 - len_batch / np.sqrt(count_seen_features[subset, np.newaxis])
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
-                                     this_code.T) / count_seen_features[subset,
-                                                                        np.newaxis]
+                                     this_code.T) / np.sqrt(count_seen_features[subset,
+                                                                        np.newaxis])
 
         # Ap *= 1 - len_batch / n_seen_samples
         # Ap += np.dot(this_code, this_code.T) / n_seen_samples
@@ -1042,43 +1042,49 @@ def dict_learning_online(X, n_components=2, alpha=1,
         #                   np.newaxis]
 
         total_time += time.time() - t0
-        A_ref *= (1 - len_batch / n_seen_samples)
-        A_ref += np.dot(this_code, this_code.T) / n_seen_samples
-        B_ref *= (1 - len_batch / n_seen_samples)
-        B_ref += safe_sparse_dot(this_X.T, this_code.T) / n_seen_samples
+        A_ref *= (1 - len_batch / sqrt(n_seen_samples))
+        A_ref += np.dot(this_code, this_code.T) / sqrt(n_seen_samples)
+        B_ref *= (1 - len_batch / sqrt(n_seen_samples))
+        B_ref += safe_sparse_dot(this_X.T, this_code.T) / sqrt(n_seen_samples)
         # Update dictionary
 
         t0 = time.time()
-        dictionary, objective_cost = _simpler_update_dict(
-            dictionary,
-
-            B, A,
-            subset,
-            seen=np.where(count_seen_features > 0)[0],
-            verbose=verbose,
-            l1_ratio=l1_ratio,
-            random_state=random_state,
-            return_r2=True,
-            shuffle=shuffle)
+        # dictionary, objective_cost = _simpler_update_dict(dictionary,
+        #     B, A,
+        #     subset,
+        #     seen=np.where(count_seen_features > 0)[0],
+        #     verbose=verbose,
+        #     l1_ratio=l1_ratio,
+        #     random_state=random_state,
+        #     return_r2=True,
+        #     shuffle=shuffle)
+        dictionary[subset], objective_cost = _update_dict(
+                    check_array(dictionary[subset], order='F'),
+                    B[subset], A,
+                    verbose=verbose,
+                    l1_ratio=l1_ratio,
+                    random_state=random_state,
+                    return_r2=True,
+                    online=True, shuffle=shuffle)
 
         total_time += time.time() - t0
         total_time += time.time() - t0
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
         objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
-        norm_cost *= (1 - len_batch / n_seen_samples)
+        norm_cost *= (1 - len_batch / sqrt(n_seen_samples))
         if sp.issparse(this_X):
             norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(
-                subset) / n_seen_samples
+                subset) / sqrt(n_seen_samples)
         else:
-            norm_cost += .5 * np.sum(this_X ** 2) / n_seen_samples
+            norm_cost += .5 * np.sum(this_X ** 2) / sqrt(n_seen_samples)
 
-        penalty_cost *= (1 - len_batch / n_seen_samples)
+        penalty_cost *= (1 - len_batch / sqrt(n_seen_samples))
         if method in ('lasso_lars', 'lasso_cd'):
             penalty_cost += alpha * np.sum(
-                np.abs(this_code)) / n_seen_samples
+                np.abs(this_code)) / sqrt(n_seen_samples)
         else:
-            penalty_cost += alpha * np.sum(this_code ** 2) / n_seen_samples
+            penalty_cost += alpha * np.sum(this_code ** 2) / sqrt(n_seen_samples)
         current_cost = objective_cost + norm_cost + penalty_cost
 
         # XXX to remove
