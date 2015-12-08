@@ -310,7 +310,7 @@ def main():
 
     dl_rec = DLRecommender(n_components=50,
                            batch_size=10,
-                           n_epochs=1,
+                           n_epochs=3,
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
