@@ -367,8 +367,6 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
     return code
 
 
-
-
 def _simpler_update_dict(dictionary, B, A, subset,
                          seen=None,
                          return_r2=False,
@@ -435,6 +433,7 @@ def _simpler_update_dict(dictionary, B, A, subset,
         return dictionary, 0
     else:
         return dictionary
+
 
 def _update_dict(dictionary, Y, code, verbose=False,
                  return_r2=False,
@@ -1007,9 +1006,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
             if verbose > 10 or ii % ceil(100. / verbose) == 0:
                 print("Iteration % 3i (elapsed time: % 3is, % 4.1fmn)"
                       % (ii, dt, dt / 60))
-                # print("Empty rows: %i" % np.sum(np.all(dictionary == 0, axis=1)))
-                # print("Enet norm: %s" % (enet_norm(dictionary.T,
-                #                                   l1_ratio=l1_ratio) / radius))
 
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
@@ -1028,10 +1024,12 @@ def dict_learning_online(X, n_components=2, alpha=1,
             random_state=random_state).T
         A *= 1 - len_batch / sqrt(n_seen_samples)
         A += np.dot(this_code, this_code.T) / sqrt(n_seen_samples)
-        B[subset] *= 1 - len_batch / np.sqrt(count_seen_features[subset, np.newaxis])
+        B[subset] *= 1 - len_batch / np.sqrt(
+            count_seen_features[subset, np.newaxis])
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
-                                     this_code.T) / np.sqrt(count_seen_features[subset,
-                                                                        np.newaxis])
+                                     this_code.T) / np.sqrt(
+            count_seen_features[subset,
+                                np.newaxis])
 
         # Ap *= 1 - len_batch / n_seen_samples
         # Ap += np.dot(this_code, this_code.T) / n_seen_samples
@@ -1050,14 +1048,14 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
         t0 = time.time()
         # dictionary, objective_cost = _simpler_update_dict(dictionary,
-        #     B, A,
-        #     subset,
-        #     seen=np.where(count_seen_features > 0)[0],
-        #     verbose=verbose,
-        #     l1_ratio=l1_ratio,
-        #     random_state=random_state,
-        #     return_r2=True,
-        #     shuffle=shuffle)
+        #                                                   B, A,
+        #                                                   subset,
+        #                                                   seen=np.where(count_seen_features > 0)[0],
+        #                                                   verbose=verbose,
+        #                                                   l1_ratio=l1_ratio,
+        #                                                   random_state=random_state,
+        #                                                   return_r2=True,
+        #                                                   shuffle=shuffle)
         dictionary[subset], objective_cost = _update_dict(
                     check_array(dictionary[subset], order='F'),
                     B[subset], A,
@@ -1084,7 +1082,8 @@ def dict_learning_online(X, n_components=2, alpha=1,
             penalty_cost += alpha * np.sum(
                 np.abs(this_code)) / sqrt(n_seen_samples)
         else:
-            penalty_cost += alpha * np.sum(this_code ** 2) / sqrt(n_seen_samples)
+            penalty_cost += alpha * np.sum(this_code ** 2) / sqrt(
+                n_seen_samples)
         current_cost = objective_cost + norm_cost + penalty_cost
 
         # XXX to remove
