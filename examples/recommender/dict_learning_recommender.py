@@ -385,7 +385,7 @@ def main():
                          param_grid={'alpha': np.logspace(-2, 2, 10)},
                          n_jobs=20,
                          cv=ShuffleSplit(X_train.shape[0],
-                                         n_iter=2, test_size=.1),
+                                         n_iter=4, test_size=.1),
                          verbose=10)
     dl_cv.fit(X_train, y_train)
     score = dl_cv.score(X_test, y_test)
