@@ -46,13 +46,56 @@ def csr_center_data(X, inplace=False):
     return X, w_global, acc_u, acc_m
 
 
+def draw_stats(debug_folder):
+    residuals = np.load(join(debug_folder, 'residuals.npy'))
+    density = np.load(join(debug_folder, 'density.npy'))
+    values = np.load(join(debug_folder, 'values.npy'))
+    # dictionary = np.load(join(debug_folder, 'dictionary.npy'))
+    # code = np.load(join(debug_folder, 'code.npy'))
+    probe_score = np.load(join(debug_folder, 'probe_score.npy'))
+
+    fig = plt.figure()
+    plt.plot(np.arange(len(residuals)), residuals)
+    plt.savefig(join(debug_folder, 'residuals.pdf'))
+    plt.close(fig)
+
+    fig = plt.figure()
+    plt.plot(np.arange(len(values)), values)
+    plt.savefig(join(debug_folder, 'values.pdf'))
+    plt.close(fig)
+
+    fig = plt.figure()
+    plt.plot(np.arange(len(density)), density)
+    plt.savefig(join(debug_folder, 'density.pdf'))
+    plt.close(fig)
+
+    fig = plt.figure()
+    plt.plot(probe_score[:, 0], probe_score[:, 1:], marker='o')
+    plt.savefig(join(debug_folder, 'probe_score.pdf'))
+    plt.close(fig)
+
+    # fig = plt.figure(figsize=(10, 10))
+    # plt.matshow(dictionary[:, :1000])
+    # plt.colorbar()
+    # plt.savefig(join(debug_folder, 'dictionary.pdf'))
+    # plt.close(fig)
+    #
+    # fig = plt.figure(figsize=(10, 10))
+    # plt.matshow(code[:1000].reshape((-1, code.shape[1] * 2)))
+    # plt.colorbar()
+    # plt.savefig(join(debug_folder, 'code.pdf'))
+    # plt.close(fig)
+
+    plt.close('all')
+
+
 class BaseRecommender(BaseEstimator, RegressorMixin):
     def __init__(self):
         pass
 
     def score(self, X, y, sample_weight=None):
         y_hat = self.predict(X)
-        return sqrt(mean_squared_error(y, y_hat, sample_weight=sample_weight))
+        return - sqrt(mean_squared_error(y, y_hat, sample_weight=sample_weight))
 
     def fit(self, X, y, **dump_kwargs):
         X_csr = fm_format_to_csr_matrix(X, y)
@@ -93,7 +136,7 @@ class DLRecommender(BaseEstimator, RegressorMixin):
 
     def score(self, X, y, sample_weight=None):
         y_hat = self.predict(X)
-        return sqrt(mean_squared_error(y, y_hat, sample_weight=sample_weight))
+        return - sqrt(mean_squared_error(y, y_hat, sample_weight=sample_weight))
 
     def predict(self, X):
         y_hat = np.zeros(X.shape[0])
@@ -145,7 +188,7 @@ class DLRecommender(BaseEstimator, RegressorMixin):
              self.sample_mean_, self.feature_mean_) = csr_center_data(X_ref)
             X_ref.data += interaction.data
             X_csr.data += interaction.data
-                permutation = random_state.permutation(X_csr.shape[0])
+            permutation = random_state.permutation(X_csr.shape[0])
 
             if self.debug_folder is not None:
                 batches = gen_batches(X_csr.shape[0],
@@ -163,7 +206,10 @@ class DLRecommender(BaseEstimator, RegressorMixin):
                                     **dump_kwargs)
             else:
                 dict_learning.partial_fit(X_csr[permutation], deprecated=False)
-                self.code_ = dict_learning.transform(X_csr)
+
+            self.dictionary_ = dict_learning.components_
+            self.code_ = dict_learning.transform(X_csr)
+
 
             for j in range(X_csr.shape[0]):
                 indices = X_csr.indices[X_csr.indptr[j]:X_csr.indptr[j + 1]]
@@ -235,66 +281,6 @@ def fm_format_to_csr_matrix(X, y, return_lists=False):
         return X_csr, (samples, features)
 
 
-def fit_score_and_dump(estimators, X_csr, random_state=None):
-    X, y = array_to_fm_format(X_csr)
-    print('Splitting')
-    X_train, X_test, y_train, y_test = train_test_split(X,
-                                                        y,
-                                                        test_size=.1,
-                                                        random_state=random_state)
-    print('Done')
-    for estimator in estimators:
-        estimator.fit(X_train, y_train, probe_list=((X_test, y_test),
-                                                    (X_train, y_train)))
-        score = estimator.score(X_test, y_test)
-        print('RMSE: %.3f' % score)
-        if hasattr(estimator, 'grid_scores'):
-            print(grid_scores)
-
-
-def draw_stats(debug_folder):
-    residuals = np.load(join(debug_folder, 'residuals.npy'))
-    density = np.load(join(debug_folder, 'density.npy'))
-    values = np.load(join(debug_folder, 'values.npy'))
-    # dictionary = np.load(join(debug_folder, 'dictionary.npy'))
-    # code = np.load(join(debug_folder, 'code.npy'))
-    probe_score = np.load(join(debug_folder, 'probe_score.npy'))
-
-    fig = plt.figure()
-    plt.plot(np.arange(len(residuals)), residuals)
-    plt.savefig(join(debug_folder, 'residuals.pdf'))
-    plt.close(fig)
-
-    fig = plt.figure()
-    plt.plot(np.arange(len(values)), values)
-    plt.savefig(join(debug_folder, 'values.pdf'))
-    plt.close(fig)
-
-    fig = plt.figure()
-    plt.plot(np.arange(len(density)), density)
-    plt.savefig(join(debug_folder, 'density.pdf'))
-    plt.close(fig)
-
-    fig = plt.figure()
-    plt.plot(probe_score[:, 0], probe_score[:, 1:], marker='o')
-    plt.savefig(join(debug_folder, 'probe_score.pdf'))
-    plt.close(fig)
-
-    # fig = plt.figure(figsize=(10, 10))
-    # plt.matshow(dictionary[:, :1000])
-    # plt.colorbar()
-    # plt.savefig(join(debug_folder, 'dictionary.pdf'))
-    # plt.close(fig)
-    #
-    # fig = plt.figure(figsize=(10, 10))
-    # plt.matshow(code[:1000].reshape((-1, code.shape[1] * 2)))
-    # plt.colorbar()
-    # plt.savefig(join(debug_folder, 'code.pdf'))
-    # plt.close(fig)
-
-    plt.close('all')
-
-
 def main():
     output_dir = expanduser(join('~/output/dl_recommender/',
                                  datetime.datetime.now().strftime('%Y-%m-%d_%H'
@@ -304,23 +290,45 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True, n_users=1000)
+                                   remove_empty=True)
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
+
+    X, y = array_to_fm_format(data)
+
+    X_train, X_test, y_train, y_test = train_test_split(X,
+                                                        y,
+                                                        test_size=.1,
+                                                        random_state=random_state)
+
+
     base_estimator = BaseRecommender()
+
+    base_estimator.fit(X_train, y_train)
+    score = base_estimator.score(X_test, y_test)
+    print('RMSE base: %.3f' % score)
+
     dl_rec = DLRecommender(n_components=50,
                            batch_size=10,
-                           n_epochs=3,
+                           n_epochs=1,
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
                            debug_folder=None,
                            random_state=random_state)
-    GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-3, 3, 14)},
-                 n_jobs=32, cv=ShuffleSplit(n_iter=3, test_size=.1))
-    estimators = [base_estimator, dl_rec]
-    fit_score_and_dump(estimators, data, random_state=random_state)
+    # dl_rec.fit(X_train, y_train)
+    # score = dl_rec.score(X_test, y_test)
+    # print('RMSE (non cv): %.3f' % score)
 
+    dl_cv = GridSearchCV(dl_rec,
+                          param_grid={'alpha': np.logspace(-3, 3, 10)},
+                          n_jobs=30,
+                          cv=ShuffleSplit(X_train.shape[0],
+                                          n_iter=3, test_size=.1))
+    dl_cv.fit(X_train, y_train)
+    score = dl_cv.score(X_test, y_test)
+    print('RMSE: %.3f' % score)
+    print(dl_cv.grid_scores_)
 
 if __name__ == '__main__':
     main()
