@@ -108,14 +108,16 @@ class BaseRecommender(BaseEstimator, RegressorMixin):
 
         return self
 
-    def predict(self, X):
-        y_hat = np.zeros(X.shape[0])
-        X_csr = self.fm_decoder.fit_transform(X, y_hat)
+    def _predict(self, X_csr):
         for i in range(X_csr.shape[0]):
             X_csr.data[X_csr.indptr[i]: X_csr.indptr[i + 1]] += \
                 self.sample_mean_[i]
         X_csr.data += self.feature_mean_.take(X_csr.indices, mode='clip')
 
+    def predict(self, X):
+        y_hat = np.zeros(X.shape[0])
+        X_csr = self.fm_decoder.fit_transform(X, y_hat)
+        self._predict(X_csr)
         return self.fm_decoder.inverse_transform(X_csr, y_only=True)
 
 
@@ -141,14 +143,12 @@ class DLRecommender(BaseRecommender):
     def predict(self, X):
         y_hat = np.zeros(X.shape[0])
         X_csr = self.fm_decoder.fit_transform(X, y_hat)
+        self._predict(X_csr)
         for i in range(X_csr.shape[0]):
-            X_csr.data[X_csr.indptr[i]: X_csr.indptr[i + 1]] += \
-                self.sample_mean_[i]
             indices = X_csr.indices[X_csr.indptr[i]:X_csr.indptr[i + 1]]
             X_csr.data[X_csr.indptr[i]:
             X_csr.indptr[i + 1]] += self.code_[i].dot(
                 self.dictionary_[:, indices])
-        X_csr.data += self.feature_mean_.take(X_csr.indices, mode='clip')
 
         return self.fm_decoder.inverse_transform(X_csr, y_only=True)
 
@@ -264,7 +264,7 @@ class DLRecommender(BaseRecommender):
             np.save(join(self.debug_folder, 'values'), values)
         draw_stats(self.debug_folder)
 
-
+# This class is rather on the WTF side
 class FMDecoder(BaseEstimator, TransformerMixin):
     """We use a state object to keep order of transformed X_oh"""
 
@@ -371,8 +371,8 @@ def main():
     dl_rec = DLRecommender(fm_decoder,
                            n_components=50,
                            batch_size=10,
-                           n_epochs=3,
-                           alpha=100,
+                           n_epochs=1,
+                           alpha=1000,
                            memory=mem,
                            l1_ratio=0.,
                            debug_folder=None,
@@ -382,8 +382,8 @@ def main():
     print('RMSE (non cv): %.3f' % score)
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-1, 3, 8)},
-                         n_jobs=16,
+                         param_grid={'alpha': np.logspace(-2, 2, 10)},
+                         n_jobs=20,
                          cv=ShuffleSplit(X_train.shape[0],
                                          n_iter=2, test_size=.1),
                          verbose=10)
