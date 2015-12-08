@@ -127,7 +127,7 @@ class DLRecommender(BaseRecommender):
                  memory=Memory(cachedir=None),
                  debug_folder=None,
                  ):
-        BaseRecommender.__init__(fm_decoder)
+        BaseRecommender.__init__(self, fm_decoder)
         self.alpha = alpha
         self.l1_ratio = l1_ratio
         self.algorithm = algorithm
@@ -137,11 +137,6 @@ class DLRecommender(BaseRecommender):
         self.n_epochs = n_epochs
         self.memory = memory
         self.debug_folder = debug_folder
-
-    def score(self, X, y, sample_weight=None):
-        y_hat = self.predict(X)
-        return - sqrt(
-            mean_squared_error(y, y_hat, sample_weight=sample_weight))
 
     def predict(self, X):
         y_hat = np.zeros(X.shape[0])
