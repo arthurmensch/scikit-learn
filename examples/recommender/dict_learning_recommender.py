@@ -1,25 +1,27 @@
 import datetime
 import json
 import os
-from os.path import expanduser, join
-import numpy as np
 from math import sqrt
+from os.path import expanduser, join
 
-from multiprocessing import Process
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.sparse as sp
 from nose.tools import assert_greater
 from numpy.testing import assert_array_equal
 from scipy.sparse import csr_matrix
-from sklearn.base import BaseEstimator
+
+from examples.recommender.convex_fm import array_to_fm_format
+from examples.recommender.movielens import fetch_ml_10m
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.base import RegressorMixin
 from sklearn.cross_validation import train_test_split, ShuffleSplit
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory
-from examples.recommender.convex_fm import array_to_fm_format
-from examples.recommender.movielens import fetch_ml_10m
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_array, gen_batches
-import matplotlib.pyplot as plt
 
 
 def csr_center_data(X, inplace=False):
@@ -90,39 +92,42 @@ def draw_stats(debug_folder):
 
 
 class BaseRecommender(BaseEstimator, RegressorMixin):
-    def __init__(self):
-        pass
+    def __init__(self, fm_decoder):
+        self.fm_decoder = fm_decoder
 
     def score(self, X, y, sample_weight=None):
         y_hat = self.predict(X)
-        return - sqrt(mean_squared_error(y, y_hat, sample_weight=sample_weight))
+        return - sqrt(
+            mean_squared_error(y, y_hat, sample_weight=sample_weight))
 
     def fit(self, X, y, **dump_kwargs):
-        X_csr = fm_format_to_csr_matrix(X, y)
+        X_csr = self.fm_decoder.fit_transform(X, y)
         X_csr, self.global_mean_, \
         self.sample_mean_, \
         self.feature_mean_ = csr_center_data(X_csr)
 
+        return self
+
     def predict(self, X):
         y_hat = np.zeros(X.shape[0])
-        X_csr, (samples, features) = fm_format_to_csr_matrix(X,
-                                                             y_hat,
-                                                             return_lists=True)
+        X_csr = self.fm_decoder.fit_transform(X, y_hat)
         for i in range(X_csr.shape[0]):
             X_csr.data[X_csr.indptr[i]: X_csr.indptr[i + 1]] += \
                 self.sample_mean_[i]
         X_csr.data += self.feature_mean_.take(X_csr.indices, mode='clip')
 
-        return X_csr[samples, features].A[0]
+        return self.fm_decoder.inverse_transform(X_csr, y_only=True)
 
 
-class DLRecommender(BaseEstimator, RegressorMixin):
-    def __init__(self, random_state=None, n_components=10,
+class DLRecommender(BaseRecommender):
+    def __init__(self, fm_decoder=None,
+                 random_state=None, n_components=10,
                  alpha=1., l1_ratio=1, algorithm='ridge',
                  n_epochs=1, batch_size=10,
                  memory=Memory(cachedir=None),
                  debug_folder=None,
                  ):
+        BaseRecommender.__init__(fm_decoder)
         self.alpha = alpha
         self.l1_ratio = l1_ratio
         self.algorithm = algorithm
@@ -131,17 +136,16 @@ class DLRecommender(BaseEstimator, RegressorMixin):
         self.random_state = random_state
         self.n_epochs = n_epochs
         self.memory = memory
-
         self.debug_folder = debug_folder
 
     def score(self, X, y, sample_weight=None):
         y_hat = self.predict(X)
-        return - sqrt(mean_squared_error(y, y_hat, sample_weight=sample_weight))
+        return - sqrt(
+            mean_squared_error(y, y_hat, sample_weight=sample_weight))
 
     def predict(self, X):
         y_hat = np.zeros(X.shape[0])
-        X_csr, (samples, features) = fm_format_to_csr_matrix(X, y_hat,
-                                                             return_lists=True)
+        X_csr = self.fm_decoder.fit_transform(X, y_hat)
         for i in range(X_csr.shape[0]):
             X_csr.data[X_csr.indptr[i]: X_csr.indptr[i + 1]] += \
                 self.sample_mean_[i]
@@ -151,12 +155,12 @@ class DLRecommender(BaseEstimator, RegressorMixin):
                 self.dictionary_[:, indices])
         X_csr.data += self.feature_mean_.take(X_csr.indices, mode='clip')
 
-        return X_csr[samples, features].A[0]
+        return self.fm_decoder.inverse_transform(X_csr, y_only=True)
 
     def fit(self, X, y, **dump_kwargs):
         if self.debug_folder is not None:
             self.dump_init()
-        X_ref = fm_format_to_csr_matrix(X, y)
+        X_ref = self.fm_decoder.fit_transform(X, y)
         X_csr = X_ref.copy()
         interaction = csr_matrix((np.empty_like(X_csr.data),
                                   X_csr.indices, X_csr.indptr),
@@ -210,11 +214,12 @@ class DLRecommender(BaseEstimator, RegressorMixin):
             self.dictionary_ = dict_learning.components_
             self.code_ = dict_learning.transform(X_csr)
 
-
             for j in range(X_csr.shape[0]):
                 indices = X_csr.indices[X_csr.indptr[j]:X_csr.indptr[j + 1]]
                 interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
                     self.code_[j].dot(self.dictionary_[:, indices])
+
+        return self
 
     def dump_init(self):
         result_dict = {'n_components': self.n_components,
@@ -265,20 +270,80 @@ class DLRecommender(BaseEstimator, RegressorMixin):
         draw_stats(self.debug_folder)
 
 
-def fm_format_to_csr_matrix(X, y, return_lists=False):
-    assert_array_equal(X.indptr, np.arange(0, (X.shape[0] + 1) * 2, 2))
-    features = np.maximum(X.indices[1::2], X.indices[::2])
-    samples = np.minimum(X.indices[1::2], X.indices[::2])
-    assert_greater(features.min(), samples.max())
-    n_samples = samples.max() + 1
-    n_features = features.max() - features.min() + 1
-    features -= features.min()
+class FMDecoder(BaseEstimator, TransformerMixin):
+    """We use a state object to keep order of transformed X_oh"""
 
-    X_csr = csr_matrix((y, (samples, features)), shape=(n_samples, n_features))
-    if not return_lists:
-        return X_csr
+    def __init__(self, n_samples=None, n_features=None):
+        self.n_samples = n_samples
+        self.n_features = n_features
+
+    def fit(self, X, y=None):
+        assert_array_equal(X.indptr,
+                           np.arange(0, (X.shape[0] + 1) * 2, 2))
+        self.features_ = np.maximum(X.indices[1::2], X.indices[::2])
+        self.samples_ = np.minimum(X.indices[1::2], X.indices[::2])
+        assert_greater(self.features_.min(), self.samples_.max())
+        present_n_samples = self.samples_.max() + 1
+        present_n_features = self.features_.max() - self.features_.min() + 1
+        assert (present_n_samples <= self.n_samples)
+        assert (present_n_features <= self.n_features)
+
+        self.features_ -= self.n_samples
+
+        return self
+
+    def fit_transform(self, X, y=None, **kwargs):
+        return self.fit(X, y).transform(X, y)
+
+    def transform(self, X, y=None):
+        if y is None:
+            y = np.ones_like(self.samples_)
+            y *= -1
+        return csr_matrix((y, (self.samples_,
+                               self.features_)), shape=(self.n_samples,
+                                                        self.n_features))
+
+    def inverse_transform(self, X_csr, y_only=False):
+        assert (X_csr.shape == (self.n_samples, self.n_features))
+        y = X_csr[self.samples_, self.features_].A[0]
+        if y_only:
+            return y
+        else:
+            encoder = OneHotEncoder(n_values=[self.n_samples,
+                                              self.n_features])
+            X_ix = np.column_stack([self.samples_, self.features_])
+            X_oh = encoder.fit_transform(X_ix)
+            return X_oh, y
+
+
+def array_to_fm_format(X):
+    """Converts a dense or sparse array X to factorization machine format.
+    If x[i, j] is represented (if X is sparse) or not nan (if dense)
+    the output will have a row:
+        [one_hot(i), one_hot(j)] -> x[i, j]
+    Parameters
+    ----------
+    X, array-like or sparse
+        Input array
+    Returns
+    -------
+    X_one_hot, sparse array, shape (n_x_entries, X.shape[1] + X.shape[2])
+        Indices of non-empty values in X, in factorization machine format.
+    y: array, shape (n_x_entries,)
+        Non-empty values in X.
+    """
+    X = check_array(X, accept_sparse='coo', force_all_finite=False)
+    n_rows, n_cols = X.shape
+    encoder = OneHotEncoder(n_values=[n_rows, n_cols])
+    if sp.issparse(X):
+        y = X.data
+        X_ix = np.column_stack([X.row, X.col])
     else:
-        return X_csr, (samples, features)
+        ix = np.isfinite(X)
+        X_ix = np.column_stack(np.where(ix))
+        y = X[ix].ravel()
+    X_oh = encoder.fit_transform(X_ix)
+    return X_oh, y
 
 
 def main():
@@ -290,10 +355,11 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True)
+                                   remove_empty=True, n_users=1000)
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
 
+    fm_decoder = FMDecoder(n_samples=data.shape[0], n_features=data.shape[1])
     X, y = array_to_fm_format(data)
 
     X_train, X_test, y_train, y_test = train_test_split(X,
@@ -301,14 +367,14 @@ def main():
                                                         test_size=.1,
                                                         random_state=random_state)
 
-
-    base_estimator = BaseRecommender()
+    base_estimator = BaseRecommender(fm_decoder)
 
     base_estimator.fit(X_train, y_train)
     score = base_estimator.score(X_test, y_test)
     print('RMSE base: %.3f' % score)
 
-    dl_rec = DLRecommender(n_components=50,
+    dl_rec = DLRecommender(fm_decoder,
+                           n_components=50,
                            batch_size=10,
                            n_epochs=3,
                            alpha=100,
@@ -316,19 +382,21 @@ def main():
                            l1_ratio=0.,
                            debug_folder=None,
                            random_state=random_state)
-    # dl_rec.fit(X_train, y_train)
-    # score = dl_rec.score(X_test, y_test)
-    # print('RMSE (non cv): %.3f' % score)
+    dl_rec.fit(X_train, y_train)
+    score = dl_rec.score(X_test, y_test)
+    print('RMSE (non cv): %.3f' % score)
 
     dl_cv = GridSearchCV(dl_rec,
-                          param_grid={'alpha': np.logspace(-3, 3, 10)},
-                          n_jobs=16,
-                          cv=ShuffleSplit(X_train.shape[0],
-                                          n_iter=3, test_size=.1))
+                         param_grid={'alpha': np.logspace(-1, 3, 8)},
+                         n_jobs=16,
+                         cv=ShuffleSplit(X_train.shape[0],
+                                         n_iter=2, test_size=.1),
+                         verbose=10)
     dl_cv.fit(X_train, y_train)
     score = dl_cv.score(X_test, y_test)
     print('RMSE: %.3f' % score)
     print(dl_cv.grid_scores_)
+
 
 if __name__ == '__main__':
     main()
