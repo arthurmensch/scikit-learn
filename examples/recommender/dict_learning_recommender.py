@@ -377,9 +377,9 @@ def main():
                            l1_ratio=0.,
                            debug_folder=None,
                            random_state=random_state)
-    dl_rec.fit(X_train, y_train)
-    score = dl_rec.score(X_test, y_test)
-    print('RMSE (non cv): %.3f' % score)
+    # dl_rec.fit(X_train, y_train)
+    # score = dl_rec.score(X_test, y_test)
+    # print('RMSE (non cv): %.3f' % score)
 
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-2, 2, 10)},
