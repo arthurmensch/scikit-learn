@@ -176,7 +176,7 @@ class DLRecommender(BaseEstimator, RegressorMixin):
                        'batch_size': self.batch_size}
         with open(join(self.debug_folder, 'results.json'), 'w+') as f:
             json.dump(result_dict, f)
-
+#
     def _forked_function(self, dict_learning, X_csr, last_seen,
                          probe_list=[]):
         code = np.zeros((X_csr.shape[0], self.n_components))
