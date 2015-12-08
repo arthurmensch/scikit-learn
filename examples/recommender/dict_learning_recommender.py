@@ -322,7 +322,7 @@ def main():
 
     dl_cv = GridSearchCV(dl_rec,
                           param_grid={'alpha': np.logspace(-3, 3, 10)},
-                          n_jobs=30,
+                          n_jobs=16,
                           cv=ShuffleSplit(X_train.shape[0],
                                           n_iter=3, test_size=.1))
     dl_cv.fit(X_train, y_train)
