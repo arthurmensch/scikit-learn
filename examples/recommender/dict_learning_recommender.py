@@ -413,6 +413,7 @@ def main():
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-3, 3, 7)},
                          n_jobs=20,
+                         error_score='-1000',
                          cv=OHStratifiedShuffleSplit(
                              fm_decoder,
                              n_iter=4, test_size=.1,
