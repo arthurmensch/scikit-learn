@@ -355,28 +355,9 @@ class OHStratifiedShuffleSplit(StratifiedShuffleSplit):
     def _iter_indices(self, X, y, labels=None):
         self.fm_decoder.fit(X)
         samples = self.fm_decoder.samples_
-        # n_samples = len(samples)
-        # if self.train_size is None:
-        #     train_size = 1 - self.test_size
         for train, test in super(OHStratifiedShuffleSplit, self)._iter_indices(
                 X, samples):
             yield train, test
-        # samples_counts = bincount(samples)
-        # count = np.zeros_like(samples)
-        # random_state = check_random_state(self.random_state)
-        # for _ in range(self.n_iter):
-        #     permutation = random_state.permutation(n_samples)
-        #     train = []
-        #     test = []
-        #     for index, sample in zip(permutation, samples[permutation]):
-        #         count[sample] += 1
-        #         if count[sample] <= ceil(self.test_size
-        #                                          * samples_counts[sample]):
-        #             train.append(index)
-        #         elif count[sample] >= ceil((1 - train_size)
-        #                                           * samples_counts[sample]):
-        #             test.append(index)
-        #     yield train, test
 
 
 def main():
@@ -424,11 +405,11 @@ def main():
     print('RMSE (non cv): %.3f' % score)
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-3, 3, 21)},
+                         param_grid={'alpha': np.logspace(-3, 3, 7)},
                          n_jobs=20,
                          cv=OHStratifiedShuffleSplit(
                              fm_decoder,
-                             n_iter=2, test_size=.1,
+                             n_iter=4, test_size=.1,
                              random_state=random_state),
                          verbose=10)
     dl_cv.fit(X_train, y_train)

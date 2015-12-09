@@ -62,3 +62,10 @@ def cholesky_delete(np.ndarray L, int go_out):
         cholesky_delete_flt(m / sizeof(float),  n, <float *> L.data,  go_out)
     else:
         raise TypeError("unsupported dtype %r." % L.dtype)
+
+cdef void _bin_indices(int[:] v, int[:, :] M):
+    n = v.shape[0]
+    cur_count =
+    for i in range(n):
+        M[v[i], cur_count[v[i]]] = i
+        cur_count[v[i]] += 1
