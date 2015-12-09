@@ -408,7 +408,7 @@ def main():
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
-                           debug_folder=join(output_dir, 'non_cv'),
+                           debug_folder=None,
                            random_state=random_state)
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-3, 3, 7)},
