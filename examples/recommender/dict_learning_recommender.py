@@ -372,25 +372,25 @@ def main():
                            n_components=50,
                            batch_size=10,
                            n_epochs=3,
-                           alpha=1000,
+                           alpha=100,
                            memory=mem,
                            l1_ratio=0.,
                            debug_folder=None,
                            random_state=random_state)
-    # dl_rec.fit(X_train, y_train)
-    # score = dl_rec.score(X_test, y_test)
-    # print('RMSE (non cv): %.3f' % score)
+    dl_rec.fit(X_train, y_train)
+    score = dl_rec.score(X_test, y_test)
+    print('RMSE (non cv): %.3f' % score)
 
-    dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-3, 3, 21)},
-                         n_jobs=20,
-                         cv=ShuffleSplit(X_train.shape[0],
-                                         n_iter=10, test_size=.1),
-                         verbose=10)
-    dl_cv.fit(X_train, y_train)
-    score = dl_cv.score(X_test, y_test)
-    print('RMSE: %.3f' % score)
-    print(dl_cv.grid_scores_)
+    # dl_cv = GridSearchCV(dl_rec,
+    #                      param_grid={'alpha': np.logspace(-3, 3, 21)},
+    #                      n_jobs=20,
+    #                      cv=ShuffleSplit(X_train.shape[0],
+    #                                      n_iter=10, test_size=.1),
+    #                      verbose=10)
+    # dl_cv.fit(X_train, y_train)
+    # score = dl_cv.score(X_test, y_test)
+    # print('RMSE: %.3f' % score)
+    # print(dl_cv.grid_scores_)
 
 
 if __name__ == '__main__':
