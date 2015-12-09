@@ -3,6 +3,7 @@ Small collection of auxiliary functions that operate on arrays
 
 """
 cimport numpy as np
+from cpython.array cimport array, clone
 import  numpy as np
 
 cimport cython
@@ -63,9 +64,19 @@ def cholesky_delete(np.ndarray L, int go_out):
     else:
         raise TypeError("unsupported dtype %r." % L.dtype)
 
+
 cdef void _bin_indices(int[:] v, int[:, :] M):
-    n = v.shape[0]
-    cur_count =
+    cdef int n = v.shape[0]
+    cdef int m = M.shape[0]
+    cdef int[::1] cur_count = clone(array('i'), m, False)
     for i in range(n):
         M[v[i], cur_count[v[i]]] = i
         cur_count[v[i]] += 1
+
+
+def bin_indices(int[:] v):
+    cdef int[::1] class_count
+    class_count = np.bincount(v)
+    M = np.empty((class_count.shape[0], class_count.max()))
+    _bin_indices(v, M)
+    return M
