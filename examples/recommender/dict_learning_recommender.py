@@ -401,20 +401,20 @@ def main():
     score = dl_rec.score(X_test, y_test)
     print('RMSE (non cv): %.3f' % score)
 
-    # dl_cv = GridSearchCV(dl_rec,
-    #                      param_grid={'alpha': np.logspace(-3, 3, 7)},
-    #                      n_jobs=20,
-    #                      cv=OHStratifiedShuffleSplit(
-    #                          fm_decoder,
-    #                          n_iter=4, test_size=.1,
-    #                          random_state=random_state),
-    #                      verbose=10)
-    # dl_cv.fit(X_train, y_train)
-    # score = dl_cv.score(X_test, y_test)
-    # print('RMSE: %.3f' % score)
-    # print(dl_cv.grid_scores_)
-    # with open(join(output_dir, 'grid.json'), 'w+') as f:
-    #     json.dump(dl_cv.grid_scores_, f)
+    dl_cv = GridSearchCV(dl_rec,
+                         param_grid={'alpha': np.logspace(-3, 3, 7)},
+                         n_jobs=20,
+                         cv=OHStratifiedShuffleSplit(
+                             fm_decoder,
+                             n_iter=4, test_size=.1,
+                             random_state=random_state),
+                         verbose=10)
+    dl_cv.fit(X_train, y_train)
+    score = dl_cv.score(X_test, y_test)
+    print('RMSE: %.3f' % score)
+    print(dl_cv.grid_scores_)
+    with open(join(output_dir, 'grid.json'), 'w+') as f:
+        json.dump(dl_cv.grid_scores_, f)
 
 if __name__ == '__main__':
     main()
