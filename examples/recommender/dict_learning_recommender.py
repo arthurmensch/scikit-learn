@@ -401,6 +401,15 @@ def main():
     score = dl_rec.score(X_test, y_test)
     print('RMSE (non cv): %.3f' % score)
 
+    dl_rec = DLRecommender(fm_decoder,
+                           n_components=50,
+                           batch_size=10,
+                           n_epochs=3,
+                           alpha=100,
+                           memory=mem,
+                           l1_ratio=0.,
+                           debug_folder=join(output_dir, 'non_cv'),
+                           random_state=random_state)
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-3, 3, 7)},
                          n_jobs=20,
