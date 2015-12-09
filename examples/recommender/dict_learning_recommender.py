@@ -20,7 +20,6 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_array, gen_batches
-from sklearn.utils.fixes import bincount
 
 
 def csr_center_data(X, inplace=False):
@@ -229,8 +228,7 @@ class DLRecommender(BaseRecommender):
         probe_score = np.zeros(len(probe_list) + 1)
         probe_score[0] = self.n_iter_
         for i, (X, y) in enumerate(probe_list):
-            y_hat = self.predict(X)
-            probe_score[i + 1] = sqrt(mean_squared_error(y_hat, y))
+            probe_score[i + 1] = self.score(X, y)
         self.probe_score_.append(probe_score)
 
         print('Iteration: %i' % probe_score[0])
@@ -244,15 +242,12 @@ class DLRecommender(BaseRecommender):
                   'r') as f:
             results = json.load(f)
         results['iteration'] = probe_score[0]
-        if len(probe_score > 1):
+        if len(probe_score) > 1:
             results['test_score'] = probe_score[1]
-        if len(probe_score > 2):
+        if len(probe_score) > 2:
             results['train_score'] = probe_score[2]
         with open(join(self.debug_folder, 'results.json'), 'w+') as f:
             json.dump(results, f)
-
-        # np.save(join(self.debug_folder, 'dictionary'), self.dictionary_)
-        # np.save(join(self.debug_folder, 'code'), self.code_)
 
         if debug_dict is not None:
             residuals = debug_dict['residuals']
@@ -391,6 +386,8 @@ def main():
     score = base_estimator.score(X_test, y_test)
     print('RMSE base: %.3f' % score)
 
+    os.makedirs(join(output_dir, 'non_cv'))
+
     dl_rec = DLRecommender(fm_decoder,
                            n_components=50,
                            batch_size=10,
@@ -398,26 +395,26 @@ def main():
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
-                           debug_folder=None,
+                           debug_folder=join(output_dir, 'non_cv'),
                            random_state=random_state)
-    dl_rec.fit(X_train, y_train)
+    dl_rec.fit(X_train, y_train, probe_list=[(X_test, y_test)])
     score = dl_rec.score(X_test, y_test)
     print('RMSE (non cv): %.3f' % score)
 
-    dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-3, 3, 7)},
-                         n_jobs=20,
-                         cv=OHStratifiedShuffleSplit(
-                             fm_decoder,
-                             n_iter=4, test_size=.1,
-                             random_state=random_state),
-                         verbose=10)
-    dl_cv.fit(X_train, y_train)
-    score = dl_cv.score(X_test, y_test)
-    print('RMSE: %.3f' % score)
-    print(dl_cv.grid_scores_)
-    with open(join(output_dir, 'grid.json'), 'w+') as f:
-        json.dump(dl_cv.grid_scores_, f)
+    # dl_cv = GridSearchCV(dl_rec,
+    #                      param_grid={'alpha': np.logspace(-3, 3, 7)},
+    #                      n_jobs=20,
+    #                      cv=OHStratifiedShuffleSplit(
+    #                          fm_decoder,
+    #                          n_iter=4, test_size=.1,
+    #                          random_state=random_state),
+    #                      verbose=10)
+    # dl_cv.fit(X_train, y_train)
+    # score = dl_cv.score(X_test, y_test)
+    # print('RMSE: %.3f' % score)
+    # print(dl_cv.grid_scores_)
+    # with open(join(output_dir, 'grid.json'), 'w+') as f:
+    #     json.dump(dl_cv.grid_scores_, f)
 
 if __name__ == '__main__':
     main()
