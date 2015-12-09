@@ -3,7 +3,6 @@ Small collection of auxiliary functions that operate on arrays
 
 """
 cimport numpy as np
-from cpython.array cimport array, clone
 import  numpy as np
 
 cimport cython
@@ -38,7 +37,7 @@ cdef float _float_min_pos(float *X, Py_ssize_t size):
    cdef Py_ssize_t i
    cdef float min_val = DBL_MAX
    for i in range(size):
-      if 0. < X[i] < min_val:
+      if X[i] > 0. and X[i] < min_val:
          min_val = X[i]
    return min_val
 
@@ -47,7 +46,7 @@ cdef double _double_min_pos(double *X, Py_ssize_t size):
    cdef Py_ssize_t i
    cdef np.float64_t min_val = FLT_MAX
    for i in range(size):
-      if 0. < X[i] < min_val:
+      if X[i] > 0. and X[i] < min_val:
          min_val = X[i]
    return min_val
 
@@ -63,20 +62,3 @@ def cholesky_delete(np.ndarray L, int go_out):
         cholesky_delete_flt(m / sizeof(float),  n, <float *> L.data,  go_out)
     else:
         raise TypeError("unsupported dtype %r." % L.dtype)
-
-
-cdef void _bin_indices(int[:] v, int[:, :] M):
-    cdef int n = v.shape[0]
-    cdef int m = M.shape[0]
-    cdef int[::1] cur_count = clone(array('i'), m, False)
-    for i in range(n):
-        M[v[i], cur_count[v[i]]] = i
-        cur_count[v[i]] += 1
-
-
-def bin_indices(int[:] v):
-    cdef int[::1] class_count
-    class_count = np.bincount(v)
-    M = np.empty((class_count.shape[0], class_count.max()))
-    _bin_indices(v, M)
-    return M
