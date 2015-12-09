@@ -1,27 +1,26 @@
 import datetime
 import json
 import os
-from math import sqrt
+from math import sqrt, ceil
 from os.path import expanduser, join
-
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
 from nose.tools import assert_greater
 from numpy.testing import assert_array_equal
 from scipy.sparse import csr_matrix
-
 from examples.recommender.convex_fm import array_to_fm_format
 from examples.recommender.movielens import fetch_ml_10m
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.base import RegressorMixin
-from sklearn.cross_validation import train_test_split, ShuffleSplit
+from sklearn.model_selection import LabelShuffleSplit, StratifiedShuffleSplit
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_array, gen_batches
+from sklearn.utils.fixes import bincount
 
 
 def csr_center_data(X, inplace=False):
@@ -264,6 +263,7 @@ class DLRecommender(BaseRecommender):
             np.save(join(self.debug_folder, 'values'), values)
         draw_stats(self.debug_folder)
 
+
 # This class is rather on the WTF side
 class FMDecoder(BaseEstimator, TransformerMixin):
     """We use a state object to keep order of transformed X_oh"""
@@ -341,6 +341,44 @@ def array_to_fm_format(X):
     return X_oh, y
 
 
+class OHStratifiedShuffleSplit(StratifiedShuffleSplit):
+    def __init__(self, fm_decoder, n_iter=5, test_size=0.2, train_size=None,
+                 random_state=None):
+        self.fm_decoder = fm_decoder
+        StratifiedShuffleSplit.__init__(
+            self,
+            n_iter=n_iter,
+            test_size=test_size,
+            train_size=train_size,
+            random_state=random_state)
+
+    def _iter_indices(self, X, y, labels=None):
+        self.fm_decoder.fit(X)
+        samples = self.fm_decoder.samples_
+        # n_samples = len(samples)
+        # if self.train_size is None:
+        #     train_size = 1 - self.test_size
+        for train, test in super(OHStratifiedShuffleSplit, self)._iter_indices(
+                X, samples):
+            yield train, test
+        # samples_counts = bincount(samples)
+        # count = np.zeros_like(samples)
+        # random_state = check_random_state(self.random_state)
+        # for _ in range(self.n_iter):
+        #     permutation = random_state.permutation(n_samples)
+        #     train = []
+        #     test = []
+        #     for index, sample in zip(permutation, samples[permutation]):
+        #         count[sample] += 1
+        #         if count[sample] <= ceil(self.test_size
+        #                                          * samples_counts[sample]):
+        #             train.append(index)
+        #         elif count[sample] >= ceil((1 - train_size)
+        #                                           * samples_counts[sample]):
+        #             test.append(index)
+        #     yield train, test
+
+
 def main():
     output_dir = expanduser(join('~/output/dl_recommender/',
                                  datetime.datetime.now().strftime('%Y-%m-%d_%H'
@@ -350,18 +388,21 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True)
+                                   remove_empty=True, n_users=1000)
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
 
     fm_decoder = FMDecoder(n_samples=data.shape[0], n_features=data.shape[1])
     X, y = array_to_fm_format(data)
 
-    X_train, X_test, y_train, y_test = train_test_split(X,
-                                                        y,
-                                                        test_size=.1,
-                                                        random_state=random_state)
-
+    oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
+        fm_decoder,
+        test_size=.1, random_state=random_state)
+    train, test = next(oh_stratified_shuffle_split.split(X, y))
+    X_train = X[train]
+    y_train = y[train]
+    X_test = X[test]
+    y_test = y[test]
     base_estimator = BaseRecommender(fm_decoder)
 
     base_estimator.fit(X_train, y_train)
@@ -371,7 +412,7 @@ def main():
     dl_rec = DLRecommender(fm_decoder,
                            n_components=50,
                            batch_size=10,
-                           n_epochs=3,
+                           n_epochs=1,
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
@@ -381,14 +422,16 @@ def main():
     score = dl_rec.score(X_test, y_test)
     print('RMSE (non cv): %.3f' % score)
 
-    # dl_cv = GridSearchCV(dl_rec,
-    #                      param_grid={'alpha': np.logspace(-3, 3, 21)},
-    #                      n_jobs=20,
-    #                      cv=ShuffleSplit(X_train.shape[0],
-    #                                      n_iter=10, test_size=.1),
-    #                      verbose=10)
-    # dl_cv.fit(X_train, y_train)
-    # score = dl_cv.score(X_test, y_test)
+    dl_cv = GridSearchCV(dl_rec,
+                         param_grid={'alpha': np.logspace(-3, 3, 21)},
+                         n_jobs=20,
+                         cv=OHStratifiedShuffleSplit(
+                             fm_decoder,
+                             n_iter=2, test_size=.1,
+                             random_state=random_state),
+                         verbose=10)
+    dl_cv.fit(X_train, y_train)
+    score = dl_cv.score(X_test, y_test)
     # print('RMSE: %.3f' % score)
     # print(dl_cv.grid_scores_)
 

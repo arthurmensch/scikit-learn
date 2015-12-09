@@ -434,9 +434,9 @@ def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
                    shape=(full_n_users, full_n_movies))
     X = X[:n_users, :n_movies]
     if remove_empty:
-        rated_movies = (X.getnnz(axis=0) > 1)
+        rated_movies = (X.getnnz(axis=0) > 2)
         X = X[:, rated_movies]
-        rating_users = (X.getnnz(axis=1) > 1)
+        rating_users = (X.getnnz(axis=1) > 2)
         X = X[rating_users, :]
     return X
 
