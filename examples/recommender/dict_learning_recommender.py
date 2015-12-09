@@ -414,9 +414,10 @@ def main():
                          verbose=10)
     dl_cv.fit(X_train, y_train)
     score = dl_cv.score(X_test, y_test)
-    # print('RMSE: %.3f' % score)
-    # print(dl_cv.grid_scores_)
-
+    print('RMSE: %.3f' % score)
+    print(dl_cv.grid_scores_)
+    with open(join(output_dir, 'grid.json'), 'w+') as f:
+        json.dump(dl_cv.grid_scores_, f)
 
 if __name__ == '__main__':
     main()
