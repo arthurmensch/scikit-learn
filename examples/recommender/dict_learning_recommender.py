@@ -388,7 +388,7 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True, n_users=1000)
+                                   remove_empty=True)
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
 
@@ -403,6 +403,7 @@ def main():
     y_train = y[train]
     X_test = X[test]
     y_test = y[test]
+
     base_estimator = BaseRecommender(fm_decoder)
 
     base_estimator.fit(X_train, y_train)
