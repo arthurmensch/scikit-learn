@@ -5,7 +5,8 @@ import numpy as np
 from numpy import sqrt
 from sklearn.utils import check_random_state
 from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.enet_projection import enet_norm, enet_projection
+from sklearn.utils.enet_projection import enet_norm, enet_projection, \
+    enet_scale
 
 
 def _enet_norm_for_projection(v, gamma):
@@ -137,3 +138,15 @@ def test_fast_enet_l1_ball():
         b[:] = enet_projection(a, 1, 1.0)
         norms[i] = np.sum(np.abs(b))
     assert_array_almost_equal(norms, np.ones(10))
+
+
+def test_enet_scale():
+    random_state = check_random_state(0)
+    a = random_state.randn(10, 100)
+    a1 = random_state.randn(100)
+    for r in [1, 2]:
+        for this_a in [a, a1]:
+            for l1_ratio in [0., 0.5, 1]:
+                b = enet_scale(this_a, r, l1_ratio)
+                norms = enet_norm(b, l1_ratio)
+            assert_array_almost_equal(norms, r)

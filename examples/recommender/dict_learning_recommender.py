@@ -127,24 +127,29 @@ class BaseRecommender(BaseEstimator, RegressorMixin):
             mean_squared_error(y, y_hat, sample_weight=sample_weight))
 
     def fit(self, X, y, **dump_kwargs):
-        X_csr = self.fm_decoder.fit_transform(X, y)
+        X_csr = self.fm_decoder.fm_to_csr(X, y)
         X_csr, self.global_mean_, \
         self.sample_mean_, \
         self.feature_mean_ = csr_center_data(X_csr)
 
         return self
 
-    def _predict(self, X_csr):
+    def predict(self, X):
+        y_hat = np.zeros(X.shape[0])
+        X_csr, (samples, features) = self.fm_decoder.fm_to_csr(
+            X, y_hat, return_indices=True)
         for i in range(X_csr.shape[0]):
             X_csr.data[X_csr.indptr[i]: X_csr.indptr[i + 1]] += \
                 self.sample_mean_[i]
         X_csr.data += self.feature_mean_.take(X_csr.indices, mode='clip')
+        self._predict_quadratic(X_csr)
+        return self.fm_decoder.csr_to_fm(X_csr, return_oh=False,
+                                         indices=(samples, features))
 
-    def predict(self, X):
-        y_hat = np.zeros(X.shape[0])
-        X_csr = self.fm_decoder.fit_transform(X, y_hat)
-        self._predict(X_csr)
-        return self.fm_decoder.inverse_transform(X_csr, y_only=True)
+    def _predict_quadratic(self, X_csr):
+        """To be overrided by more complex classes"""
+        pass
+
 
 
 class DLRecommender(BaseRecommender):
@@ -166,22 +171,17 @@ class DLRecommender(BaseRecommender):
         self.memory = memory
         self.debug_folder = debug_folder
 
-    def predict(self, X):
-        y_hat = np.zeros(X.shape[0])
-        X_csr = self.fm_decoder.fit_transform(X, y_hat)
-        self._predict(X_csr)
+    def _predict_quadratic(self, X_csr):
         for i in range(X_csr.shape[0]):
             indices = X_csr.indices[X_csr.indptr[i]:X_csr.indptr[i + 1]]
             X_csr.data[X_csr.indptr[i]:
             X_csr.indptr[i + 1]] += self.code_[i].dot(
                 self.dictionary_[:, indices])
 
-        return self.fm_decoder.inverse_transform(X_csr, y_only=True)
-
     def fit(self, X, y, **dump_kwargs):
         if self.debug_folder is not None:
             self.dump_init()
-        X_ref = self.fm_decoder.fit_transform(X, y)
+        X_ref = self.fm_decoder.fm_to_csr(X, y)
         X_csr = X_ref.copy()
         interaction = csr_matrix((np.empty_like(X_csr.data),
                                   X_csr.indices, X_csr.indptr),
@@ -287,49 +287,65 @@ class DLRecommender(BaseRecommender):
         draw_stats(self.debug_folder)
 
 
-# This class is rather on the WTF side
 class FMDecoder(BaseEstimator, TransformerMixin):
-    """We use a state object to keep order of transformed X_oh"""
-
     def __init__(self, n_samples=None, n_features=None):
         self.n_samples = n_samples
         self.n_features = n_features
 
-    def fit(self, X, y=None):
+    def fm_to_indices(self, X):
         assert_array_equal(X.indptr,
                            np.arange(0, (X.shape[0] + 1) * 2, 2))
-        self.features_ = np.maximum(X.indices[1::2], X.indices[::2])
-        self.samples_ = np.minimum(X.indices[1::2], X.indices[::2])
-        assert_greater(self.features_.min(), self.samples_.max())
-        present_n_samples = self.samples_.max() + 1
-        present_n_features = self.features_.max() - self.features_.min() + 1
-        assert (present_n_samples <= self.n_samples)
-        assert (present_n_features <= self.n_features)
+        features = np.maximum(X.indices[1::2], X.indices[::2])
+        samples = np.minimum(X.indices[1::2], X.indices[::2])
+        assert_greater(features.min(), samples.max())
+        existing_n_samples = samples.max() + 1
+        existing_n_features = features.max() - features.min() + 1
+        assert (existing_n_samples <= self.n_samples)
+        assert (existing_n_features <= self.n_features)
 
-        self.features_ -= self.n_samples
+        features -= self.n_samples
 
-        return self
+        return samples, features
 
-    def fit_transform(self, X, y=None, **kwargs):
-        return self.fit(X, y).transform(X, y)
-
-    def transform(self, X, y=None):
+    def fm_to_csr(self, X, y=None, return_indices=False):
+        (samples, features) = self.fm_to_indices(X)
         if y is None:
-            y = np.ones_like(self.samples_)
-            y *= -1
-        return csr_matrix((y, (self.samples_,
-                               self.features_)), shape=(self.n_samples,
+            y = np.empty_like(samples)
+            y[:] = np.nan
+        X_csr = csr_matrix((y, (samples,
+                               features)), shape=(self.n_samples,
                                                         self.n_features))
+        if not return_indices:
+            return X_csr
+        else:
+            return X_csr, (samples, features)
 
-    def inverse_transform(self, X_csr, y_only=False):
+    def csr_to_fm(self, X_csr, return_oh=True, indices=None):
         assert (X_csr.shape == (self.n_samples, self.n_features))
-        y = X_csr[self.samples_, self.features_].A[0]
-        if y_only:
+
+        if indices is None:
+            y = X_csr.data
+        else:
+            if isinstance(indices, tuple):
+                indices_samples, indices_features = indices
+            elif isinstance(indices, sp.csc_matrix):
+                indices_samples, indices_features = self.fm_to_indices(indices)
+            y = X_csr[indices_samples, indices_features].A[0]
+        if not return_oh:
             return y
         else:
-            encoder = OneHotEncoder(n_values=[self.n_samples,
-                                              self.n_features])
-            X_ix = np.column_stack([self.samples_, self.features_])
+            X = check_array(X_csr, accept_sparse='coo',
+                            force_all_finite=False)
+            n_rows, n_cols = X_csr.shape
+            assert((n_rows, n_cols) == (self.n_samples, self.n_features))
+            if indices is None:
+                encoder = OneHotEncoder(n_values=[self.n_samples,
+                                                  self.n_features])
+                X_ix = np.column_stack([X.row, X.col])
+            else:
+                assert(np.sorted(indices_samples) == np.sorted(X.row))
+                assert(np.sorted(indices_features) == np.sorted(X.col))
+                X_ix = np.column_stack([indices_samples, indices_features])
             X_oh = encoder.fit_transform(X_ix)
             return X_oh, y
 
@@ -376,8 +392,7 @@ class OHStratifiedShuffleSplit(StratifiedShuffleSplit):
             random_state=random_state)
 
     def _iter_indices(self, X, y, labels=None):
-        self.fm_decoder.fit(X)
-        samples = self.fm_decoder.samples_
+        samples, features = self.fm_decoder.fm_to_indices(X)
         for train, test in super(OHStratifiedShuffleSplit, self)._iter_indices(
                 X, samples):
             yield train, test
@@ -423,7 +438,7 @@ def main():
     dl_rec = DLRecommender(fm_decoder,
                            n_components=50,
                            batch_size=10,
-                           n_epochs=3,
+                           n_epochs=5,
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
