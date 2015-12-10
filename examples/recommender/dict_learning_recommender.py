@@ -1,26 +1,54 @@
 import datetime
 import json
 import os
-from math import sqrt, ceil
+from math import sqrt
 from os.path import expanduser, join
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.sparse as sp
 from nose.tools import assert_greater
 from numpy.testing import assert_array_equal
 from scipy.sparse import csr_matrix
+
 from examples.recommender.convex_fm import array_to_fm_format
-from examples.recommender.movielens import fetch_ml_10m
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.base import RegressorMixin
-from sklearn.model_selection import LabelShuffleSplit, StratifiedShuffleSplit
 from sklearn.decomposition import MiniBatchDictionaryLearning
-from sklearn.externals.joblib import Memory
+from sklearn.externals.joblib import Memory, Parallel, delayed
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_array, gen_batches
 
+
+def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
+                 n_users=None, n_movies=None, remove_empty=True):
+    df = pd.read_csv(join(datadir, 'ratings.dat'), sep="::", header=None)
+    df.rename(columns={0: 'userId', 1: 'movieId', 2: 'rating', 3: 'timestamp'},
+              inplace=True)
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+
+    df.reset_index(drop=True, inplace=True)
+    df.set_index(['userId', 'movieId'], inplace=True)
+    df.sort_index(level=['userId', 'movieId'], inplace=True)
+
+    ratings = df['rating']
+
+    full_n_users = ratings.index.get_level_values(0).max()
+    full_n_movies = ratings.index.get_level_values(1).max()
+
+    X = csr_matrix((ratings, (ratings.index.get_level_values(0) - 1,
+                              ratings.index.get_level_values(1) - 1)),
+                   shape=(full_n_users, full_n_movies))
+    X = X[:n_users, :n_movies]
+    if remove_empty:
+        rated_movies = (X.getnnz(axis=0) > 2)
+        X = X[:, rated_movies]
+        rating_users = (X.getnnz(axis=1) > 2)
+        X = X[rating_users, :]
+    return X
 
 def csr_center_data(X, inplace=False):
     if not inplace:
@@ -355,51 +383,42 @@ class OHStratifiedShuffleSplit(StratifiedShuffleSplit):
             yield train, test
 
 
+def single_run(X, y, estimators, train, test, index):
+    X_train = X[train]
+    y_train = y[train]
+    X_test = X[test]
+    y_test = y[test]
+
+    scores = np.zeros(len(estimators))
+    for i, estimator in enumerate(estimators):
+        estimator.fit(X_train, y_train)
+        scores[i] = estimator.score(X_test, y_test)
+        print('RMSE %s: %.3f' % (estimator, scores[i]))
+
+    return scores
+
+
 def main():
     output_dir = expanduser(join('~/output/dl_recommender/',
                                  datetime.datetime.now().strftime('%Y-%m-%d_%H'
                                                                   '-%M-%S')))
     os.makedirs(output_dir)
 
+    os.makedirs(join(output_dir, 'non_cv'))
+
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
                                    remove_empty=True)
+
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
 
-    fm_decoder = FMDecoder(n_samples=data.shape[0], n_features=data.shape[1])
     X, y = array_to_fm_format(data)
 
-    oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
-        fm_decoder,
-        test_size=.1, random_state=random_state)
-    train, test = next(oh_stratified_shuffle_split.split(X, y))
-    X_train = X[train]
-    y_train = y[train]
-    X_test = X[test]
-    y_test = y[test]
+    fm_decoder = FMDecoder(n_samples=data.shape[0], n_features=data.shape[1])
 
     base_estimator = BaseRecommender(fm_decoder)
-
-    base_estimator.fit(X_train, y_train)
-    score = base_estimator.score(X_test, y_test)
-    print('RMSE base: %.3f' % score)
-
-    os.makedirs(join(output_dir, 'non_cv'))
-
-    # dl_rec = DLRecommender(fm_decoder,
-    #                        n_components=50,
-    #                        batch_size=10,
-    #                        n_epochs=3,
-    #                        alpha=100,
-    #                        memory=mem,
-    #                        l1_ratio=0.,
-    #                        debug_folder=join(output_dir, 'non_cv'),
-    #                        random_state=random_state)
-    # dl_rec.fit(X_train, y_train, probe_list=[(X_test, y_test)])
-    # score = dl_rec.score(X_test, y_test)
-    # print('RMSE (non cv): %.3f' % score)
 
     dl_rec = DLRecommender(fm_decoder,
                            n_components=50,
@@ -408,23 +427,44 @@ def main():
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
-                           debug_folder=None,
+                           # debug_folder=join(output_dir, 'non_cv'),
                            random_state=random_state)
-    dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-3, 3, 7)},
-                         n_jobs=20,
-                         error_score='-1000',
-                         cv=OHStratifiedShuffleSplit(
-                             fm_decoder,
-                             n_iter=4, test_size=.1,
-                             random_state=random_state),
-                         verbose=10)
-    dl_cv.fit(X_train, y_train)
-    score = dl_cv.score(X_test, y_test)
-    print('RMSE: %.3f' % score)
-    print(dl_cv.grid_scores_)
-    with open(join(output_dir, 'grid.json'), 'w+') as f:
-        json.dump(dl_cv.grid_scores_, f)
 
+    # dl_cv = GridSearchCV(dl_rec,
+    #                      param_grid={'alpha': np.logspace(-3, 3, 7)},
+    #                      n_jobs=20,
+    #                      error_score='-1000',
+    #                      cv=OHStratifiedShuffleSplit(
+    #                          fm_decoder,
+    #                          n_iter=4, test_size=.1,
+    #                          random_state=random_state),
+    #                      verbose=10)
+
+    estimators = [base_estimator, dl_rec]
+
+    oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
+        fm_decoder,
+        n_iter=5,
+        test_size=.1, random_state=random_state)
+
+    scores = Parallel(n_jobs=5, verbose=10)(
+        delayed(single_run)(X, y, estimators, train, test, index)
+        for index, (train, test) in enumerate(
+            oh_stratified_shuffle_split.split(X, y)))
+
+    scores = np.array(scores)
+    scores = np.mean(scores, axis=0)
+    print(scores)
+
+    # dl_cv.fit(X_train, y_train)
+    # score = dl_cv.score(X_test, y_test)
+    # print('RMSE: %.3f' % score)
+    # print(dl_cv.grid_scores_)
+    # with open(join(output_dir, 'dl_cv.pkl'), 'wb+') as f:
+    #     pickle.dump(dl_cv, f)
+    # with open(join(output_dir, 'dl_rec.pkl'), 'wb+') as f:
+    #     pickle.dump(dl_rec, f)
+    # with open(join(output_dir, 'X.pkl'), 'wb+') as f:
+    #     pickle.dump(X, f)
 if __name__ == '__main__':
     main()
