@@ -257,7 +257,7 @@ def test_dict_learning_online_fit_convergence():
                                             batch_size=1,
                                             fit_algorithm=algorithm,
                                             verbose=1,
-                                            tol=1e-2,
+                                            tol=1e-1,
                                             alpha=1, shuffle=False,
                                             dict_init=V,
                                             l1_ratio=l1_ratio,

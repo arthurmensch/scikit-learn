@@ -504,7 +504,7 @@ def _update_dict(dictionary, Y, code,
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
     radius[radius == 0] = 1
     if restart:
-        restart_radius = sqrt(dictionary.shape[0])
+        restart_radius = 1 # sqrt(dictionary.shape[0])
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -547,7 +547,7 @@ def _update_dict(dictionary, Y, code,
                     print("Adding new random atom")
 
                 dictionary[:, k] = random_state.randn(n_features)
-                atom_norm_square = np.sum(dictionary[:, k]) ** 2
+                atom_norm_square = np.sum(dictionary[:, k] ** 2)
                 dictionary[:, k] /= sqrt(atom_norm_square / restart_radius)
 
                 if l1_ratio != 0.:
@@ -562,7 +562,6 @@ def _update_dict(dictionary, Y, code,
                     code[:, k] = 0
             else:
                 dictionary[:, k] = 0
-                atom_norm_square = 1
         else:
             # Projecting onto the norm ball
             if l1_ratio != 0.:
@@ -572,7 +571,6 @@ def _update_dict(dictionary, Y, code,
                                                    check_input=False)
             else:
                 dictionary[:, k] /= sqrt(atom_norm_square)
-
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(-1.0, dictionary[:, k], code[k, :],
                 a=R, overwrite_a=True)
@@ -730,7 +728,7 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
-    radius = sqrt(n_features)
+    radius = 1  # sqrt(n_features)
     dictionary = enet_scale(dictionary, l1_ratio=l1_ratio,
                             radius=radius, inplace=True)
 
@@ -956,9 +954,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
     X = check_array(X, accept_sparse='csr', order='C', dtype=np.float64,
                     copy=False)
 
+    radius = 1  # sqrt(n_features)
     if n_iter != 0:
         if inner_stats is None:
-            radius = sqrt(n_features)
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
                        radius=radius,
                        inplace=True)
