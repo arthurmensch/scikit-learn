@@ -439,7 +439,7 @@ def main():
                            n_components=50,
                            batch_size=10,
                            n_epochs=5,
-                           alpha=1,
+                           alpha=10000,
                            memory=mem,
                            l1_ratio=0.,
                            # debug_folder=join(output_dir, 'non_cv'),
