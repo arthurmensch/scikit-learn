@@ -406,8 +406,8 @@ def single_run(X, y, estimators, train, test, index):
 
     scores = np.zeros(len(estimators))
     for i, estimator in enumerate(estimators):
-        estimator.fit(X_train, y_train, probe_list=[(X_test, y_test), (X_train,
-                                                                       y_train)])
+        estimator.fit(X_train, y_train)
+        # probe_list=[(X_test, y_test), (X_train, y_train)])
         scores[i] = estimator.score(X_test, y_test)
         print('RMSE %s: %.3f' % (estimator, scores[i]))
         if hasattr(estimator, 'grid_score_'):
