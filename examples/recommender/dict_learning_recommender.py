@@ -445,17 +445,17 @@ def main():
                            alpha=100,
                            memory=mem,
                            l1_ratio=0.,
-                           debug_folder=join(output_dir, 'non_cv'),
+                           # debug_folder=join(output_dir, 'non_cv'),
                            random_state=random_state)
 
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-1, 3, 5)},
                          cv=OHStratifiedShuffleSplit(
                              fm_decoder,
-                             n_iter=4, test_size=.1,
+                             n_iter=3, test_size=.1,
                              random_state=random_state),
-                         error_score='-1000',
-                         n_jobs=20,
+                         error_score=-1000,
+                         n_jobs=15,
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
