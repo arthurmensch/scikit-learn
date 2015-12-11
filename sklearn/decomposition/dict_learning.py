@@ -1066,7 +1066,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
         count_seen_features[subset] += len_batch
-        # print(enet_norm(dictionary.T, l1_ratio=l1_ratio))
         this_code = sparse_encode(
             this_X,
             dictionary.T,

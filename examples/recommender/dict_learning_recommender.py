@@ -3,7 +3,6 @@ import json
 import os
 from math import sqrt
 from os.path import expanduser, join
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -11,7 +10,6 @@ import scipy.sparse as sp
 from nose.tools import assert_greater
 from numpy.testing import assert_array_equal
 from scipy.sparse import csr_matrix
-
 from examples.recommender.convex_fm import array_to_fm_format, ConvexFM
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.base import RegressorMixin
@@ -21,6 +19,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_array, gen_batches
+from joblib import dump
 
 
 def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
@@ -49,6 +48,7 @@ def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
         rating_users = (X.getnnz(axis=1) > 2)
         X = X[rating_users, :]
     return X
+
 
 def csr_center_data(X, inplace=False):
     if not inplace:
@@ -149,7 +149,6 @@ class BaseRecommender(BaseEstimator, RegressorMixin):
     def _predict_quadratic(self, X_csr):
         """To be overrided by more complex classes"""
         pass
-
 
 
 class DLRecommender(BaseRecommender):
@@ -313,8 +312,8 @@ class FMDecoder(BaseEstimator, TransformerMixin):
             y = np.empty_like(samples)
             y[:] = np.nan
         X_csr = csr_matrix((y, (samples,
-                               features)), shape=(self.n_samples,
-                                                        self.n_features))
+                                features)), shape=(self.n_samples,
+                                                   self.n_features))
         if not return_indices:
             return X_csr
         else:
@@ -337,14 +336,14 @@ class FMDecoder(BaseEstimator, TransformerMixin):
             X = check_array(X_csr, accept_sparse='coo',
                             force_all_finite=False)
             n_rows, n_cols = X_csr.shape
-            assert((n_rows, n_cols) == (self.n_samples, self.n_features))
+            assert ((n_rows, n_cols) == (self.n_samples, self.n_features))
             if indices is None:
                 encoder = OneHotEncoder(n_values=[self.n_samples,
                                                   self.n_features])
                 X_ix = np.column_stack([X.row, X.col])
             else:
-                assert(np.sorted(indices_samples) == np.sorted(X.row))
-                assert(np.sorted(indices_features) == np.sorted(X.col))
+                assert (np.sorted(indices_samples) == np.sorted(X.row))
+                assert (np.sorted(indices_features) == np.sorted(X.col))
                 X_ix = np.column_stack([indices_samples, indices_features])
             X_oh = encoder.fit_transform(X_ix)
             return X_oh, y
@@ -398,22 +397,30 @@ class OHStratifiedShuffleSplit(StratifiedShuffleSplit):
             yield train, test
 
 
-def single_run(X, y, estimators, train, test, index):
+def single_run(X, y, estimator, train, test, debug_folder=None):
     X_train = X[train]
     y_train = y[train]
     X_test = X[test]
     y_test = y[test]
 
-    scores = np.zeros(len(estimators))
-    for i, estimator in enumerate(estimators):
-        estimator.fit(X_train, y_train)
-        # probe_list=[(X_test, y_test), (X_train, y_train)])
-        scores[i] = estimator.score(X_test, y_test)
-        print('RMSE %s: %.3f' % (estimator, scores[i]))
-        if hasattr(estimator, 'grid_scores_'):
-            print(estimator.grid_scores_)
+    if not os.path.exists(debug_folder):
+        os.makedirs(debug_folder)
 
-    return scores
+    estimator.set_params(debug_folder=debug_folder)
+
+    estimator.fit(X_train, y_train,
+                  probe_list=[(X_test, y_test), (X_train, y_train)])
+    # else:
+    #     estimator.fit(X_train, y_train)
+
+    score = estimator.score(X_test, y_test)
+    print('RMSE %s: %.3f' % (estimator, score))
+    if hasattr(estimator, 'grid_scores_'):
+        print(estimator.grid_scores_)
+    dump(estimator, join(debug_folder, 'estimator.pkl'))
+    with open(join(debug_folder, 'score'), 'w+') as f:
+        f.write('score : %.4f' % score)
+    return score
 
 
 def main():
@@ -421,8 +428,6 @@ def main():
                                  datetime.datetime.now().strftime('%Y-%m-%d_%H'
                                                                   '-%M-%S')))
     os.makedirs(output_dir)
-
-    os.makedirs(join(output_dir, 'non_cv'))
 
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
@@ -438,15 +443,15 @@ def main():
 
     base_estimator = BaseRecommender(fm_decoder)
 
-    dl_rec = DLRecommender(fm_decoder,
-                           n_components=50,
-                           batch_size=10,
-                           n_epochs=5,
-                           alpha=100,
-                           memory=mem,
-                           l1_ratio=0.,
-                           # debug_folder=join(output_dir, 'non_cv'),
-                           random_state=random_state)
+    dl_rec = [DLRecommender(fm_decoder,
+                            n_components=50,
+                            batch_size=10,
+                            n_epochs=5,
+                            alpha=alpha,
+                            memory=mem,
+                            l1_ratio=0.,
+                            random_state=random_state)
+              for alpha in np.logspace(-2, 3, 6)]
 
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-3, 2, 6)},
@@ -459,21 +464,23 @@ def main():
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
-    estimators = [dl_cv]
+    estimators = dl_rec
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
-        n_iter=5,
+        n_iter=1,
         test_size=.1, random_state=random_state)
 
-    scores = Parallel(n_jobs=1, verbose=10)(
-        delayed(single_run)(X, y, estimators, train, test, index)
-        for index, (train, test) in enumerate(
-            oh_stratified_shuffle_split.split(X, y)))
+    scores = Parallel(n_jobs=6, verbose=10)(
+        delayed(single_run)(X, y, estimator, train, test,
+                            debug_folder=join(output_dir,
+                                              "split_{}_est_{}".format(i, j)))
+        for i, (train, test) in enumerate(
+            oh_stratified_shuffle_split.split(X, y))
+        for j, estimator in enumerate(estimators))
 
-    scores = np.array(scores)
-    scores = np.mean(scores, axis=0)
     print(scores)
+
 
 if __name__ == '__main__':
     main()
