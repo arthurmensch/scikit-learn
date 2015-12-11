@@ -20,6 +20,7 @@ import array
 
 import numpy as np
 import scipy.sparse as sp
+from math import sqrt
 from scipy.sparse.linalg import LinearOperator, eigsh
 from sklearn.preprocessing import OneHotEncoder
 
@@ -124,6 +125,11 @@ class ConvexFM(BaseEstimator, RegressorMixin):
         self.eigsh_kwargs = eigsh_kwargs
         self.verbose = verbose
         self.random_state = random_state
+
+    def score(self, X, y, sample_weight=None):
+        y_hat = self.predict(X)
+        return - sqrt(
+            mean_squared_error(y, y_hat, sample_weight=sample_weight))
 
     def predict_quadratic(self, X, P=None, lams=None):
         """Prediction from the quadratic term of the factorization machine.

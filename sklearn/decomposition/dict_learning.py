@@ -454,7 +454,7 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
 def _update_dict(dictionary, Y, code,
                  verbose=False,
                  return_r2=False,
-                 l1_ratio=0., online=False, restart=True,
+                 l1_ratio=0., online=False, full_update=True,
                  shuffle=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
@@ -502,9 +502,10 @@ def _update_dict(dictionary, Y, code,
     random_state = check_random_state(random_state)
 
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
+    # print("in : %s " % radius)
     radius[radius == 0] = 1
-    if restart:
-        restart_radius = 1 # sqrt(dictionary.shape[0])
+    if full_update:
+        restart_radius = 1 # sqrt(n_features)
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -535,26 +536,20 @@ def _update_dict(dictionary, Y, code,
         else:
             dictionary[:, k] /= scale
 
-        atom_norm_square = np.sum(dictionary[:, k] ** 2)
+        new_radius = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
 
-        if atom_norm_square < threshold:
-        # Cleaning small atoms
-            if restart:
+        if new_radius < threshold:
+            # Cleaning small atoms
+            if full_update:
                 if verbose == 1:
                     sys.stdout.write("+")
                     sys.stdout.flush()
                 elif verbose:
                     print("Adding new random atom")
 
-                dictionary[:, k] = random_state.randn(n_features)
-                atom_norm_square = np.sum(dictionary[:, k] ** 2)
-                dictionary[:, k] /= sqrt(atom_norm_square / restart_radius)
-
-                if l1_ratio != 0.:
-                    dictionary[:, k] = enet_projection(dictionary[:, k],
-                                                       radius=restart_radius,
-                                                       l1_ratio=l1_ratio,
-                                                       check_input=False)
+                dictionary[:, k] = enet_scale(random_state.randn(n_features),
+                                              l1_ratio=l1_ratio,
+                                              radius=restart_radius)
 
                 # Setting corresponding coefs to 0
                 code[k, :] = 0.0
@@ -564,16 +559,15 @@ def _update_dict(dictionary, Y, code,
                 dictionary[:, k] = 0
         else:
             # Projecting onto the norm ball
-            if l1_ratio != 0.:
-                dictionary[:, k] = enet_projection(dictionary[:, k],
-                                                   radius=radius[k],
-                                                   l1_ratio=l1_ratio,
-                                                   check_input=False)
-            else:
-                dictionary[:, k] /= sqrt(atom_norm_square)
+            dictionary[:, k] = enet_projection(dictionary[:, k],
+                                               radius=radius[k],
+                                               l1_ratio=l1_ratio,
+                                               check_input=False)
         # R <- -1.0 * U_k * V_k^T + R
         R = ger(-1.0, dictionary[:, k], code[k, :],
                 a=R, overwrite_a=True)
+    radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
+    # print("out : %s " % radius)
 
     if return_r2:
         if online:
@@ -728,10 +722,9 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
-    radius = 1  # sqrt(n_features)
+    radius = 1 # sqrt(n_features)
     dictionary = enet_scale(dictionary, l1_ratio=l1_ratio,
                             radius=radius, inplace=True)
-
     # If max_iter is 0, number of iterations returned should be zero
     ii = -1
 
@@ -755,7 +748,7 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
                                              online=False,
                                              shuffle=False,
                                              random_state=random_state,
-                                             restart=True,
+                                             full_update=True,
                                              l1_ratio=l1_ratio)
         dictionary = dictionary.T
 
@@ -954,7 +947,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
     X = check_array(X, accept_sparse='csr', order='C', dtype=np.float64,
                     copy=False)
 
-    radius = 1  # sqrt(n_features)
+    radius = 1 # sqrt(n_features)
     if n_iter != 0:
         if inner_stats is None:
             enet_scale(dictionary.T, l1_ratio=l1_ratio,
@@ -1031,6 +1024,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
     for ii, batch, subset in zip(range(iter_offset, iter_offset + n_iter),
                                  batches, subsets):
+
         t1 = time.time()
         if shuffle:
             this_X = X[permutation[batch]]
@@ -1054,10 +1048,11 @@ def dict_learning_online(X, n_components=2, alpha=1,
             if len(existing) == 0:
                 # No samples : skip
                 continue
+
         if not is_full_slice(subset):
-            restart = False
+            full_update = False
         else:
-            restart = True
+            full_update = True
             subset = slice(None)
 
         dt = (time.time() - t0)
@@ -1072,7 +1067,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
         len_batch = batch.stop - batch.start
         n_seen_samples += len_batch
         count_seen_features[subset] += len_batch
-
+        # print(enet_norm(dictionary.T, l1_ratio=l1_ratio))
         this_code = sparse_encode(
             this_X,
             dictionary.T,
@@ -1100,7 +1095,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             l1_ratio=l1_ratio,
             random_state=random_state,
             return_r2=False,
-            online=True, restart=restart,
+            online=True, full_update=full_update,
             shuffle=shuffle)
         total_time += time.time() - t1
 

@@ -12,7 +12,7 @@ from nose.tools import assert_greater
 from numpy.testing import assert_array_equal
 from scipy.sparse import csr_matrix
 
-from examples.recommender.convex_fm import array_to_fm_format
+from examples.recommender.convex_fm import array_to_fm_format, ConvexFM
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.base import RegressorMixin
 from sklearn.decomposition import MiniBatchDictionaryLearning
@@ -155,7 +155,7 @@ class BaseRecommender(BaseEstimator, RegressorMixin):
 class DLRecommender(BaseRecommender):
     def __init__(self, fm_decoder=None,
                  random_state=None, n_components=10,
-                 alpha=1., l1_ratio=1, algorithm='ridge',
+                 alpha=1., l1_ratio=0., algorithm='ridge',
                  n_epochs=1, batch_size=10,
                  memory=Memory(cachedir=None),
                  debug_folder=None,
@@ -406,9 +406,12 @@ def single_run(X, y, estimators, train, test, index):
 
     scores = np.zeros(len(estimators))
     for i, estimator in enumerate(estimators):
-        estimator.fit(X_train, y_train)
+        estimator.fit(X_train, y_train, probe_list=[(X_test, y_test), (X_train,
+                                                                       y_train)])
         scores[i] = estimator.score(X_test, y_test)
         print('RMSE %s: %.3f' % (estimator, scores[i]))
+        if hasattr(estimator, 'grid_score_'):
+            print(estimator.grid_score_)
 
     return scores
 
@@ -439,14 +442,14 @@ def main():
                            n_components=50,
                            batch_size=10,
                            n_epochs=5,
-                           alpha=10,
+                           alpha=100,
                            memory=mem,
                            l1_ratio=0.,
-                           # debug_folder=join(output_dir, 'non_cv'),
+                           debug_folder=join(output_dir, 'non_cv'),
                            random_state=random_state)
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-1, 3, 10)},
+                         param_grid={'alpha': np.logspace(-1, 3, 5)},
                          n_jobs=20,
                          error_score='-1000',
                          cv=OHStratifiedShuffleSplit(
@@ -455,7 +458,8 @@ def main():
                              random_state=random_state),
                          verbose=10)
 
-    estimators = [base_estimator, dl_cv]
+    convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
+    estimators = [dl_cv]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
@@ -471,15 +475,5 @@ def main():
     scores = np.mean(scores, axis=0)
     print(scores)
 
-    # dl_cv.fit(X_train, y_train)
-    # score = dl_cv.score(X_test, y_test)
-    # print('RMSE: %.3f' % score)
-    # print(dl_cv.grid_scores_)
-    # with open(join(output_dir, 'dl_cv.pkl'), 'wb+') as f:
-    #     pickle.dump(dl_cv, f)
-    # with open(join(output_dir, 'dl_rec.pkl'), 'wb+') as f:
-    #     pickle.dump(dl_rec, f)
-    # with open(join(output_dir, 'X.pkl'), 'wb+') as f:
-    #     pickle.dump(X, f)
 if __name__ == '__main__':
     main()
