@@ -439,14 +439,14 @@ def main():
                            n_components=50,
                            batch_size=10,
                            n_epochs=5,
-                           alpha=100,
+                           alpha=10,
                            memory=mem,
                            l1_ratio=0.,
                            # debug_folder=join(output_dir, 'non_cv'),
                            random_state=random_state)
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-3, 3, 7)},
+                         param_grid={'alpha': np.logspace(-1, 3, 10)},
                          n_jobs=20,
                          error_score='-1000',
                          cv=OHStratifiedShuffleSplit(
