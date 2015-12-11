@@ -948,11 +948,10 @@ def dict_learning_online(X, n_components=2, alpha=1,
                     copy=False)
 
     radius = 1 # sqrt(n_features)
-    if n_iter != 0:
-        if inner_stats is None:
-            enet_scale(dictionary.T, l1_ratio=l1_ratio,
-                       radius=radius,
-                       inplace=True)
+    if n_iter != 0 and iter_offset == 0 and inner_stats is None:
+        enet_scale(dictionary.T, l1_ratio=l1_ratio,
+                   radius=radius,
+                   inplace=True)
 
     batches = gen_batches(n_samples, batch_size)
     batches = itertools.cycle(batches)
@@ -1762,7 +1761,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             subsets=self.subsets_,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
-            # Loading whole X in memory if deprecated
             batch_size=batch_size,
             shuffle=self.shuffle,
             verbose=self.verbose, return_code=False,
