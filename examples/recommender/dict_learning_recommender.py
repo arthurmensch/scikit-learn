@@ -432,7 +432,7 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True)
+                                   remove_empty=True, n_users=10000)
 
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
@@ -451,7 +451,7 @@ def main():
                             memory=mem,
                             l1_ratio=0.,
                             random_state=random_state)
-              for alpha in np.logspace(-2, 3, 6)]
+              for alpha in np.logspace(-3, 2, 6)]
 
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-3, 2, 6)},
