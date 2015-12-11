@@ -432,7 +432,7 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True)
+                                   remove_empty=True, n_users=1000)
 
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
@@ -459,7 +459,7 @@ def main():
                              n_iter=5, test_size=.1,
                              random_state=random_state),
                          error_score=-1000,
-                         n_jobs=20,
+                         n_jobs=1,
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)

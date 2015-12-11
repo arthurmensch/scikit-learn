@@ -890,7 +890,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
     if missing_values not in [None, 0]:
         raise ValueError('Missing value should be 0 or None')
-    if missing_values == 0 and not sp.issparse_csr(X):
+    if missing_values == 0 and not sp.isspmatrix_csr(X):
         raise ValueError('X should be provided in csr format when using missing'
                          ' values')
 
