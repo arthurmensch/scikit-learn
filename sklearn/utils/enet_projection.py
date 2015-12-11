@@ -5,9 +5,10 @@ J. Mairal, F. Bach, J. Ponce, G. Sapiro, 2009: Online dictionary learning
 for sparse coding (http://www.di.ens.fr/sierra/pdfs/icml09.pdf)
 """
 import numpy as np
-from .enet_proj_fast import enet_projection_inplace
-from .enet_proj_fast import enet_norm as c_enet_norm
+
 from . import check_array
+from .enet_proj_fast import enet_norm as c_enet_norm
+from .enet_proj_fast import enet_projection_inplace
 
 
 def enet_projection(v, radius=1., l1_ratio=0.1, check_input=True):
@@ -43,6 +44,7 @@ def enet_scale(v, radius=1, l1_ratio=0.1, inplace=False):
         v = v[np.newaxis, :]
 
     l1_v = np.sum(np.abs(v), axis=1) * l1_ratio
+    l1_v[l1_v == 0] = 1
     if l1_ratio != 1:
         l2_v = np.sum(v ** 2, axis=1) * (1 - l1_ratio)
         S = (- l1_v + np.sqrt(l1_v ** 2 + 4 * radius * l2_v))

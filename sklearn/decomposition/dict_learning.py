@@ -505,7 +505,7 @@ def _update_dict(dictionary, Y, code,
     # print("in : %s " % radius)
     radius[radius == 0] = 1
     if full_update:
-        restart_radius = 1 # sqrt(n_features)
+        restart_radius = 1  # sqrt(n_features)
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -722,7 +722,7 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
-    radius = 1 # sqrt(n_features)
+    radius = 1  # sqrt(n_features)
     dictionary = enet_scale(dictionary, l1_ratio=l1_ratio,
                             radius=radius, inplace=True)
     # If max_iter is 0, number of iterations returned should be zero
@@ -947,7 +947,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
     X = check_array(X, accept_sparse='csr', order='C', dtype=np.float64,
                     copy=False)
 
-    radius = 1 # sqrt(n_features)
+    radius = 1  # sqrt(n_features)
     if n_iter != 0 and iter_offset == 0 and inner_stats is None:
         enet_scale(dictionary.T, l1_ratio=l1_ratio,
                    radius=radius,
@@ -1667,7 +1667,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             Returns the instance itself.
         """
         self.random_state_ = check_random_state(self.random_state)
-        X = check_array(X, accept_sparse='csc')
+        X = check_array(X, accept_sparse='csr')
 
         if self.feature_ratio == 1:
             self.subsets_ = itertools.repeat(None)
@@ -1730,12 +1730,14 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         """
         if not hasattr(self, 'random_state_'):
             self.random_state_ = check_random_state(self.random_state)
-        X = check_array(X, accept_sparse='csc')
-        if not hasattr(self, 'subsets'):
-            self.subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(
-                X.shape[1] / self.feature_ratio),
-                                                random_state=self.random_state_,
-                                                random=self.feature_ratio > 1)
+        X = check_array(X, accept_sparse='csr')
+
+        if self.feature_ratio == 1:
+            self.subsets_ = itertools.repeat(None)
+        else:
+            self.subsets_ = gen_cycling_subsets(
+                X.shape[1], batch_size=int(X.shape[1] / self.feature_ratio),
+                random_state=self.random_state_)
         if hasattr(self, 'components_'):
             dict_init = self.components_
         else:
