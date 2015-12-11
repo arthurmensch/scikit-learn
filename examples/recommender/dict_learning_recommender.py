@@ -455,14 +455,14 @@ def main():
                              random_state=random_state),
                          verbose=10)
 
-    estimators = [base_estimator, dl_rec]
+    estimators = [base_estimator, dl_cv]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
-        n_iter=5,
+        n_iter=1,
         test_size=.1, random_state=random_state)
 
-    scores = Parallel(n_jobs=5, verbose=10)(
+    scores = Parallel(n_jobs=1, verbose=10)(
         delayed(single_run)(X, y, estimators, train, test, index)
         for index, (train, test) in enumerate(
             oh_stratified_shuffle_split.split(X, y)))
