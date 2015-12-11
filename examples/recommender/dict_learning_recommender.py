@@ -406,12 +406,12 @@ def single_run(X, y, estimator, train, test, debug_folder=None):
     if not os.path.exists(debug_folder):
         os.makedirs(debug_folder)
 
-    estimator.set_params(debug_folder=debug_folder)
+    #    estimator.set_params(debug_folder=debug_folder)
 
-    estimator.fit(X_train, y_train,
-                  probe_list=[(X_test, y_test), (X_train, y_train)])
+    # estimator.fit(X_train, y_train,
+    #               probe_list=[(X_test, y_test), (X_train, y_train)])
     # else:
-    #     estimator.fit(X_train, y_train)
+    estimator.fit(X_train, y_train)
 
     score = estimator.score(X_test, y_test)
     print('RMSE %s: %.3f' % (estimator, score))
@@ -432,7 +432,7 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True, n_users=10000)
+                                   remove_empty=True)
 
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
@@ -443,35 +443,34 @@ def main():
 
     base_estimator = BaseRecommender(fm_decoder)
 
-    dl_rec = [DLRecommender(fm_decoder,
+    dl_rec = DLRecommender(fm_decoder,
                             n_components=50,
                             batch_size=10,
                             n_epochs=5,
-                            alpha=alpha,
+                            alpha=1,
                             memory=mem,
                             l1_ratio=0.,
                             random_state=random_state)
-              for alpha in np.logspace(-3, 2, 6)]
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-3, 2, 6)},
+                         param_grid={'alpha': np.logspace(-4, 2, 7)},
                          cv=OHStratifiedShuffleSplit(
                              fm_decoder,
                              n_iter=5, test_size=.1,
                              random_state=random_state),
                          error_score=-1000,
-                         n_jobs=10,
+                         n_jobs=20,
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
-    estimators = dl_rec
+    estimators = [dl_cv]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
-        n_iter=1,
+        n_iter=3,
         test_size=.1, random_state=random_state)
 
-    scores = Parallel(n_jobs=6, verbose=10)(
+    scores = Parallel(n_jobs=1, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))
