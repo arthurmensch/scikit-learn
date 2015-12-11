@@ -410,8 +410,8 @@ def single_run(X, y, estimators, train, test, index):
         # probe_list=[(X_test, y_test), (X_train, y_train)])
         scores[i] = estimator.score(X_test, y_test)
         print('RMSE %s: %.3f' % (estimator, scores[i]))
-        if hasattr(estimator, 'grid_score_'):
-            print(estimator.grid_score_)
+        if hasattr(estimator, 'grid_scores_'):
+            print(estimator.grid_scores_)
 
     return scores
 
@@ -427,7 +427,7 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True, n_users=10000)
+                                   remove_empty=True)
 
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
@@ -449,13 +449,13 @@ def main():
                            random_state=random_state)
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-1, 3, 5)},
+                         param_grid={'alpha': np.logspace(-3, 2, 6)},
                          cv=OHStratifiedShuffleSplit(
                              fm_decoder,
-                             n_iter=3, test_size=.1,
+                             n_iter=5, test_size=.1,
                              random_state=random_state),
                          error_score=-1000,
-                         n_jobs=15,
+                         n_jobs=10,
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
@@ -463,7 +463,7 @@ def main():
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
-        n_iter=1,
+        n_iter=5,
         test_size=.1, random_state=random_state)
 
     scores = Parallel(n_jobs=1, verbose=10)(
