@@ -470,7 +470,7 @@ def main():
         n_iter=10,
         test_size=.1, random_state=random_state)
 
-    scores = Parallel(n_jobs=10, verbose=10)(
+    scores = Parallel(n_jobs=1, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))
