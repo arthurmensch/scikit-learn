@@ -447,7 +447,7 @@ def main():
                             n_components=50,
                             batch_size=10,
                             n_epochs=5,
-                            alpha=1,
+                            alpha=0.1,
                             memory=mem,
                             l1_ratio=0.,
                             random_state=random_state)
@@ -463,7 +463,7 @@ def main():
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
-    estimators = [dl_cv]
+    estimators = [dl_rec]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
