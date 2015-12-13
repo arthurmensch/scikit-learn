@@ -453,17 +453,17 @@ def main():
                             random_state=random_state)
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-4, 2, 7)},
+                         param_grid={'alpha': np.logspace(-3, 2, 6)},
                          cv=OHStratifiedShuffleSplit(
                              fm_decoder,
-                             n_iter=5, test_size=.1,
+                             n_iter=10, test_size=.2,
                              random_state=random_state),
                          error_score=-1000,
-                         n_jobs=24,
+                         n_jobs=30,
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
-    estimators = [dl_rec]
+    estimators = [dl_cv]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
