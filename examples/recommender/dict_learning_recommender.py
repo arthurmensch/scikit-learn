@@ -478,7 +478,11 @@ def main():
             oh_stratified_shuffle_split.split(X, y))
         for j, estimator in enumerate(estimators))
 
+    scores = np.array(scores);
+    np.save(scores, join(output_dir, 'scores'))
     print(scores)
+    print(scores.mean())
+    print(scores.std())
 
 
 if __name__ == '__main__':
