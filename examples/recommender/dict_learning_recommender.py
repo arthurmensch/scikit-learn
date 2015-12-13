@@ -479,10 +479,10 @@ def main():
         for j, estimator in enumerate(estimators))
 
     scores = np.array(scores);
-    np.save(scores, join(output_dir, 'scores'))
     print(scores)
     print(scores.mean())
     print(scores.std())
+    np.save(join(output_dir, 'scores'), scores)
 
 
 if __name__ == '__main__':
