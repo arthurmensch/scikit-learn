@@ -436,12 +436,12 @@ def single_run(X, y, estimator, train, test, debug_folder=None):
     if not os.path.exists(debug_folder):
         os.makedirs(debug_folder)
 
-    estimator.set_params(debug_folder=debug_folder)
-
-    estimator.fit(X_train, y_train,
-                  probe_list=[(X_test, y_test), (X_train, y_train)])
+    # estimator.set_params(debug_folder=debug_folder)
+    #
+    # estimator.fit(X_train, y_train,
+    #               probe_list=[(X_test, y_test), (X_train, y_train)])
     # else:
-    # estimator.fit(X_train, y_train)
+    estimator.fit(X_train, y_train)
 
     score = estimator.score(X_test, y_test)
     print('RMSE %s: %.3f' % (estimator, score))
@@ -486,7 +486,7 @@ def main():
               for learning_rate in [0.5, 0.75, 1]]
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-5, 2, 6)},
+                         param_grid={'alpha': np.logspace(-4, 2, 10)},
                          # cv=OHStratifiedShuffleSplit(
                          #     fm_decoder,
                          #     n_iter=10, test_size=.2,
@@ -496,12 +496,12 @@ def main():
                              n_folds=3,
                              random_state=random_state),
                          error_score=-1000,
-                         n_jobs=18,
+                         n_jobs=30,
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
                          beta=1, verbose=100)
-    estimators = dl_rec
+    estimators = [dl_cv]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
@@ -512,11 +512,11 @@ def main():
         fm_decoder,
         n_folds=3, random_state=random_state)
 
-    uniform_split = ShuffleSplit(n_iter=4,
+    uniform_split = ShuffleSplit(n_iter=10,
                                  test_size=.25, random_state=random_state)
 
 
-    scores = Parallel(n_jobs=12, verbose=10)(
+    scores = Parallel(n_jobs=1, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))
@@ -524,11 +524,11 @@ def main():
             uniform_split.split(X, y))
         for j, estimator in enumerate(estimators))
 
+    np.save(join(output_dir, 'scores'), scores)
     scores = np.array(scores)
     print(scores)
     print(scores.mean())
     print(scores.std())
-    np.save(join(output_dir, 'scores'), scores)
 
 
 if __name__ == '__main__':
