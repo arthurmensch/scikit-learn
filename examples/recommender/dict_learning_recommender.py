@@ -465,7 +465,7 @@ def main():
                             n_components=50,
                             batch_size=10,
                             n_epochs=5,
-                            alpha=0.001,
+                            alpha=0.1,
                             memory=mem,
                             l1_ratio=0.,
                             random_state=random_state)
@@ -477,6 +477,7 @@ def main():
                          #     n_iter=10, test_size=.2,
                          #     random_state=random_state),
                          cv=KFold(
+                             shuffle=True,
                              n_folds=3,
                              random_state=random_state),
                          error_score=-1000,
@@ -500,7 +501,7 @@ def main():
                                  test_size=.25, random_state=random_state)
 
 
-    scores = Parallel(n_jobs=1  , verbose=10)(
+    scores = Parallel(n_jobs=4, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))

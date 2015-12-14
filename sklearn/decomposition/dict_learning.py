@@ -1008,7 +1008,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
     for ii, batch, mask_subset in zip(range(iter_offset, iter_offset + n_iter),
                                       batches, mask_subsets):
 
-                  t1 = time.time()
+        t1 = time.time()
 
         if shuffle:
             this_X = X[permutation[batch]]
@@ -1070,7 +1070,8 @@ def dict_learning_online(X, n_components=2, alpha=1,
             random_state=random_state).T
 
         A *= 1 - len_batch / pow(n_seen_samples, learning_rate)
-        A += np.dot(this_code, this_code.T) / pow(n_seen_samples, learning_rate)
+        A += np.dot(this_code, this_code.T) / pow(n_seen_samples,
+                                                  learning_rate)
         B[subset] *= 1 - len_batch / np.power(count_seen_features[subset,
                                                                  np.newaxis],
                                               learning_rate)
@@ -1107,8 +1108,8 @@ def dict_learning_online(X, n_components=2, alpha=1,
                 norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(
                     subset) / pow(n_seen_samples, learning_rate)
             else:
-                norm_cost += .5 * np.sum(this_X ** 2) * n_features / len(
-                    subset) / pow(n_seen_samples, learning_rate)
+                norm_cost += .5 * np.sum(this_X ** 2)\
+                             / pow(n_seen_samples, learning_rate)
         else:
             norm_cost += .5 * np.sum(this_X ** 2) / pow(n_seen_samples,
                                                         learning_rate)
@@ -1118,8 +1119,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             penalty_cost += alpha * np.sum(
                 np.abs(this_code)) / pow(n_seen_samples, learning_rate)
         else:
-            penalty_cost += alpha * np.sum(this_code ** 2) / sqrt(
-                n_seen_samples)
+            penalty_cost += alpha * np.sum(this_code ** 2) / pow(n_seen_samples, learning_rate)
         current_cost = objective_cost + norm_cost + penalty_cost
 
         # Stopping criterion
@@ -1734,13 +1734,13 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         if not hasattr(self, 'random_state_'):
             self.random_state_ = check_random_state(self.random_state)
         X = check_array(X, accept_sparse='csr')
-
-        if self.feature_ratio == 1:
-            self.mask_subsets_ = itertools.repeat(None)
-        else:
-            self.mask_subsets_ = gen_cycling_subsets(
-                X.shape[1], batch_size=int(X.shape[1] / self.feature_ratio),
-                random_state=self.random_state_)
+        if not hasattr(self, 'mask_subsets_'):
+            if self.feature_ratio == 1:
+                self.mask_subsets_ = itertools.repeat(None)
+            else:
+                self.mask_subsets_ = gen_cycling_subsets(
+                    X.shape[1], batch_size=int(X.shape[1] / self.feature_ratio),
+                    random_state=self.random_state_)
         if hasattr(self, 'components_'):
             dict_init = self.components_
         else:
