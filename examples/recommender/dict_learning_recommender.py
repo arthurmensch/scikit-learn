@@ -243,10 +243,9 @@ class DLRecommender(BaseRecommender):
                 interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
                     self.code_[j].dot(self.dictionary_[:, indices])
 
-
             A, B, residual_stat = dict_learning.inner_stats_
-            last_cost, norm_cost, penalty_cost, n_seen_samples,\
-                 count_seen_features, A_ref, B_ref = residual_stat
+            last_cost, norm_cost, penalty_cost, n_seen_samples, \
+            count_seen_features, A_ref, B_ref = residual_stat
             n_seen_samples = 0
             count_seen_features[:] = 0
             residual_stats = (last_cost, norm_cost, penalty_cost,
@@ -423,7 +422,7 @@ class OHStratifiedKFold(StratifiedKFold):
     def _iter_test_masks(self, X, y, labels=None):
         samples, features = self.fm_decoder.fm_to_indices(X)
         for mask in StratifiedKFold._iter_test_masks(self,
-                X, samples):
+                                                     X, samples):
             yield mask
 
 
@@ -473,17 +472,17 @@ def main():
 
     base_estimator = BaseRecommender(fm_decoder)
 
-    dl_rec = [DLRecommender(fm_decoder,
-                            n_components=50,
-                            batch_size=10,
-                            n_epochs=5,
-                            alpha=alpha,
-                            learning_rate=learning_rate,
-                            memory=mem,
-                            l1_ratio=0.,
-                            random_state=random_state)
-              for alpha in np.logspace(-3, 0, 4)
-              for learning_rate in [0.5, 0.75, 1]]
+    dl_rec = DLRecommender(fm_decoder,
+                           n_components=50,
+                           batch_size=10,
+                           n_epochs=5,
+                           alpha=1,
+                           learning_rate=.75,
+                           memory=mem,
+                           l1_ratio=0.,
+                           random_state=random_state)
+    # for alpha in np.logspace(-3, 0, 4)
+    # for learning_rate in [0.5, 0.75, 1]]
 
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-4, 2, 10)},
@@ -514,7 +513,6 @@ def main():
 
     uniform_split = ShuffleSplit(n_iter=10,
                                  test_size=.25, random_state=random_state)
-
 
     scores = Parallel(n_jobs=1, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
