@@ -360,12 +360,8 @@ def gen_cycling_subsets(n, batch_size, random=True, random_state=None):
             permutation = random_state.permutation(n)
         else:
             permutation = np.arange(n)
-        # if accumulate is not None:
-        #     permutation = np.concatenate((accumulate, permutation))
-        #     accumulate = None
-        batches = gen_batches(len(permutation), batch_size)
+        batches = gen_batches(n, batch_size)
         for batch in batches:
-            # if batch.stop - batch.start == batch_size:
             yield permutation[batch]
 
 
