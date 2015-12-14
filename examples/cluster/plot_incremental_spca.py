@@ -23,8 +23,10 @@ def run():
                                      n_iter=100000,
                                      random_state=rng, verbose=2,
                                      batch_size=20,
+                                     learning_rate=1,
                                      debug_info=True,
-                                     feature_ratio=7,
+                                     shuffle=True,
+                                     feature_ratio=10,
                                      )
 
     t0 = time.time()

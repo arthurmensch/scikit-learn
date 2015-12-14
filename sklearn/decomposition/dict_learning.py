@@ -24,12 +24,6 @@ from ..linear_model import Lasso, orthogonal_mp_gram, LassoLars, Lars, \
 from ..utils.enet_projection import enet_projection, enet_scale, enet_norm
 
 
-def is_full_slice(subset):
-    if hasattr(subset, '__len__'):
-        return False
-    return subset is None or subset == slice(None)
-
-
 def _sparse_encode(X, dictionary, gram, cov=None, algorithm='lasso_lars',
                    missing_values=None,
                    regularization=None, copy_cov=True,
@@ -283,7 +277,6 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
         The sparse codes
 
     See also
-    See also
     --------
     sklearn.linear_model.lars_path
     sklearn.linear_model.orthogonal_mp
@@ -482,10 +475,10 @@ def _update_dict(dictionary, Y, code,
     random_state = check_random_state(random_state)
 
     radius = enet_norm(dictionary.T, l1_ratio=l1_ratio)
-    # print("in : %s " % radius)
     radius[radius == 0] = 1
+
     if full_update:
-        restart_radius = 1  # sqrt(n_features)
+        restart_radius = 1
 
     # Residuals, computed 'in-place' for efficiency
     R = -np.dot(code.T, dictionary.T).T
@@ -503,18 +496,17 @@ def _update_dict(dictionary, Y, code,
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
         # Coordinate update
         if online:
-            dictionary[:, k] = R[:, k]
             scale = code[k, k]
         else:
-            dictionary[:, k] = np.dot(R, code[k, :].T)
             scale = np.sum(code[k, :] ** 2)
         if scale < threshold:
+            # Trigger cleaning
             dictionary[:, k] = 0
-            code[k, :] = 0
-            if online:
-                code[:, k] = 0
         else:
-            dictionary[:, k] /= scale
+            if online:
+                dictionary[:, k] = R[:, k] / scale
+            else:
+                dictionary[:, k] = np.dot(R, code[k, :].T) / scale
 
         new_radius = enet_norm(dictionary[:, k], l1_ratio=l1_ratio)
 
@@ -700,7 +692,7 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
-    radius = 1  # sqrt(n_features)
+    radius = 1
     dictionary = enet_scale(dictionary, l1_ratio=l1_ratio,
                             radius=radius, inplace=True)
     # If max_iter is 0, number of iterations returned should be zero
@@ -932,14 +924,10 @@ def dict_learning_online(X, n_components=2, alpha=1,
     X = check_array(X, accept_sparse='csr', order='C', dtype=np.float64,
                     copy=False)
 
-    radius = 1  # sqrt(n_features)
-    if n_iter != 0 and iter_offset == 0 and inner_stats is None:
-        enet_scale(dictionary.T, l1_ratio=l1_ratio,
-                   radius=radius,
-                   inplace=True)
 
     batches = gen_batches(n_samples, batch_size)
     batches = itertools.cycle(batches)
+
 
     if missing_values not in [0, None]:
         raise NotImplementedError
@@ -949,8 +937,14 @@ def dict_learning_online(X, n_components=2, alpha=1,
     elif mask_subsets is None:
         mask_subsets = gen_cycling_subsets(n_features,
                                            n_features / feature_ratio,
-                                           random=(feature_ratio > 1))
+                                           random=(feature_ratio > 1),
+                                           random_state=random_state)
 
+    radius = 1  # sqrt(n_features)
+    if n_iter != 0 and iter_offset == 0 and inner_stats is None:
+        enet_scale(dictionary.T, l1_ratio=l1_ratio,
+                   radius=radius,
+                   inplace=True)
     if inner_stats is None:
         # The covariance of the dictionary
         A = np.zeros((n_components, n_components))
@@ -1674,10 +1668,11 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         if self.feature_ratio == 1:
             self.mask_subsets_ = itertools.repeat(None)
         else:
-            self.mask_subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(
+            self.mask_subsets_ = gen_cycling_subsets(X.shape[1],
+                                                     batch_size=int(
                 X.shape[1] / self.feature_ratio),
-                                                random_state=self.random_state_,
-                                                random=self.feature_ratio > 1)
+                                                     random=self.feature_ratio > 1,
+                                                     random_state=self.random_state_)
 
         res = dict_learning_online(
             X, self.n_components, self.alpha,
