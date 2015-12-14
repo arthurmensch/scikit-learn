@@ -16,7 +16,8 @@ from sklearn.base import RegressorMixin
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, Parallel, delayed
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV
+from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV, \
+    StratifiedKFold, ShuffleSplit
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_array, gen_batches
 from joblib import dump
@@ -397,6 +398,22 @@ class OHStratifiedShuffleSplit(StratifiedShuffleSplit):
             yield train, test
 
 
+class OHStratifiedKFold(StratifiedKFold):
+    def __init__(self, fm_decoder, n_iter=5, n_folds=3,
+                 random_state=None):
+        self.fm_decoder = fm_decoder
+        StratifiedKFold.__init__(
+            self,
+            n_folds=n_folds,
+            random_state=random_state)
+
+    def _iter_test_masks(self, X, y, labels=None):
+        samples, features = self.fm_decoder.fm_to_indices(X)
+        for mask in StratifiedKFold._iter_test_masks(self,
+                X, samples):
+            yield mask
+
+
 def single_run(X, y, estimator, train, test, debug_folder=None):
     X_train = X[train]
     y_train = y[train]
@@ -406,8 +423,8 @@ def single_run(X, y, estimator, train, test, debug_folder=None):
     if not os.path.exists(debug_folder):
         os.makedirs(debug_folder)
 
-    #    estimator.set_params(debug_folder=debug_folder)
-
+    # estimator.set_params(debug_folder=debug_folder)
+    #
     # estimator.fit(X_train, y_train,
     #               probe_list=[(X_test, y_test), (X_train, y_train)])
     # else:
@@ -454,28 +471,41 @@ def main():
 
     dl_cv = GridSearchCV(dl_rec,
                          param_grid={'alpha': np.logspace(-3, 2, 6)},
-                         cv=OHStratifiedShuffleSplit(
+                         # cv=OHStratifiedShuffleSplit(
+                         #     fm_decoder,
+                         #     n_iter=10, test_size=.2,
+                         #     random_state=random_state),
+                         cv=OHStratifiedKFold(
                              fm_decoder,
-                             n_iter=10, test_size=.2,
+                             n_folds=3,
                              random_state=random_state),
                          error_score=-1000,
-                         n_jobs=30,
+                         n_jobs=18,
                          verbose=10)
 
-    convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
-    estimators = [dl_rec]
+    convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
+                         beta=1, verbose=100)
+    estimators = [dl_cv]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
-        n_iter=10,
-        test_size=.1, random_state=random_state)
+        n_iter=1,
+        test_size=.25, random_state=random_state)
 
-    scores = Parallel(n_jobs=10, verbose=10)(
+    oh_stratified_kfold = OHStratifiedKFold(
+        fm_decoder,
+        n_folds=3, random_state=random_state)
+
+    uniform_split = ShuffleSplit(n_iter=4,
+                                 test_size=.25, random_state=random_state)
+
+
+    scores = Parallel(n_jobs=1, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))
         for i, (train, test) in enumerate(
-            oh_stratified_shuffle_split.split(X, y))
+            uniform_split.split(X, y))
         for j, estimator in enumerate(estimators))
 
     scores = np.array(scores);

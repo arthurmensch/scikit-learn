@@ -1665,9 +1665,9 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         X = check_array(X, accept_sparse='csr')
 
         if self.feature_ratio == 1:
-            self.subsets_ = itertools.repeat(None)
+            self.mask_subsets_ = itertools.repeat(None)
         else:
-            self.subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(
+            self.mask_subsets_ = gen_cycling_subsets(X.shape[1], batch_size=int(
                 X.shape[1] / self.feature_ratio),
                                                 random_state=self.random_state_,
                                                 random=self.feature_ratio > 1)
@@ -1687,7 +1687,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             return_n_iter=True,
             return_debug_info=self.debug_info,
             feature_ratio=self.feature_ratio,
-            mask_subsets=self.subsets_)
+            mask_subsets=self.mask_subsets_)
 
         if self.debug_info:
             (U, self.inner_stats_, n_iter), debug_info = res
@@ -1728,9 +1728,9 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         X = check_array(X, accept_sparse='csr')
 
         if self.feature_ratio == 1:
-            self.subsets_ = itertools.repeat(None)
+            self.mask_subsets_ = itertools.repeat(None)
         else:
-            self.subsets_ = gen_cycling_subsets(
+            self.mask_subsets_ = gen_cycling_subsets(
                 X.shape[1], batch_size=int(X.shape[1] / self.feature_ratio),
                 random_state=self.random_state_)
         if hasattr(self, 'components_'):
@@ -1755,7 +1755,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             tol=0,
             missing_values=self.missing_values,
             feature_ratio=self.feature_ratio,
-            mask_subsets=self.subsets_,
+            mask_subsets=self.mask_subsets_,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
             batch_size=batch_size,
