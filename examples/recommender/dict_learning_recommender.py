@@ -447,7 +447,7 @@ def main():
                             n_components=50,
                             batch_size=10,
                             n_epochs=5,
-                            alpha=0.1,
+                            alpha=0.001,
                             memory=mem,
                             l1_ratio=0.,
                             random_state=random_state)
@@ -463,14 +463,14 @@ def main():
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, beta=1, verbose=100)
-    estimators = [dl_cv]
+    estimators = [dl_rec]
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
         n_iter=10,
         test_size=.1, random_state=random_state)
 
-    scores = Parallel(n_jobs=1, verbose=10)(
+    scores = Parallel(n_jobs=10, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))
