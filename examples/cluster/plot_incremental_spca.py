@@ -21,7 +21,7 @@ def run():
     rng = 0
     incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.01,
                                      n_iter=100000,
-                                     random_state=rng, verbose=2,
+                                     random_state=rng, verbose=5,
                                      batch_size=20,
                                      learning_rate=1,
                                      debug_info=True,
@@ -32,7 +32,7 @@ def run():
     t0 = time.time()
 
 
-    for i in range(30):
+    for i in range(4):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)
