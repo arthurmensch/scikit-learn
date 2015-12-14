@@ -759,6 +759,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          method='lars',
                          iter_offset=0, tol=0.,
+                         learning_rate=.5,
                          mask_subsets=None,
                          feature_ratio=1,
                          missing_values=None,
@@ -1007,7 +1008,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
     for ii, batch, mask_subset in zip(range(iter_offset, iter_offset + n_iter),
                                       batches, mask_subsets):
 
-        t1 = time.time()
+                  t1 = time.time()
 
         if shuffle:
             this_X = X[permutation[batch]]
@@ -1068,13 +1069,14 @@ def dict_learning_online(X, n_components=2, alpha=1,
             missing_values=missing_values,
             random_state=random_state).T
 
-        A *= 1 - len_batch / sqrt(n_seen_samples)
-        A += np.dot(this_code, this_code.T) / sqrt(n_seen_samples)
-        B[subset] *= 1 - len_batch / np.sqrt(count_seen_features[subset,
-                                                                 np.newaxis])
+        A *= 1 - len_batch / pow(n_seen_samples, learning_rate)
+        A += np.dot(this_code, this_code.T) / pow(n_seen_samples, learning_rate)
+        B[subset] *= 1 - len_batch / np.power(count_seen_features[subset,
+                                                                 np.newaxis],
+                                              learning_rate)
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
-                                     this_code.T) / np.sqrt(
-            count_seen_features[subset, np.newaxis])
+                                     this_code.T) / np.power(
+            count_seen_features[subset, np.newaxis], learning_rate)
 
         # Update dictionary
         dictionary[subset] = _update_dict(
@@ -1089,29 +1091,32 @@ def dict_learning_online(X, n_components=2, alpha=1,
             shuffle=shuffle)
         total_time += time.time() - t1
 
-        A_ref *= (1 - len_batch / sqrt(n_seen_samples))
-        A_ref += np.dot(this_code, this_code.T) / sqrt(n_seen_samples)
-        B_ref *= (1 - len_batch / sqrt(n_seen_samples))
-        B_ref += safe_sparse_dot(this_X.T, this_code.T) / sqrt(n_seen_samples)
+        A_ref *= (1 - len_batch / pow(n_seen_samples, learning_rate))
+        A_ref += np.dot(this_code, this_code.T) / pow(n_seen_samples,
+                                                      learning_rate)
+        B_ref *= (1 - len_batch / pow(n_seen_samples, learning_rate))
+        B_ref += safe_sparse_dot(this_X.T, this_code.T) / pow(n_seen_samples,
+                                                              learning_rate)
         total_time += time.time() - t0
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
         objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
-        norm_cost *= (1 - len_batch / sqrt(n_seen_samples))
+        norm_cost *= (1 - len_batch / pow(n_seen_samples, learning_rate))
         if not full_update:
             if missing_values is not None:
                 norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(
-                    subset) / sqrt(n_seen_samples)
+                    subset) / pow(n_seen_samples, learning_rate)
             else:
                 norm_cost += .5 * np.sum(this_X ** 2) * n_features / len(
-                    subset) / sqrt(n_seen_samples)
+                    subset) / pow(n_seen_samples, learning_rate)
         else:
-            norm_cost += .5 * np.sum(this_X ** 2) / sqrt(n_seen_samples)
+            norm_cost += .5 * np.sum(this_X ** 2) / pow(n_seen_samples,
+                                                        learning_rate)
 
-        penalty_cost *= (1 - len_batch / sqrt(n_seen_samples))
+        penalty_cost *= (1 - len_batch / pow(n_seen_samples, learning_rate))
         if method in ('lasso_lars', 'lasso_cd'):
             penalty_cost += alpha * np.sum(
-                np.abs(this_code)) / sqrt(n_seen_samples)
+                np.abs(this_code)) / pow(n_seen_samples, learning_rate)
         else:
             penalty_cost += alpha * np.sum(this_code ** 2) / sqrt(
                 n_seen_samples)
@@ -1617,6 +1622,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
     """
 
     def __init__(self, n_components=None, alpha=1, dict_penalty=0,
+                 learning_rate=1,
                  l1_ratio=0.0,
                  n_iter=1000, fit_algorithm='lars', n_jobs=1,
                  batch_size=3, tol=0., shuffle=True, dict_init=None,
@@ -1645,6 +1651,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.random_state = random_state
         self.tol = tol
         self.debug_info = debug_info
+        self.learning_rate = learning_rate
         self.feature_ratio = feature_ratio
 
     def fit(self, X, y=None):
@@ -1675,6 +1682,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         res = dict_learning_online(
             X, self.n_components, self.alpha,
             l1_ratio=self.l1_ratio,
+            learning_rate=self.learning_rate,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
             missing_values=self.missing_values,

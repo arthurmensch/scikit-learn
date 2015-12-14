@@ -17,7 +17,7 @@ from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, Parallel, delayed
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV, \
-    StratifiedKFold, ShuffleSplit
+    StratifiedKFold, ShuffleSplit, KFold
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_array, gen_batches
 from joblib import dump
@@ -202,6 +202,7 @@ class DLRecommender(BaseRecommender):
             shuffle=False,
             n_iter=n_iter,
             missing_values=0,
+            learning_rate=.5,
             verbose=10,
             debug_info=self.debug_folder is not None,
             random_state=random_state)
@@ -475,8 +476,7 @@ def main():
                          #     fm_decoder,
                          #     n_iter=10, test_size=.2,
                          #     random_state=random_state),
-                         cv=OHStratifiedKFold(
-                             fm_decoder,
+                         cv=KFold(
                              n_folds=3,
                              random_state=random_state),
                          error_score=-1000,
@@ -500,7 +500,7 @@ def main():
                                  test_size=.25, random_state=random_state)
 
 
-    scores = Parallel(n_jobs=1, verbose=10)(
+    scores = Parallel(n_jobs=1  , verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))
@@ -508,7 +508,7 @@ def main():
             uniform_split.split(X, y))
         for j, estimator in enumerate(estimators))
 
-    scores = np.array(scores);
+    scores = np.array(scores)
     print(scores)
     print(scores.mean())
     print(scores.std())
