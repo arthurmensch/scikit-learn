@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import svd
+from scipy.sparse import coo_matrix
 
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_random_state, check_array
@@ -31,11 +32,18 @@ class softImpute(BaseEstimator):
             V, D = sparse_plus_low_rank_ridge(self, X, U, V, D, self.alpha)
             U, D = sparse_plus_low_rank_ridge(self, X.T, V, U, D, self.alpha)
         M = safe_sparse_dot(X, V)
-        U, D, R = svd(M)
-        D = np.maximum(D[:self.n_components] - self.alpha, 0)
+        self.U, D, R = svd(M)
+        self.D = np.maximum(D - self.alpha, 0)
+        self.V = V.dot(R)
 
 
-def sparse_plus_low_rank_ridge(self, X, U, V, D, alpha):
+    def predict(self, X, copyto=False):
+        row, col = X.nonzero()
+        data = np.sum(self.U[row] * self.V[col] * self.D, axis=1)
+        return coo_matrix(data, (row, col))
+
+
+def sparse_plus_low_rank_ridge(X, U, V, D, alpha):
     D2 = D ** 2
 
     X_proj = X.copy()
