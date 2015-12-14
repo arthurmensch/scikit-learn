@@ -1030,6 +1030,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             subset = mask_subset
         else:
             subset = np.intersect1d(mask_subset, existing)
+        print(subset)
 
         full_update = (isinstance(subset, slice) and subset == slice(None))
 
