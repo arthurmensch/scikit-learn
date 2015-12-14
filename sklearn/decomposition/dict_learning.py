@@ -979,12 +979,21 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
                 shuffle=shuffle)
         else:
             seen = np.where(count_seen_features > 0)[0]
-            dictionary, objective_cost = _simpler_update_dict(
-                    dictionary,
-                    B, A,
+            # dictionary, objective_cost = _simpler_update_dict(
+            #         dictionary,
+            #         B, A,
+            #         subset,
+            #         seen=seen,
+            #         update_support=support,
+            #         verbose=verbose,
+            #         l1_ratio=l1_ratio,
+            #         random_state=random_state,
+            #         return_r2=True,
+            #         shuffle=shuffle)
+            dictionary[subset], objective_cost = _update_dict(
+                    subset_dictionary,
+                    B[subset], A,
                     subset,
-                    seen=seen,
-                    update_support=support,
                     verbose=verbose,
                     l1_ratio=l1_ratio,
                     random_state=random_state,
