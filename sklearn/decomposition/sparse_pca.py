@@ -9,6 +9,8 @@ from ..linear_model import ridge_regression
 from ..base import BaseEstimator, TransformerMixin
 from .dict_learning import dict_learning, dict_learning_online, \
     MiniBatchDictionaryLearning
+# from .dict_learning_working import dict_learning, dict_learning_online, \
+#     MiniBatchDictionaryLearning
 
 
 class SparsePCA(BaseEstimator, TransformerMixin):
@@ -300,7 +302,6 @@ class IncrementalSparsePCA(MiniBatchDictionaryLearning):
                  feature_ratio=1):
         MiniBatchDictionaryLearning.__init__(self, n_components=n_components,
                                              alpha=alpha,
-                                             dict_penalty=dict_penalty,
                                              l1_ratio=l1_ratio,
                                              learning_rate=learning_rate,
                                              fit_algorithm='ridge',

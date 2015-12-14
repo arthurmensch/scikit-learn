@@ -157,12 +157,14 @@ class DLRecommender(BaseRecommender):
                  random_state=None, n_components=10,
                  alpha=1., l1_ratio=0., algorithm='ridge',
                  n_epochs=1, batch_size=10,
+                 learning_rate=0.5,
                  memory=Memory(cachedir=None),
                  debug_folder=None,
                  ):
         BaseRecommender.__init__(self, fm_decoder)
         self.alpha = alpha
         self.l1_ratio = l1_ratio
+        self.learning_rate = learning_rate
         self.algorithm = algorithm
         self.n_components = n_components
         self.batch_size = batch_size
@@ -202,7 +204,7 @@ class DLRecommender(BaseRecommender):
             shuffle=False,
             n_iter=n_iter,
             missing_values=0,
-            learning_rate=.5,
+            learning_rate=self.learning_rate,
             verbose=10,
             debug_info=self.debug_folder is not None,
             random_state=random_state)
@@ -241,6 +243,16 @@ class DLRecommender(BaseRecommender):
                 interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
                     self.code_[j].dot(self.dictionary_[:, indices])
 
+
+            A, B, residual_stat = dict_learning.inner_stats_
+            last_cost, norm_cost, penalty_cost, n_seen_samples,\
+                 count_seen_features, A_ref, B_ref = residual_stat
+            n_seen_samples = 0
+            count_seen_features[:] = 0
+            residual_stats = (last_cost, norm_cost, penalty_cost,
+                              n_seen_samples,
+                              count_seen_features, A_ref, B_ref)
+            dict_learning.inner_stats_ = A, B, residual_stats
         return self
 
     def dump_init(self):
@@ -424,12 +436,12 @@ def single_run(X, y, estimator, train, test, debug_folder=None):
     if not os.path.exists(debug_folder):
         os.makedirs(debug_folder)
 
-    # estimator.set_params(debug_folder=debug_folder)
-    #
-    # estimator.fit(X_train, y_train,
-    #               probe_list=[(X_test, y_test), (X_train, y_train)])
+    estimator.set_params(debug_folder=debug_folder)
+
+    estimator.fit(X_train, y_train,
+                  probe_list=[(X_test, y_test), (X_train, y_train)])
     # else:
-    estimator.fit(X_train, y_train)
+    # estimator.fit(X_train, y_train)
 
     score = estimator.score(X_test, y_test)
     print('RMSE %s: %.3f' % (estimator, score))
@@ -461,17 +473,20 @@ def main():
 
     base_estimator = BaseRecommender(fm_decoder)
 
-    dl_rec = DLRecommender(fm_decoder,
+    dl_rec = [DLRecommender(fm_decoder,
                             n_components=50,
                             batch_size=10,
                             n_epochs=5,
-                            alpha=0.1,
+                            alpha=alpha,
+                            learning_rate=learning_rate,
                             memory=mem,
                             l1_ratio=0.,
                             random_state=random_state)
+              for alpha in np.logspace(-3, 0, 4)
+              for learning_rate in [0.5, 0.75, 1]]
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-3, 2, 6)},
+                         param_grid={'alpha': np.logspace(-5, 2, 6)},
                          # cv=OHStratifiedShuffleSplit(
                          #     fm_decoder,
                          #     n_iter=10, test_size=.2,
@@ -486,7 +501,7 @@ def main():
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
                          beta=1, verbose=100)
-    estimators = [dl_cv]
+    estimators = dl_rec
 
     oh_stratified_shuffle_split = OHStratifiedShuffleSplit(
         fm_decoder,
@@ -501,7 +516,7 @@ def main():
                                  test_size=.25, random_state=random_state)
 
 
-    scores = Parallel(n_jobs=4, verbose=10)(
+    scores = Parallel(n_jobs=8, verbose=10)(
         delayed(single_run)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
                                               "split_{}_est_{}".format(i, j)))

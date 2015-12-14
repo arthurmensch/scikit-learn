@@ -19,20 +19,20 @@ def run():
 
     print('Learning the dictionary... ')
     rng = 0
-    incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.01,
+    incr_spca = IncrementalSparsePCA(n_components=30, alpha=0.1,
                                      n_iter=100000,
                                      random_state=rng, verbose=5,
                                      batch_size=20,
                                      learning_rate=1,
                                      debug_info=True,
                                      shuffle=True,
-                                     feature_ratio=8,
+                                     feature_ratio=10,
                                      )
 
     t0 = time.time()
 
 
-    for i in range(10):
+    for i in range(100):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)
@@ -50,6 +50,7 @@ def run():
             component *= -1
         plt.subplot(10, 3, i + 1)
         plt.imshow(component.reshape(faces.images[0].shape), cmap=plt.cm.gray,
+                   # vmax=0.01, vmin=-0.0,
                    interpolation='nearest')
         plt.xticks(())
         plt.yticks(())

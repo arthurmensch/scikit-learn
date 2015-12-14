@@ -353,77 +353,6 @@ def sparse_encode(X, dictionary, missing_values=None, gram=None, cov=None,
 
     return code
 
-
-# def _simpler_update_dict(dictionary, B, A, subset,
-#                          seen=None,
-#                          return_r2=False,
-#                          l1_ratio=0.,
-#                          update_support=False,
-#                          verbose=False,
-#                          shuffle=False,
-#                          random_state=None):
-#     threshold = 1e-20
-#     n_components = len(A)
-#     n_features = B.shape[0]
-#     random_state = check_random_state(random_state)
-#
-#     if shuffle:
-#         component_range = random_state.permutation(n_components)
-#     else:
-#         component_range = np.arange(n_components)
-#
-#     for k in component_range:
-#         scale = A[k, k]
-#         if update_support:
-#             support = np.where(dictionary[:, k] != 0)[0]
-#             if seen is not None:
-#                 support = np.intersect1d(support, seen, assume_unique=True)
-#             this_subset = np.union1d(subset, support)
-#         else:
-#             this_subset = subset
-#         radius = enet_norm(dictionary[this_subset, k], l1_ratio=l1_ratio)
-#
-#         if radius == 0:
-#             radius = 1
-#
-#         if scale < threshold:
-#             dictionary[this_subset, k] = 0
-#         else:
-#             grad = - B[this_subset, k] + dictionary[this_subset].dot(A[:, k])
-#             dictionary[this_subset, k] -= grad / scale
-#
-#         atom_norm_square = np.sum(dictionary[this_subset, k] ** 2) / radius
-#         if atom_norm_square == 0:
-#             atom_norm_square = 1
-#         # if atom_norm_square < threshold:
-#         #     if verbose == 1:
-#         #         sys.stdout.write("+")
-#         #         sys.stdout.flush()
-#         #     elif verbose:
-#         #         print("Adding new random atom")
-#         #     dictionary[this_subset, k] = random_state.randn(n_features)
-#         #     if l1_ratio != 0.:
-#         #         # Normalizating new random atom before enet projection
-#         #         dictionary[this_subset, k] /= sqrt(atom_norm_square) / radius
-#         #     atom_norm_square = np.sum(dictionary[this_subset, k] ** 2)
-#         #     # Setting corresponding coefs to 0
-#         #     A[k, :] = 0.0
-#         #     A[:, k] = 0.0
-#         # Projecting onto the norm ball
-#         if l1_ratio != 0.:
-#             dictionary[this_subset, k] = enet_projection(
-#                 dictionary[this_subset, k],
-#                 radius=radius,
-#                 l1_ratio=l1_ratio,
-#                 check_input=True)
-#         else:
-#             dictionary[this_subset, k] /= sqrt(atom_norm_square)
-#     if return_r2:
-#         return dictionary, 0
-#     else:
-#         return dictionary
-
-
 def _update_dict(dictionary, Y, code,
                  verbose=False,
                  return_r2=False,
@@ -941,7 +870,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
     radius = 1  # sqrt(n_features)
     if n_iter != 0 and iter_offset == 0 and inner_stats is None:
-        print('enet_scale')
         enet_scale(dictionary.T, l1_ratio=l1_ratio,
                    radius=radius,
                    inplace=True)
@@ -1068,7 +996,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
         A += np.dot(this_code, this_code.T) / pow(n_seen_samples,
                                                   learning_rate)
         B[subset] *= 1 - len_batch / np.power(count_seen_features[subset,
-                                                                 np.newaxis],
+                                                                  np.newaxis],
                                               learning_rate)
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
                                      this_code.T) / np.power(
@@ -1086,8 +1014,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
             full_update=full_update,
             shuffle=shuffle)
         total_time += time.time() - t1
-
-        print(enet_norm(dictionary.T, l1_ratio=l1_ratio))
 
         A_ref *= (1 - len_batch / pow(n_seen_samples, learning_rate))
         A_ref += np.dot(this_code, this_code.T) / pow(n_seen_samples,
@@ -1618,7 +1544,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
     """
 
-    def __init__(self, n_components=None, alpha=1, dict_penalty=0,
+    def __init__(self, n_components=None, alpha=1,
                  learning_rate=1,
                  l1_ratio=0.0,
                  n_iter=1000, fit_algorithm='lars', n_jobs=1,
@@ -1636,7 +1562,6 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                                        transform_alpha, split_sign,
                                        missing_values, n_jobs)
         self.alpha = alpha
-        self.dict_penalty = dict_penalty
         self.l1_ratio = l1_ratio
         self.n_iter = n_iter
         self.fit_algorithm = fit_algorithm
@@ -1778,10 +1703,10 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                 self.debug_info_ = debug_info
             else:
                 for key in self.debug_info_:
-                    self.debug_info_[key] += debug_info[key]
+                    if isinstance(self.debug_info_[key], list):
+                        self.debug_info_[key].extend(debug_info[key])
         else:
             U, self.inner_stats_ = res
-
         self.n_iter_ = iter_offset + n_iter
         self.components_ = U
         return self
