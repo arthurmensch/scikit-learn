@@ -26,7 +26,7 @@ def run():
                                      learning_rate=1,
                                      debug_info=True,
                                      shuffle=True,
-                                     feature_ratio=8,
+                                     feature_ratio=10,
                                      )
 
     t0 = time.time()

@@ -751,7 +751,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
                          batch_size=3, verbose=False, shuffle=True, n_jobs=1,
                          method='lars',
                          iter_offset=0, tol=0.,
-                         learning_rate=.5,
+                         learning_rate=1,
                          mask_subsets=None,
                          feature_ratio=1,
                          missing_values=None,
@@ -1030,7 +1030,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             subset = mask_subset
         else:
             subset = np.intersect1d(mask_subset, existing)
-        print(subset)
+        print(len(subset))
 
         full_update = (isinstance(subset, slice) and subset == slice(None))
 
@@ -1762,6 +1762,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             mask_subsets=self.mask_subsets_,
             method=self.fit_algorithm,
             n_jobs=self.n_jobs, dict_init=dict_init,
+            learning_rate=self.learning_rate,
             batch_size=batch_size,
             shuffle=self.shuffle,
             verbose=self.verbose, return_code=False,
