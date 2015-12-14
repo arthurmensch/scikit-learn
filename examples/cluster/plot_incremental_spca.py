@@ -6,6 +6,9 @@ import numpy as np
 from sklearn.decomposition.sparse_pca import IncrementalSparsePCA
 from sklearn import datasets
 
+import matplotlib
+matplotlib.use('Qt4Agg')
+
 def run():
     faces = datasets.fetch_olivetti_faces()
 
