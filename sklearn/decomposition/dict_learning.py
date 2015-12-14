@@ -942,6 +942,9 @@ def dict_learning_online(X, n_components=2, alpha=1, l1_ratio=0.0,
 
         # print(count_seen_features)
         # XXX Use sample weights
+
+        print(len(subset))
+
         this_code = sparse_encode(
             this_X[:, subset],
             subset_dictionary.T,
