@@ -32,7 +32,7 @@ def run():
     t0 = time.time()
 
 
-    for i in range(1):
+    for i in range(10):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)

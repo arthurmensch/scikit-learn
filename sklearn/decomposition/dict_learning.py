@@ -941,6 +941,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
     radius = 1  # sqrt(n_features)
     if n_iter != 0 and iter_offset == 0 and inner_stats is None:
+        print('enet_scale')
         enet_scale(dictionary.T, l1_ratio=l1_ratio,
                    radius=radius,
                    inplace=True)
@@ -1029,7 +1030,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             subset = mask_subset
         else:
             subset = np.intersect1d(mask_subset, existing)
-        print(subset[:10])
+        # print(subset[:10])
 
         full_update = (isinstance(subset, slice) and subset == slice(None))
 
@@ -1085,6 +1086,8 @@ def dict_learning_online(X, n_components=2, alpha=1,
             full_update=full_update,
             shuffle=shuffle)
         total_time += time.time() - t1
+
+        print(enet_norm(dictionary.T, l1_ratio=l1_ratio))
 
         A_ref *= (1 - len_batch / pow(n_seen_samples, learning_rate))
         A_ref += np.dot(this_code, this_code.T) / pow(n_seen_samples,
