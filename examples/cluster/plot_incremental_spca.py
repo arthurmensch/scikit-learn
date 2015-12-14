@@ -26,13 +26,13 @@ def run():
                                      learning_rate=1,
                                      debug_info=True,
                                      shuffle=True,
-                                     feature_ratio=10,
+                                     feature_ratio=8,
                                      )
 
     t0 = time.time()
 
 
-    for i in range(100):
+    for i in range(30):
         print('Epoch %i' % i)
         this_data = data
         this_data -= np.mean(this_data, axis=0)

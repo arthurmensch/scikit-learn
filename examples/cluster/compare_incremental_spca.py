@@ -19,7 +19,7 @@ def single_run(estimator, data):
     feature_ratio = estimator.feature_ratio
     delattr(estimator, 'inner_stats_')
     estimator.set_params(feature_ratio=1)
-    for i in range(200):
+    for i in range(20):
         print('New epoch %i' % i)
         this_data = data.copy()
         this_data -= np.mean(this_data, axis=0)

@@ -490,7 +490,6 @@ def _update_dict(dictionary, Y, code,
         component_range = random_state.permutation(n_components)
     else:
         component_range = np.arange(n_components)
-
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
