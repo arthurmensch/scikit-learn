@@ -11,7 +11,7 @@ from nose.tools import assert_greater
 from numpy.testing import assert_array_equal
 from scipy.sparse import csr_matrix
 from examples.recommender.convex_fm import array_to_fm_format, ConvexFM
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.base import RegressorMixin
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.externals.joblib import Memory, Parallel, delayed
@@ -152,6 +152,8 @@ class BaseRecommender(BaseEstimator, RegressorMixin):
         pass
 
 
+def _find_decomposition()
+
 class DLRecommender(BaseRecommender):
     def __init__(self, fm_decoder=None,
                  random_state=None, n_components=10,
@@ -184,6 +186,7 @@ class DLRecommender(BaseRecommender):
         if self.debug_folder is not None:
             self.dump_init()
         X_ref = self.fm_decoder.fm_to_csr(X, y)
+        n_elem = X_ref.getnnz()
         X_csr = X_ref.copy()
         interaction = csr_matrix((np.empty_like(X_csr.data),
                                   X_csr.indices, X_csr.indptr),
@@ -194,8 +197,8 @@ class DLRecommender(BaseRecommender):
                                        X_csr.shape[1])
         dict_learning = MiniBatchDictionaryLearning(
             n_components=self.n_components,
-            alpha=self.alpha,
-            transform_alpha=self.alpha,
+            alpha=self.alpha * n_elem,
+            transform_alpha=self.alpha * n_elem,
             fit_algorithm=self.algorithm,
             transform_algorithm=self.algorithm,
             dict_init=dict_init,
@@ -426,6 +429,46 @@ class OHStratifiedKFold(StratifiedKFold):
             yield mask
 
 
+def fit_and_predict(estimator, X, y, train, test):
+    estimator.fit(X[train], y[train])
+    return estimator.predict(X[test])
+
+
+def fit_cv_and_bag(X, y, estimator, train, test, debug_folder,
+                   random_state=None):
+    assert (isinstance(estimator, GridSearchCV))
+    assert (estimator.refit is False)
+
+    X_train = X[train]
+    y_train = y[train]
+    y_test = y[test]
+
+    if not os.path.exists(debug_folder):
+        os.makedirs(debug_folder)
+    estimator.fit(X_train, y_train)
+
+    best_estimator = clone(estimator.estimator).set_params(
+        **estimator.best_params_)
+    k_fold = KFold(shuffle=True, n_folds=3, random_state=random_state)
+    y_hat_list = Parallel(n_jobs=3, verbose=10)(delayed(fit_and_predict)
+                                                (clone(best_estimator),
+                                                 X, y, train,
+                                                 test) for train, _ in
+                                                k_fold.split(X, y))
+    y_hat = np.array(y_hat_list).mean(axis=0)
+    score = - sqrt(mean_squared_error(y_test, y_hat))
+
+    print('RMSE %s: %.3f' % (estimator, score))
+    if hasattr(estimator, 'grid_scores_'):
+        print(estimator.grid_scores_)
+    dump(estimator, join(debug_folder, 'estimator.pkl'))
+
+    with open(join(debug_folder, 'score'), 'w+') as f:
+        f.write('score : %.4f' % score)
+
+    return score
+
+
 def single_run(X, y, estimator, train, test, debug_folder=None):
     X_train = X[train]
     y_train = y[train]
@@ -435,11 +478,6 @@ def single_run(X, y, estimator, train, test, debug_folder=None):
     if not os.path.exists(debug_folder):
         os.makedirs(debug_folder)
 
-    # estimator.set_params(debug_folder=debug_folder)
-    #
-    # estimator.fit(X_train, y_train,
-    #               probe_list=[(X_test, y_test), (X_train, y_train)])
-    # else:
     estimator.fit(X_train, y_train)
 
     score = estimator.score(X_test, y_test)
@@ -461,7 +499,7 @@ def main():
     random_state = check_random_state(0)
     mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
     data = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                   remove_empty=True)
+                                   remove_empty=True, n_users=1000)
 
     permutation = random_state.permutation(data.shape[0])
     data = data[permutation]
@@ -476,26 +514,21 @@ def main():
                            n_components=50,
                            batch_size=10,
                            n_epochs=5,
-                           alpha=1,
+                           alpha=10e-8,
                            learning_rate=.75,
                            memory=mem,
                            l1_ratio=0.,
                            random_state=random_state)
-    # for alpha in np.logspace(-3, 0, 4)
-    # for learning_rate in [0.5, 0.75, 1]]
 
     dl_cv = GridSearchCV(dl_rec,
-                         param_grid={'alpha': np.logspace(-4, 2, 10)},
-                         # cv=OHStratifiedShuffleSplit(
-                         #     fm_decoder,
-                         #     n_iter=10, test_size=.2,
-                         #     random_state=random_state),
+                         param_grid={'alpha': np.logspace(-8, -6, 3)},
                          cv=KFold(
                              shuffle=True,
                              n_folds=3,
                              random_state=random_state),
                          error_score=-1000,
-                         n_jobs=30,
+                         n_jobs=3,
+                         refit=False,
                          verbose=10)
 
     convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
@@ -511,13 +544,16 @@ def main():
         fm_decoder,
         n_folds=3, random_state=random_state)
 
-    uniform_split = ShuffleSplit(n_iter=10,
+    uniform_split = ShuffleSplit(n_iter=1,
                                  test_size=.25, random_state=random_state)
 
     scores = Parallel(n_jobs=1, verbose=10)(
-        delayed(single_run)(X, y, estimator, train, test,
+        delayed(fit_cv_and_bag)(X, y, estimator, train, test,
                             debug_folder=join(output_dir,
-                                              "split_{}_est_{}".format(i, j)))
+                                              "split_{}_est_{}".format(i,
+                                                                       j)),
+                            )
+                            # random_state=random_state)
         for i, (train, test) in enumerate(
             uniform_split.split(X, y))
         for j, estimator in enumerate(estimators))
