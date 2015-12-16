@@ -623,6 +623,7 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
                 for j, grid_score in enumerate(self.grid_scores_):
                     scores_array[:, j] = self.grid_scores_[j].cv_validation_scores
                 best_idx = np.argmax(scores_array, axis=0)
+                print(scores_array)
                 used_estimators = list()
                 for split, idx in enumerate(best_idx):
                     used_estimators.append(estimators[n_splits * idx + split])
