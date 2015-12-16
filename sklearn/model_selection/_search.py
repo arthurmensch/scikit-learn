@@ -412,6 +412,8 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
            ``scoring`` parameter was set when fitting.
 
         """
+        if self.refit == 'bagging':
+            raise NotImplementedError('Fit manually')
         if self.scorer_ is None:
             raise ValueError("No score function explicitly defined, "
                              "and the estimator doesn't provide one %s"
@@ -438,6 +440,9 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
             underlying estimator.
 
         """
+        if self.refit == 'bagging':
+            pred = [estimator.predict(X) for estimator in self.best_estimator_]
+            return np.array(pred).mean(axis=0)
         return self.best_estimator_.predict(X)
 
     @if_delegate_has_method(delegate='estimator')
@@ -546,14 +551,15 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
         base_estimator = clone(self.estimator)
 
         pre_dispatch = self.pre_dispatch
-
+        return_estimator = self.refit == 'bagging'
         out = Parallel(
             n_jobs=self.n_jobs, verbose=self.verbose,
             pre_dispatch=pre_dispatch
         )(delayed(_fit_and_score)(clone(base_estimator), X, y, self.scorer_,
                                   train, test, self.verbose, parameters,
                                   self.fit_params, return_parameters=True,
-                                  error_score=self.error_score)
+                                  error_score=self.error_score,
+                                  return_estimator=return_estimator)
           for parameters in parameter_iterable
           for train, test in cv.split(X, y, labels))
 
@@ -562,12 +568,19 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
 
         scores = list()
         grid_scores = list()
+        if return_estimator:
+            estimators = list()
         for grid_start in range(0, n_fits, n_splits):
             n_test_samples = 0
             score = 0
             all_scores = []
-            for this_score, this_n_test_samples, _, parameters in \
-                    out[grid_start:grid_start + n_splits]:
+            for out_elem in out[grid_start:grid_start + n_splits]:
+                if not return_estimator:
+                    this_score, this_n_test_samples, _, parameters = out_elem
+                else:
+                    (this_score, this_n_test_samples, _,
+                     parameters, this_estimator) = out_elem
+                    estimators.append(this_estimator)
                 all_scores.append(this_score)
                 if self.iid:
                     this_score *= this_n_test_samples
@@ -594,15 +607,25 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
         self.best_score_ = best.mean_validation_score
 
         if self.refit:
-            # fit the best estimator using the entire dataset
-            # clone first to work around broken estimators
-            best_estimator = clone(base_estimator).set_params(
-                **best.parameters)
-            if y is not None:
-                best_estimator.fit(X, y, **self.fit_params)
-            else:
-                best_estimator.fit(X, **self.fit_params)
-            self.best_estimator_ = best_estimator
+            if self.refit is True:
+                # fit the best estimator using the entire dataset
+                # clone first to work around broken estimators
+                best_estimator = clone(base_estimator).set_params(
+                    **best.parameters)
+                if y is not None:
+                    best_estimator.fit(X, y, **self.fit_params)
+                else:
+                    best_estimator.fit(X, **self.fit_params)
+                self.best_estimator_ = best_estimator
+            elif self.refit == 'bagging':
+                used_estimators = list()
+                for i in range(n_splits):
+                    idx = sorted(range(len(self.grid_scores_)),
+                                 key=lambda x:
+                                 self.grid_scores_[x].cv_validation_scores[i],
+                                 reverse=True)[0]
+                    used_estimators.append(estimators[idx])
+                    self.best_estimator_ = used_estimators
         return self
 
 
