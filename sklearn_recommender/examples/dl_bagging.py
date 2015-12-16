@@ -43,7 +43,7 @@ def single_run_bagging(X, y,
 
     best_estimator.set_params(**estimator.best_params_)
     k_fold = estimator.cv
-    y_hat_list = Parallel(n_jobs=2, verbose=10,
+    y_hat_list = Parallel(n_jobs=3, verbose=10,
                           max_nbytes=None)(delayed(_fit_and_predict)
                                                 (clone(best_estimator),
                                                  X_train[train_model],
@@ -62,40 +62,6 @@ def single_run_bagging(X, y,
     return score
 
 
-def fit_cv_and_bag(X, y, estimator, train, test, debug_folder):
-    X_train = X[train]
-    y_train = y[train]
-    X_test = X[test]
-    y_test = y[test]
-
-    if not os.path.exists(debug_folder):
-        os.makedirs(debug_folder)
-
-    best_estimator = clone(estimator.estimator)
-    estimator.fit(X_train, y_train)
-
-    best_estimator.set_params(**estimator.best_params_)
-    k_fold = estimator.cv
-    y_hat_list = Parallel(n_jobs=3, verbose=10, max_nbytes=0)(delayed(_fit_and_predict)
-                                                (clone(best_estimator),
-                                                 X_train[train],
-                                                 y_train[train],
-                                                 X_test) for train, _ in
-                                                k_fold.split(X_train, y_train))
-    y_hat = np.array(y_hat_list).mean(axis=0)
-    score = - sqrt(mean_squared_error(y_test, y_hat))
-
-    print('RMSE %s: %.3f' % (estimator, score))
-    if hasattr(estimator, 'grid_scores_'):
-        print(estimator.grid_scores_)
-    dump(estimator, join(debug_folder, 'estimator.pkl'))
-
-    with open(join(debug_folder, 'score'), 'w+') as f:
-        f.write('score : %.4f' % score)
-
-    return score
-
-
 output_dir = expanduser(join('~/output/dl_recommender/',
                              datetime.datetime.now().strftime('%Y-%m-%d_%H'
                                                               '-%M-%S'))
@@ -105,7 +71,7 @@ os.makedirs(output_dir)
 random_state = check_random_state(0)
 mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
 X_csr = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True, n_users=10000)
+                                remove_empty=True)
 
 permutation = random_state.permutation(X_csr.shape[0])
 
@@ -125,7 +91,7 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
-                       n_epochs=5       ,
+                       n_epochs=5,
                        alpha=10e-8,
                        learning_rate=.75,
                        memory=mem,
