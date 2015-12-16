@@ -625,6 +625,7 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
                                  key=lambda x:
                                  self.grid_scores_[x].cv_validation_scores[i],
                                  reverse=True)[0]
+                    print(idx)
                     used_estimators.append(estimators[n_splits * idx + i])
                     self.best_estimator_ = used_estimators
         return self
