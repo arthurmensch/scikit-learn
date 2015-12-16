@@ -1,9 +1,7 @@
 import datetime
 import os
 from os.path import join, expanduser
-
 import numpy as np
-
 from sklearn.externals.joblib import Parallel, delayed, Memory
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import ShuffleSplit, KFold, GridSearchCV
@@ -12,6 +10,7 @@ from sklearn_recommender import DLRecommender, ConvexFM
 from sklearn_recommender.base import array_to_fm_format, FMDecoder, \
     BaseRecommender
 from sklearn_recommender.datasets import fetch_ml_10m
+
 
 def single_run(X, y,
                estimator, train, test,
@@ -71,7 +70,7 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
-                       n_epochs=5,
+                       n_epochs=1,
                        alpha=10e-8,
                        learning_rate=.75,
                        memory=mem,
@@ -79,13 +78,13 @@ dl_rec = DLRecommender(fm_decoder,
                        random_state=0)
 
 dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': [1e-4, 1e-3, 1e-2, 1e-1]},
-                            cv=KFold(
-                                shuffle=False,
-                                n_folds=3),
-                            error_score=-1000,
-                            n_jobs=20,
-                            refit='bagging',
-                            verbose=10)
+                     cv=KFold(
+                         shuffle=False,
+                         n_folds=3),
+                     error_score=-1000,
+                     n_jobs=20,
+                     refit='bagging',
+                     verbose=10)
 estimators = [dl_cv]
 
 scores = Parallel(n_jobs=1, verbose=10)(
