@@ -75,7 +75,7 @@ dl_rec = DLRecommender(fm_decoder,
                        learning_rate=.75,
                        memory=mem,
                        l1_ratio=0.,
-                       random_state=0)
+                       random_state=random_state)
 
 dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': [1e-4, 1e-3, 1e-2, 1e-1]},
                      cv=KFold(
