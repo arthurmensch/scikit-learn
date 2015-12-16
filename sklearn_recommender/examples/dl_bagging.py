@@ -29,7 +29,8 @@ def single_run(X, y,
             os.makedirs(debug_folder)
 
     estimator.fit(X_train, y_train)
-
+    print(estimator.best_estimator_)
+    print(estimator.grid_score_)
     y_hat = estimator.predict(X_test)
     score = np.sqrt(mean_squared_error(y_hat, y_test))
     print('RMSE %s: %.3f' % (estimator, score))
