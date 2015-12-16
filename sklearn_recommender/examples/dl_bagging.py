@@ -76,7 +76,7 @@ def fit_cv_and_bag(X, y, estimator, train, test, debug_folder):
 
     best_estimator.set_params(**estimator.best_params_)
     k_fold = estimator.cv
-    y_hat_list = Parallel(n_jobs=2, verbose=10, max_nbytes=0)(delayed(_fit_and_predict)
+    y_hat_list = Parallel(n_jobs=3, verbose=10, max_nbytes=0)(delayed(_fit_and_predict)
                                                 (clone(best_estimator),
                                                  X_train[train],
                                                  y_train[train],
@@ -125,7 +125,7 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
-                       n_epochs=5,
+                       n_epochs=5       ,
                        alpha=10e-8,
                        learning_rate=.75,
                        memory=mem,
