@@ -83,7 +83,7 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': [1e-4, 1e-3, 1e-2, 1e-1]},
                                 shuffle=False,
                                 n_folds=3),
                             error_score=-1000,
-                            n_jobs=3,
+                            n_jobs=20,
                             refit='bagging',
                             verbose=10)
 estimators = [dl_cv]
