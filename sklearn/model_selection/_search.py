@@ -619,15 +619,14 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
                     best_estimator.fit(X, **self.fit_params)
                 self.best_estimator_ = best_estimator
             elif self.refit == 'bagging':
+                scores_array = np.zeros((n_splits, len(self.grid_scores_)))
+                for j, grid_score in enumerate(self.grid_scores_):
+                    scores_array[:, j] = self.grid_scores_[j].cv_validation_scores
+                best_idx = np.argmax(scores_array, axis=0)
                 used_estimators = list()
-                for i in range(n_splits):
-                    idx = sorted(range(len(self.grid_scores_)),
-                                 key=lambda x:
-                                 self.grid_scores_[x].cv_validation_scores[i],
-                                 reverse=True)[0]
-                    print(idx)
-                    used_estimators.append(estimators[n_splits * idx + i])
-                    self.best_estimator_ = used_estimators
+                for split, idx in enumerate(best_idx):
+                    used_estimators.append(estimators[n_splits * idx + split])
+                self.best_estimator_ = used_estimators
         return self
 
 
