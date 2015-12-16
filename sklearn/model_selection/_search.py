@@ -610,6 +610,7 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
             if self.refit is True:
                 # fit the best estimator using the entire dataset
                 # clone first to work around broken estimators
+                print('refit')
                 best_estimator = clone(base_estimator).set_params(
                     **best.parameters)
                 if y is not None:
