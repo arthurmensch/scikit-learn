@@ -667,6 +667,11 @@ def dict_learning(X, n_components, alpha, l1_ratio=0, max_iter=100, tol=1e-8,
         if ii % 5 == 0 and callback is not None:
             callback(locals())
 
+    if ii > 0:
+        S = (dictionary ** 2).sum(axis=1)
+        S[S == 0] = 1
+        dictionary /= np.sqrt(S[:, np.newaxis])
+
     if return_n_iter:
         return code, dictionary, errors, ii + 1
     else:

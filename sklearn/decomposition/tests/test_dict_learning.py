@@ -195,10 +195,10 @@ def test_dict_learning_online_missing_value():
                                         batch_size=1,
                                         fit_algorithm='cd',
                                         missing_values=0,
-                                        alpha=1, shuffle=False, dict_init=V,
+                                        alpha=0.1, shuffle=False, dict_init=V,
                                         verbose=1,
                                         random_state=0).fit(sp_X)
-    dict2 = MiniBatchDictionaryLearning(n_components, alpha=1,
+    dict2 = MiniBatchDictionaryLearning(n_components, alpha=0.1,
                                         fit_algorithm='cd',
                                         missing_values=0,
                                         n_iter=1, dict_init=V, verbose=1,
@@ -209,7 +209,7 @@ def test_dict_learning_online_missing_value():
             dict2.partial_fit(sample)
 
     assert_true(not np.all(sparse_encode(sp_X, dict1.components_,
-                                        alpha=1,
+                                         alpha=0.1,
                                          missing_values=0,
                                          algorithm='lasso_cd') ==
                            0))
