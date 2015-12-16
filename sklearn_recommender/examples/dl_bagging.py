@@ -43,11 +43,12 @@ def single_run_bagging(X, y,
 
     best_estimator.set_params(**estimator.best_params_)
     k_fold = estimator.cv
-    y_hat_list = Parallel(n_jobs=3, verbose=10)(delayed(_fit_and_predict)
+    y_hat_list = Parallel(n_jobs=2, verbose=10,
+                          max_nbytes=None)(delayed(_fit_and_predict)
                                                 (clone(best_estimator),
-                                                 X_train[train],
-                                                 y_train[train],
-                                                 X_test) for train, _ in
+                                                 X_train[train_model],
+                                                 y_train[train_model],
+                                                 X_test) for train_model, _ in
                                                 k_fold.split(X_train, y_train))
     y_hat = np.array(y_hat_list).mean(axis=0)
     score = - sqrt(mean_squared_error(y_test, y_hat))
@@ -75,7 +76,7 @@ def fit_cv_and_bag(X, y, estimator, train, test, debug_folder):
 
     best_estimator.set_params(**estimator.best_params_)
     k_fold = estimator.cv
-    y_hat_list = Parallel(n_jobs=3, verbose=10)(delayed(_fit_and_predict)
+    y_hat_list = Parallel(n_jobs=2, verbose=10, max_nbytes=0)(delayed(_fit_and_predict)
                                                 (clone(best_estimator),
                                                  X_train[train],
                                                  y_train[train],
@@ -112,7 +113,7 @@ X_csr = X_csr[permutation]
 
 X, y = array_to_fm_format(X_csr)
 
-uniform_split = ShuffleSplit(n_iter=4,
+uniform_split = ShuffleSplit(n_iter=1,
                              test_size=.25, random_state=random_state)
 
 fm_decoder = FMDecoder(n_samples=X_csr.shape[0], n_features=X_csr.shape[1])
@@ -124,7 +125,7 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
-                       n_epochs=1,
+                       n_epochs=5,
                        alpha=10e-8,
                        learning_rate=.75,
                        memory=mem,
@@ -137,7 +138,7 @@ dl_cv = GridSearchCV(dl_rec,
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=6,
+                     n_jobs=15,
                      refit=False,
                      verbose=10)
 estimators = [dl_cv]
