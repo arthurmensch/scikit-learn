@@ -8,8 +8,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.base import RegressorMixin
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.utils import check_array
-
+from sklearn.utils import check_array, check_X_y
 import numpy as np
 import scipy.sparse as sp
 
@@ -100,7 +99,7 @@ class FMDecoder(BaseEstimator, TransformerMixin):
         if y is None:
             y = np.empty_like(samples)
             y[:] = np.nan
-        X_csr = csr_matrix((y, (samples,
+        X_csr = csr_matrix((np.asarray(y), (samples,
                                 features)), shape=(self.n_samples,
                                                    self.n_features))
         if not return_indices:
