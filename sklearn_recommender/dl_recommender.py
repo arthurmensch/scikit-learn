@@ -16,7 +16,6 @@ def _find_decomposition(X_ref, dict_learning,
     random_state = check_random_state(random_state)
     print(X_ref.indices.shape)
     print(X_ref.indptr.shape)
-    print(X_ref.data)
     X_csr = X_ref.copy()
     interaction = csr_matrix((np.zeros_like(X_csr.data),
                               X_csr.indices, X_csr.indptr),
@@ -105,13 +104,13 @@ class DLRecommender(BaseRecommender):
             learning_rate=self.learning_rate,
             verbose=3,
             debug_info=self.debug_folder is not None,
-            random_state=self.random_state)
+            random_state=random_state)
 
         if self.debug_folder is None:
             (self.global_mean_, self.sample_mean_,
              self.feature_mean_, self.dictionary_, self.code_) = \
                 self.memory.cache(_find_decomposition)(X_ref, dict_learning,
-                                    self.n_epochs, self.random_state)
+                                    self.n_epochs, random_state)
         if self.debug_folder is not None:
             X_csr = X_ref.copy()
             interaction = csr_matrix((np.empty_like(X_csr.data),
