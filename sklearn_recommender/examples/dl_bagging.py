@@ -82,7 +82,7 @@ dl_list = [DLRecommender(fm_decoder,
                          n_components=50,
                          batch_size=10,
                          n_epochs=5,
-                         alpha=0.01,
+                         alpha=alpha,
                          learning_rate=.75,
                          l1_ratio=0.,
                          random_state=0) for alpha in np.logspace(-4, 0, 5)]
@@ -96,8 +96,8 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                      n_jobs=15,
                      refit='bagging',
                      verbose=10)
-estimators = [dl_cv]
-# estimators = dl_list
+# estimators = [dl_cv]
+estimators = dl_list
 
 dump((X, y), 'test')
 X, y = load('test', mmap_mode='r')
