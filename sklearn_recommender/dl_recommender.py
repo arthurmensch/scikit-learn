@@ -115,7 +115,7 @@ class DLRecommender(BaseRecommender):
              self.feature_mean_, self.dictionary_, self.code_) = \
                 self.memory.cache(_find_decomposition)(X_ref, dict_learning,
                                                        self.n_epochs,
-                                                       random_state)
+                                                       self.random_state)
         if self.debug_folder is not None:
             X_csr = X_ref.copy()
             interaction = csr_matrix((np.empty_like(X_csr.data),
