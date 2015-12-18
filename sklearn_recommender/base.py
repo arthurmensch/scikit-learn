@@ -118,7 +118,7 @@ class FMDecoder(BaseEstimator, TransformerMixin):
                 indices_samples, indices_features = indices
             elif isinstance(indices, sp.csc_matrix):
                 indices_samples, indices_features = self.fm_to_indices(indices)
-            y = X_csr[indices_samples, indices_features].A[0]
+            y = X_csr[indices_samples, indices_features].A[0].copy()
         if not return_oh:
             return y
         else:

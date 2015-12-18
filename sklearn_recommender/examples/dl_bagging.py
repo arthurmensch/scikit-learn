@@ -4,7 +4,7 @@ from os.path import join, expanduser
 
 import numpy as np
 
-from sklearn.externals.joblib import Parallel, delayed, Memory, dump
+from sklearn.externals.joblib import Parallel, delayed, Memory, dump, load
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import ShuffleSplit, KFold, GridSearchCV
 from sklearn.utils import check_random_state
@@ -30,8 +30,8 @@ def single_run(X, y,
             os.makedirs(debug_folder)
 
     estimator.fit(X_train, y_train)
-    print(estimator.best_estimator_)
-    print(estimator.grid_scores_)
+    # print(estimator.best_estimator_)
+    # print(estimator.grid_scores_)
     y_hat = estimator.predict(X_test)
     score = np.sqrt(mean_squared_error(y_hat, y_test))
     print('RMSE %s: %.3f' % (estimator, score))
@@ -74,7 +74,7 @@ dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
                        n_epochs=1,
-                       alpha=10e-8,
+                       alpha=0.01,
                        learning_rate=.75,
                        memory=mem,
                        l1_ratio=0.,
@@ -85,10 +85,13 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 2, 7)},
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=21,
+                     n_jobs=3,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
+
+dump((X, y), 'test')
+X, y = load('test', mmap_mode='r')
 
 scores = Parallel(n_jobs=1, verbose=10)(
     delayed(single_run)(X, y, estimator, train, test,
