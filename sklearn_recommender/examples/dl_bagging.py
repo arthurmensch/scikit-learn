@@ -88,12 +88,12 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                      n_jobs=15,
                      refit='bagging',
                      verbose=10)
-estimators = [dl_rec]
+estimators = [dl_cv]
 
 dump((X, y), 'test')
 X, y = load('test', mmap_mode='r')
 
-scores = Parallel(n_jobs=20, verbose=10, max_nbytes=None)(
+scores = Parallel(n_jobs=1, verbose=10, max_nbytes=None)(
     delayed(single_run)(X, y, estimator, train, test,
                         estimator_idx, split_idx,
                         output_dir=output_dir

@@ -235,7 +235,8 @@ def _fit_and_score(estimator, X, y, scorer, train, test, verbose,
         estimator.set_params(**parameters)
 
     start_time = time.time()
-
+    print(train)
+    print(test)
     X_train, y_train = _safe_split(estimator, X, y, train)
     X_test, y_test = _safe_split(estimator, X, y, test, train)
 
