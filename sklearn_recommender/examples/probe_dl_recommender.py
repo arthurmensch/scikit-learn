@@ -28,7 +28,7 @@ def single_run(X, y,
                                                                  estimator_idx))
         if not os.path.exists(debug_folder):
             os.makedirs(debug_folder)
-        estimator.set_params(debug_folder)
+        estimator.set_params(debug_folder=debug_folder)
         estimator.fit(X_train, y_train, probe=[(X_test, y_test)])
     else:
         estimator.fit(X_train, y_train)
