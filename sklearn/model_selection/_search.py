@@ -556,8 +556,7 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
         return_estimator = self.refit == 'bagging'
         out = Parallel(
             n_jobs=self.n_jobs, verbose=self.verbose,
-            # max_nbytes=None,
-            # mmap_mode='r',
+            max_nbytes='100M',
             pre_dispatch=pre_dispatch
         )(delayed(self.memory.cache(_fit_and_score))(clone(base_estimator), X, y, self.scorer_,
                                   train, test, self.verbose, parameters,

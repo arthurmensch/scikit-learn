@@ -81,7 +81,7 @@ dl_rec = DLRecommender(fm_decoder,
 dl_list = [DLRecommender(fm_decoder,
                          n_components=50,
                          batch_size=10,
-                         n_epochs=5,
+                         n_epochs=1,
                          alpha=alpha,
                          learning_rate=.75,
                          l1_ratio=0.,
@@ -99,10 +99,7 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
 estimators = [dl_cv]
 # estimators = dl_list
 
-dump((X, y), 'test')
-X, y = load('test', mmap_mode='r')
-
-scores = Parallel(n_jobs=1, verbose=10, max_nbytes=None)(
+scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
                             estimator_idx, split_idx,
                             output_dir=output_dir
