@@ -53,7 +53,7 @@ os.makedirs(output_dir)
 random_state = check_random_state(0)
 mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
 X_csr = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True, n_users=200)
 
 permutation = random_state.permutation(X_csr.shape[0])
 
@@ -80,13 +80,12 @@ dl_rec = DLRecommender(fm_decoder,
                        l1_ratio=0.,
                        random_state=random_state)
 
-dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5),
-                                         'random_state': [10, 20]},
+dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                      cv=KFold(
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=30,
+                     n_jobs=15,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
