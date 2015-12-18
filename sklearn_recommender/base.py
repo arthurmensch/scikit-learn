@@ -99,9 +99,9 @@ class FMDecoder(BaseEstimator, TransformerMixin):
         if y is None:
             y = np.empty_like(samples)
             y[:] = np.nan
-        X_csr = csr_matrix((np.asarray(y), (samples,
+        X_csr = csr_matrix((y, (samples,
                                 features)), shape=(self.n_samples,
-                                                   self.n_features))
+                                                   self.n_features)).sort_indices()
         if not return_indices:
             return X_csr
         else:
