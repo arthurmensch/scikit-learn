@@ -80,12 +80,13 @@ dl_rec = DLRecommender(fm_decoder,
                        l1_ratio=0.,
                        random_state=random_state)
 
-dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 2, 7)},
+dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5),
+                                         'random_state': [10, 20]},
                      cv=KFold(
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=21,
+                     n_jobs=30,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
