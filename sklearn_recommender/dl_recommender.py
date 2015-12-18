@@ -12,7 +12,7 @@ from .base import csr_center_data, BaseRecommender
 
 
 def _find_decomposition(X_ref, dict_learning,
-                        n_epochs, random_state):
+                        n_epochs):
     # print('Not cached')
     # return (0, np.zeros(X_ref.shape[0]),
     #         np.zeros(X_ref.shape[1]),
@@ -20,7 +20,7 @@ def _find_decomposition(X_ref, dict_learning,
     #                   X_ref.shape[1])),
     #         np.zeros((X_ref.shape[0], dict_learning.n_components)))
 
-    random_state = check_random_state(random_state)
+    # random_state = check_random_state(random_state)
     X_csr = X_ref.copy()
     interaction = csr_matrix((np.zeros_like(X_csr.data),
                               X_csr.indices, X_csr.indptr),
@@ -32,8 +32,8 @@ def _find_decomposition(X_ref, dict_learning,
         X_ref.data += interaction.data
         X_csr.data += interaction.data
 
-        permutation = random_state.permutation(X_csr.shape[0])
-        dict_learning.partial_fit(X_csr[permutation], deprecated=False)
+        # permutation = random_state.permutation(X_csr.shape[0])
+        dict_learning.partial_fit(X_csr, deprecated=False)
 
         dictionary = dict_learning.components_
         code = dict_learning.transform(X_csr)
@@ -102,7 +102,7 @@ class DLRecommender(BaseRecommender):
                 dict_init=dict_init,
                 l1_ratio=self.l1_ratio,
                 batch_size=self.batch_size,
-                shuffle=False,
+                shuffle=True,
                 n_iter=n_iter,
                 missing_values=0,
                 learning_rate=self.learning_rate,
@@ -114,8 +114,7 @@ class DLRecommender(BaseRecommender):
             (self.global_mean_, self.sample_mean_,
              self.feature_mean_, self.dictionary_, self.code_) = \
                 self.memory.cache(_find_decomposition)(X_ref, dict_learning,
-                                                       self.n_epochs,
-                                                       self.random_state)
+                                                       self.n_epochs)
         if self.debug_folder is not None:
             X_csr = X_ref.copy()
             interaction = csr_matrix((np.empty_like(X_csr.data),
