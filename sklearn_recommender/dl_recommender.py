@@ -13,12 +13,12 @@ from .base import csr_center_data, BaseRecommender
 
 def _find_decomposition(X_ref, dict_learning,
                         n_epochs, random_state):
-    print('Not cached')
-    return (0, np.zeros(X_ref.shape[0]),
-            np.zeros(X_ref.shape[1]),
-            np.zeros((dict_learning.n_components,
-                      X_ref.shape[1])),
-            np.zeros((X_ref.shape[0], dict_learning.n_components)))
+    # print('Not cached')
+    # return (0, np.zeros(X_ref.shape[0]),
+    #         np.zeros(X_ref.shape[1]),
+    #         np.zeros((dict_learning.n_components,
+    #                   X_ref.shape[1])),
+    #         np.zeros((X_ref.shape[0], dict_learning.n_components)))
 
     random_state = check_random_state(random_state)
     X_csr = X_ref.copy()
