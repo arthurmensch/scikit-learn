@@ -92,13 +92,13 @@ class FMDecoder(BaseEstimator, TransformerMixin):
         return samples, features
 
     def fm_to_csr(self, X, y=None, return_indices=False):
-        X = check_array(X, copy=True)
+        X = check_array(X, copy=True, accept_sparse='csr')
         (samples, features) = self.fm_to_indices(X)
         if y is None:
             y = np.empty_like(samples)
             y[:] = np.nan
         else:
-            y = check_array(y, copy=True)
+            y = check_array(y, copy=True, ensure_2d=False)
         X_csr = csr_matrix((y, (samples,
                                 features)), shape=(self.n_samples,
                                                    self.n_features))
