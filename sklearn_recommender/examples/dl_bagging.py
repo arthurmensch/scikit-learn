@@ -1,8 +1,10 @@
 import datetime
 import os
 from os.path import join, expanduser
+
 import numpy as np
-from sklearn.externals.joblib import Parallel, delayed, Memory
+
+from sklearn.externals.joblib import Parallel, delayed, Memory, dump
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import ShuffleSplit, KFold, GridSearchCV
 from sklearn.utils import check_random_state
@@ -37,6 +39,7 @@ def single_run(X, y,
     if output_dir is not None:
         with open(join(debug_folder, 'score'), 'w+') as f:
             f.write('score : %.4f' % score)
+        dump(estimator, join(debug_folder, 'estimator'))
 
     return score
 
@@ -70,7 +73,7 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
-                       n_epochs=1,
+                       n_epochs=5,
                        alpha=10e-8,
                        learning_rate=.75,
                        memory=mem,
@@ -82,7 +85,7 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 2, 7)},
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=15,
+                     n_jobs=21,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
