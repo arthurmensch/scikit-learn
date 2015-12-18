@@ -78,14 +78,14 @@ dl_rec = DLRecommender(fm_decoder,
                        learning_rate=.75,
                        memory=mem,
                        l1_ratio=0.,
-                       random_state=random_state)
+                       random_state=0)
 
 dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                      cv=KFold(
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=15,
+                     n_jobs=1,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
