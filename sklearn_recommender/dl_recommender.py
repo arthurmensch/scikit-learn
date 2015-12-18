@@ -108,7 +108,7 @@ class DLRecommender(BaseRecommender):
                 learning_rate=self.learning_rate,
                 verbose=3,
                 debug_info=self.debug_folder is not None,
-                random_state=random_state)
+                random_state=self.random_state)
 
         if self.debug_folder is None:
             (self.global_mean_, self.sample_mean_,
