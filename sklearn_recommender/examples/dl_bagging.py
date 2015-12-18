@@ -89,6 +89,7 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
+# estimators = dl_rec
 
 dump((X, y), 'test')
 X, y = load('test', mmap_mode='r')
