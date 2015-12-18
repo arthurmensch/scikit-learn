@@ -77,11 +77,8 @@ class FMDecoder(BaseEstimator, TransformerMixin):
         self.n_features = n_features
 
     def fm_to_indices(self, X):
-        try:
-            assert_array_equal(X.indptr,
-                               np.arange(0, (X.shape[0] + 1) * 2, 2))
-        except AssertionError:
-            print('WTF')
+        assert_array_equal(X.indptr,
+                           np.arange(0, (X.shape[0] + 1) * 2, 2))
         features = np.maximum(X.indices[1::2], X.indices[::2])
         samples = np.minimum(X.indices[1::2], X.indices[::2])
         assert_greater(features.min(), samples.max())
