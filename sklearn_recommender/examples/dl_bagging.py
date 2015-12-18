@@ -70,7 +70,7 @@ base_estimator = BaseRecommender(fm_decoder)
 
 convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
                      beta=1, verbose=100)
-dl_rec = DLRecommender(fm_decoder,
+dl_rec = [DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
                        n_epochs=5,
@@ -78,7 +78,7 @@ dl_rec = DLRecommender(fm_decoder,
                        learning_rate=.75,
                        memory=mem,
                        l1_ratio=0.,
-                       random_state=0)
+                       random_state=0) for alpha in np.logspace(-4, 0, 5)]
 
 dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                      cv=KFold(
@@ -88,12 +88,12 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                      n_jobs=15,
                      refit='bagging',
                      verbose=10)
-estimators = [dl_cv]
+estimators = [dl_rec]
 
 dump((X, y), 'test')
 X, y = load('test', mmap_mode='r')
 
-scores = Parallel(n_jobs=1, verbose=10)(
+scores = Parallel(n_jobs=20, verbose=10)(
     delayed(single_run)(X, y, estimator, train, test,
                         estimator_idx, split_idx,
                         output_dir=output_dir

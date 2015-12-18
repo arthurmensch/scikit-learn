@@ -111,7 +111,7 @@ class DLRecommender(BaseRecommender):
                 random_state=self.random_state)
 
         if self.debug_folder is None:
-            print(X_ref)
+            # print(X_ref)
             (self.global_mean_, self.sample_mean_,
              self.feature_mean_, self.dictionary_, self.code_) = \
                 self.memory.cache(_find_decomposition)(X_ref, dict_learning,
