@@ -14,7 +14,9 @@ from .base import csr_center_data, BaseRecommender
 def _find_decomposition(X_ref, dict_learning,
                         n_epochs, random_state):
     random_state = check_random_state(random_state)
-
+    print(X_ref.indices.shape)
+    print(X_ref.indptr.shape)
+    print(X_ref.data)
     X_csr = X_ref.copy()
     interaction = csr_matrix((np.zeros_like(X_csr.data),
                               X_csr.indices, X_csr.indptr),
