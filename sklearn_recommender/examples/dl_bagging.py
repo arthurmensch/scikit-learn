@@ -87,7 +87,7 @@ dl_list = [DLRecommender(fm_decoder,
                          l1_ratio=0.,
                          random_state=0) for alpha in np.logspace(-4, 0, 5)]
 
-dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
+dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(1, 5, 5)},
                      cv=KFold(
                              shuffle=False,
                              n_folds=3),
