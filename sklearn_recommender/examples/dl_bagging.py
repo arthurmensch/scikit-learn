@@ -75,7 +75,7 @@ dl_rec = DLRecommender(fm_decoder,
                        batch_size=10,
                        n_epochs=1,
                        alpha=0.01,
-                       learning_rate=.75,
+                       learning_rate=1,
                        memory=mem,
                        l1_ratio=0.,
                        random_state=random_state)
@@ -85,7 +85,7 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 2, 7)},
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=3,
+                     n_jobs=21,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
