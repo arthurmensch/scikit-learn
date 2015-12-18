@@ -93,7 +93,7 @@ estimators = [dl_rec]
 dump((X, y), 'test')
 X, y = load('test', mmap_mode='r')
 
-scores = Parallel(n_jobs=20, verbose=10)(
+scores = Parallel(n_jobs=20, verbose=10, max_nbytes=None)(
     delayed(single_run)(X, y, estimator, train, test,
                         estimator_idx, split_idx,
                         output_dir=output_dir
