@@ -53,7 +53,7 @@ os.makedirs(output_dir)
 random_state = check_random_state(0)
 mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
 X_csr = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True, n_users=10000)
 
 permutation = random_state.permutation(X_csr.shape[0])
 
@@ -85,7 +85,7 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 2, 7)},
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=21,
+                     n_jobs=3,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]

@@ -505,6 +505,8 @@ class MemorizedFunc(Logger):
     #-------------------------------------------------------------------------
 
     def _get_argument_hash(self, *args, **kwargs):
+        for i, arg in enumerate(args):
+            print('hashing %s : %s' % (i, hashing.hash(arg)))
         return hashing.hash(filter_args(self.func, self.ignore,
                                          args, kwargs),
                              coerce_mmap=(self.mmap_mode is not None))

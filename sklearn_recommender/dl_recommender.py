@@ -13,9 +13,14 @@ from .base import csr_center_data, BaseRecommender
 
 def _find_decomposition(X_ref, dict_learning,
                         n_epochs, random_state):
+    print('Not cached')
+    return (0, np.zeros(X_ref.shape[0]),
+            np.zeros(X_ref.shape[1]),
+            np.zeros((dict_learning.n_components,
+                      X_ref.shape[1])),
+            np.zeros((X_ref.shape[0], dict_learning.n_components)))
+
     random_state = check_random_state(random_state)
-    print(X_ref.indices.shape)
-    print(X_ref.indptr.shape)
     X_csr = X_ref.copy()
     interaction = csr_matrix((np.zeros_like(X_csr.data),
                               X_csr.indices, X_csr.indptr),
@@ -32,7 +37,6 @@ def _find_decomposition(X_ref, dict_learning,
 
         dictionary = dict_learning.components_
         code = dict_learning.transform(X_csr)
-
 
         # FIXME could be factored
         for j in range(X_csr.shape[0]):
@@ -78,7 +82,7 @@ class DLRecommender(BaseRecommender):
             indices = X_csr.indices[X_csr.indptr[i]:X_csr.indptr[i + 1]]
             X_csr.data[X_csr.indptr[i]:
             X_csr.indptr[i + 1]] += self.code_[i].dot(
-                self.dictionary_[:, indices])
+                    self.dictionary_[:, indices])
 
     def fit(self, X, y, **dump_kwargs):
         if self.debug_folder is not None:
@@ -90,37 +94,39 @@ class DLRecommender(BaseRecommender):
         dict_init = random_state.randn(self.n_components,
                                        X_ref.shape[1])
         dict_learning = MiniBatchDictionaryLearning(
-            n_components=self.n_components,
-            alpha=self.alpha,
-            transform_alpha=self.alpha,
-            fit_algorithm=self.algorithm,
-            transform_algorithm=self.algorithm,
-            dict_init=dict_init,
-            l1_ratio=self.l1_ratio,
-            batch_size=self.batch_size,
-            shuffle=False,
-            n_iter=n_iter,
-            missing_values=0,
-            learning_rate=self.learning_rate,
-            verbose=3,
-            debug_info=self.debug_folder is not None,
-            random_state=random_state)
+                n_components=self.n_components,
+                alpha=self.alpha,
+                transform_alpha=self.alpha,
+                fit_algorithm=self.algorithm,
+                transform_algorithm=self.algorithm,
+                dict_init=dict_init,
+                l1_ratio=self.l1_ratio,
+                batch_size=self.batch_size,
+                shuffle=False,
+                n_iter=n_iter,
+                missing_values=0,
+                learning_rate=self.learning_rate,
+                verbose=3,
+                debug_info=self.debug_folder is not None,
+                random_state=random_state)
 
         if self.debug_folder is None:
             (self.global_mean_, self.sample_mean_,
              self.feature_mean_, self.dictionary_, self.code_) = \
                 self.memory.cache(_find_decomposition)(X_ref, dict_learning,
-                                    self.n_epochs, random_state)
+                                                       self.n_epochs,
+                                                       random_state)
         if self.debug_folder is not None:
             X_csr = X_ref.copy()
             interaction = csr_matrix((np.empty_like(X_csr.data),
-                          X_csr.indices, X_csr.indptr),
-                         shape=X_csr.shape)
+                                      X_csr.indices, X_csr.indptr),
+                                     shape=X_csr.shape)
             self.code_ = np.zeros((X.shape[0], self.n_components))
             for i in range(self.n_epochs):
                 X_ref.data -= interaction.data
                 (X_csr, self.global_mean_,
-                 self.sample_mean_, self.feature_mean_) = csr_center_data(X_ref)
+                 self.sample_mean_, self.feature_mean_) = csr_center_data(
+                    X_ref)
                 X_ref.data += interaction.data
                 X_csr.data += interaction.data
                 permutation = random_state.permutation(X_csr.shape[0])
@@ -134,7 +140,7 @@ class DLRecommender(BaseRecommender):
                                               deprecated=False)
                     self.dictionary_ = dict_learning.components_
                     self.code_[:last_seen] = dict_learning.transform(
-                        X_csr[:last_seen])
+                            X_csr[:last_seen])
                     self.n_iter_ = dict_learning.n_iter_
                     self.dump_inter(debug_dict=dict_learning.debug_info_,
                                     **dump_kwargs)

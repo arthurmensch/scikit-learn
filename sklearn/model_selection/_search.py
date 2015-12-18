@@ -554,7 +554,8 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
         return_estimator = self.refit == 'bagging'
         out = Parallel(
             n_jobs=self.n_jobs, verbose=self.verbose,
-            max_nbytes=None,
+            # max_nbytes=None,
+            mmap_mode='r',
             pre_dispatch=pre_dispatch
         )(delayed(_fit_and_score)(clone(base_estimator), X, y, self.scorer_,
                                   train, test, self.verbose, parameters,
@@ -625,7 +626,7 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
                     scores_array[:, j] = self.grid_scores_[j].cv_validation_scores
                 best_idx = np.argmax(scores_array, axis=1)
                 print(scores_array)
-                print(estimators)
+                # print(estimators)
                 used_estimators = list()
                 for split, idx in enumerate(best_idx):
                     print(n_splits * idx + split)
