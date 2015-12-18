@@ -112,7 +112,7 @@ class FMDecoder(BaseEstimator, TransformerMixin):
         assert (X_csr.shape == (self.n_samples, self.n_features))
 
         if indices is None:
-            y = X_csr.data
+            y = check_array(X_csr.data, ensure_2d=False, copy=True)
         else:
             if isinstance(indices, tuple):
                 indices_samples, indices_features = indices
@@ -154,7 +154,7 @@ def array_to_fm_format(X):
     y: array, shape (n_x_entries,)
         Non-empty values in X.
     """
-    X = check_array(X, accept_sparse='coo', force_all_finite=False)
+    X = check_array(X, accept_sparse='coo', force_all_finite=False, copy=True)
     n_rows, n_cols = X.shape
     encoder = OneHotEncoder(n_values=[n_rows, n_cols])
     if sp.issparse(X):
