@@ -19,6 +19,7 @@ import warnings
 
 import numpy as np
 
+from sklearn.externals.joblib import Memory
 from ..base import BaseEstimator, is_classifier, clone
 from ..base import MetaEstimatorMixin, ChangedBehaviorWarning
 from ._split import check_cv
@@ -368,7 +369,8 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
     def __init__(self, estimator, scoring=None,
                  fit_params=None, n_jobs=1, iid=True,
                  refit=True, cv=None, verbose=0, pre_dispatch='2*n_jobs',
-                 error_score='raise'):
+                 error_score='raise',
+                 ):
 
         self.scoring = scoring
         self.estimator = estimator
@@ -554,10 +556,10 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
         return_estimator = self.refit == 'bagging'
         out = Parallel(
             n_jobs=self.n_jobs, verbose=self.verbose,
-            max_nbytes='10K',
+            max_nbytes=None,
             # mmap_mode='r',
             pre_dispatch=pre_dispatch
-        )(delayed(_fit_and_score)(clone(base_estimator), X, y, self.scorer_,
+        )(delayed(self.memory.cache(_fit_and_score))(clone(base_estimator), X, y, self.scorer_,
                                   train, test, self.verbose, parameters,
                                   self.fit_params, return_parameters=True,
                                   error_score=self.error_score,
@@ -807,13 +809,15 @@ class GridSearchCV(BaseSearchCV):
 
     def __init__(self, estimator, param_grid, scoring=None, fit_params=None,
                  n_jobs=1, iid=True, refit=True, cv=None, verbose=0,
-                 pre_dispatch='2*n_jobs', error_score='raise'):
+                 pre_dispatch='2*n_jobs', error_score='raise',
+                 memory=Memory(cachedir=None)):
 
         super(GridSearchCV, self).__init__(
             estimator=estimator, scoring=scoring, fit_params=fit_params,
             n_jobs=n_jobs, iid=iid, refit=refit, cv=cv, verbose=verbose,
             pre_dispatch=pre_dispatch, error_score=error_score)
         self.param_grid = param_grid
+        self.memory = memory
         _check_param_grid(param_grid)
 
     def fit(self, X, y=None, labels=None):

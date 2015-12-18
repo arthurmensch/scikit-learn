@@ -62,7 +62,7 @@ class DLRecommender(BaseRecommender):
                  alpha=1., l1_ratio=0., algorithm='ridge',
                  n_epochs=1, batch_size=10,
                  learning_rate=0.5,
-                 memory=Memory(cachedir=None),
+                 # memory=Memory(cachedir=None),
                  debug_folder=None,
                  ):
         BaseRecommender.__init__(self, fm_decoder)
@@ -74,7 +74,7 @@ class DLRecommender(BaseRecommender):
         self.batch_size = batch_size
         self.random_state = random_state
         self.n_epochs = n_epochs
-        self.memory = memory
+        # self.memory = memory
         self.debug_folder = debug_folder
 
     def _predict_quadratic(self, X_csr, samples, features):
@@ -114,8 +114,7 @@ class DLRecommender(BaseRecommender):
             # print(X_ref)
             (self.global_mean_, self.sample_mean_,
              self.feature_mean_, self.dictionary_, self.code_) = \
-                self.memory.cache(_find_decomposition)(X_ref, dict_learning,
-                                                       self.n_epochs)
+                _find_decomposition(X_ref, dict_learning, self.n_epochs)
         if self.debug_folder is not None:
             X_csr = X_ref.copy()
             interaction = csr_matrix((np.empty_like(X_csr.data),

@@ -53,7 +53,7 @@ os.makedirs(output_dir)
 random_state = check_random_state(0)
 mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
 X_csr = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True, n_users=200)
 
 permutation = random_state.permutation(X_csr.shape[0])
 
@@ -73,10 +73,9 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
                        batch_size=10,
-                       n_epochs=5,
+                       n_epochs=1,
                        alpha=0.01,
                        learning_rate=.75,
-                       memory=mem,
                        l1_ratio=0.,
                        random_state=0)
 dl_list = [DLRecommender(fm_decoder,
@@ -85,7 +84,6 @@ dl_list = [DLRecommender(fm_decoder,
                        n_epochs=5,
                        alpha=0.01,
                        learning_rate=.75,
-                       memory=mem,
                        l1_ratio=0.,
                        random_state=0) for alpha in np.logspace(-4, 0, 5)]
 
@@ -94,11 +92,12 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5)},
                          shuffle=False,
                          n_folds=3),
                      error_score=-1000,
-                     n_jobs=15,
+                     memory=mem,
+                     n_jobs=3,
                      refit='bagging',
                      verbose=10)
-# estimators = [dl_cv]
-estimators = dl_list
+estimators = [dl_cv]
+# estimators = dl_list
 
 dump((X, y), 'test')
 X, y = load('test', mmap_mode='r')
