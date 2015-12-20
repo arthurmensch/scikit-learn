@@ -160,6 +160,8 @@ class DLRecommender(BaseRecommender):
                 count_seen_features, A_ref, B_ref = residual_stat
                 n_seen_samples = 0
                 count_seen_features[:] = 0
+                A *= X_csr.shape[0]
+                B *= X_csr.shape[0]
                 residual_stats = (last_cost, norm_cost, penalty_cost,
                                   n_seen_samples,
                                   count_seen_features, A_ref, B_ref)
