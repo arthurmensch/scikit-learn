@@ -152,7 +152,8 @@ class DLRecommender(BaseRecommender):
                     X_csr.indptr[j + 1]]
                     interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
                         self.code_[j].dot(self.dictionary_[:, indices])
-
+                self.dictionary_ -= self.dictionary_.mean(
+                        axis=0)[np.newaxis, :]
                 # A, B, residual_stat = dict_learning.inner_stats_
                 # last_cost, norm_cost, penalty_cost, n_seen_samples, \
                 # count_seen_features, A_ref, B_ref = residual_stat

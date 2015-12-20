@@ -78,9 +78,9 @@ dl_list = [DLRecommender(fm_decoder,
                          random_state=0)
            for alpha in np.logspace(-4, 0, 5)
            for learning_rate in [.5, .75, 1]]
-estimators = dl_list
+estimators = dl_list[12:13]
 
-scores = Parallel(n_jobs=15, verbose=10, max_nbytes='100M')(
+scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
                             estimator_idx, split_idx,
                             output_dir=output_dir
