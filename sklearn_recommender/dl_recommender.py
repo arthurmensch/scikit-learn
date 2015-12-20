@@ -155,17 +155,17 @@ class DLRecommender(BaseRecommender):
                     interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
                         self.code_[j].dot(self.dictionary_[:, indices])
 
-                A, B, residual_stat = dict_learning.inner_stats_
-                last_cost, norm_cost, penalty_cost, n_seen_samples, \
-                count_seen_features, A_ref, B_ref = residual_stat
-                n_seen_samples = 0
-                count_seen_features[:] = 0
-                A *= X_csr.shape[0]
-                B *= X_csr.shape[0]
-                residual_stats = (last_cost, norm_cost, penalty_cost,
-                                  n_seen_samples,
-                                  count_seen_features, A_ref, B_ref)
-                dict_learning.inner_stats_ = A, B, residual_stats
+                # A, B, residual_stat = dict_learning.inner_stats_
+                # last_cost, norm_cost, penalty_cost, n_seen_samples, \
+                # count_seen_features, A_ref, B_ref = residual_stat
+                # n_seen_samples = 0
+                # count_seen_features[:] = 0
+                # A *= X_csr.shape[0]
+                # B *= X_csr.shape[0]
+                # residual_stats = (last_cost, norm_cost, penalty_cost,
+                #                   n_seen_samples,
+                #                   count_seen_features, A_ref, B_ref)
+                # dict_learning.inner_stats_ = A, B, residual_stats
         return self
 
     def dump_init(self):
