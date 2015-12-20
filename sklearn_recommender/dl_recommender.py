@@ -144,8 +144,6 @@ class DLRecommender(BaseRecommender):
                     self.dump_inter(debug_dict=dict_learning.debug_info_,
                                     **dump_kwargs)
 
-                dict_learning.partial_fit(X_csr[permutation], deprecated=False)
-
                 self.dictionary_ = dict_learning.components_
                 self.code_ = dict_learning.transform(X_csr)
 
@@ -165,7 +163,7 @@ class DLRecommender(BaseRecommender):
                 # residual_stats = (last_cost, norm_cost, penalty_cost,
                 #                   n_seen_samples,
                 #                   count_seen_features, A_ref, B_ref)
-                # dict_learning.inner_stats_ = A, B, residual_stats
+                dict_learning.inner_stats_ = None
         return self
 
     def dump_init(self):
