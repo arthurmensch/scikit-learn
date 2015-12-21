@@ -53,7 +53,7 @@ os.makedirs(output_dir)
 random_state = check_random_state(0)
 mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
 X_csr = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True) #n_users=10000)
 
 permutation = random_state.permutation(X_csr.shape[0])
 
@@ -71,14 +71,15 @@ base_estimator = BaseRecommender(fm_decoder)
 dl_list = [DLRecommender(fm_decoder,
                          n_components=50,
                          batch_size=10,
-                         n_epochs=5,
+                         n_epochs=10,
                          alpha=alpha,
                          learning_rate=learning_rate,
                          l1_ratio=0.,
                          random_state=0)
            for alpha in np.logspace(-4, 0, 5)
            for learning_rate in [.5, .75, 1]]
-estimators = dl_list[12:13]
+estimators = dl_list
+# estimators = [base_estimator]
 
 scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
