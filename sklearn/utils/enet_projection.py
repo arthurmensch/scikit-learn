@@ -44,7 +44,6 @@ def enet_scale(v, radius=1, l1_ratio=0.1, inplace=False):
         v = v[np.newaxis, :]
 
     l1_v = np.sum(np.abs(v), axis=1) * l1_ratio
-    l1_v[l1_v == 0] = 1
     if l1_ratio != 1:
         l2_v = np.sum(v ** 2, axis=1) * (1 - l1_ratio)
         S = (- l1_v + np.sqrt(l1_v ** 2 + 4 * radius * l2_v))
@@ -52,6 +51,7 @@ def enet_scale(v, radius=1, l1_ratio=0.1, inplace=False):
         S /= (2 * l2_v)
         v *= S[:, np.newaxis]
     else:
+        l1_v[l1_v == 0] = 1
         v /= l1_v[:, np.newaxis] / radius
     return v.squeeze()
 
