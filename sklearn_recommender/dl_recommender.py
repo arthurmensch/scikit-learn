@@ -62,7 +62,7 @@ class DLRecommender(BaseRecommender):
                  alpha=1., l1_ratio=0., algorithm='ridge',
                  n_epochs=1, batch_size=10,
                  learning_rate=0.5,
-                 # memory=Memory(cachedir=None),
+                 fit_intercept=False,
                  debug_folder=None,
                  ):
         BaseRecommender.__init__(self, fm_decoder)
@@ -74,7 +74,7 @@ class DLRecommender(BaseRecommender):
         self.batch_size = batch_size
         self.random_state = random_state
         self.n_epochs = n_epochs
-        # self.memory = memory
+        self.fit_intercept = fit_intercept
         self.debug_folder = debug_folder
 
     def _predict_quadratic(self, X_csr, samples, features):
@@ -103,7 +103,7 @@ class DLRecommender(BaseRecommender):
                 l1_ratio=self.l1_ratio,
                 batch_size=self.batch_size,
                 shuffle=True,
-                fit_intercept=True,
+                fit_intercept=self.fit_intercept,
                 n_iter=n_iter,
                 missing_values=0,
                 learning_rate=self.learning_rate,
@@ -111,30 +111,25 @@ class DLRecommender(BaseRecommender):
                 debug_info=self.debug_folder is not None,
                 random_state=self.random_state)
 
-        self.dictionary_ = dict_init
-        self.code_ = np.zeros((X.shape[0], self.n_components))
+        if self.fit_intercept:
+            self.dictionary_ = np.r_[np.ones((1, dict_init.shape[1])),
+                                     dict_init]
+            self.code_ = np.zeros((X.shape[0], self.n_components + 1))
+        else:
+            self.dictionary_ = dict_init
+            self.code_ = np.zeros((X.shape[0], self.n_components))
 
         if self.debug_folder is None:
             (self.global_mean_, self.sample_mean_,
              self.feature_mean_, self.dictionary_, self.code_) = \
                 _find_decomposition(X_ref, dict_learning, self.n_epochs)
         if self.debug_folder is not None:
-            X_csr = X_ref.copy()
-            interaction = csr_matrix((np.zeros_like(X_csr.data),
-                                      X_csr.indices, X_csr.indptr),
-                                     shape=X_csr.shape)
             (X_csr, self.global_mean_,
              self.sample_mean_, self.feature_mean_) = csr_center_data(
                     X_ref)
             self.dump_inter(**dump_kwargs)
 
             for i in range(self.n_epochs):
-                # X_ref.data -= interaction.data
-                # (X_csr, self.global_mean_,
-                #  self.sample_mean_, self.feature_mean_) = csr_center_data(
-                # X_ref)
-                # X_ref.data += interaction.data
-                # X_csr.data += interaction.data
                 permutation = random_state.permutation(X_csr.shape[0])
 
                 batches = gen_batches(X_csr.shape[0],
@@ -145,21 +140,11 @@ class DLRecommender(BaseRecommender):
                     dict_learning.partial_fit(X_csr[permutation[batch]],
                                               deprecated=False)
                     self.dictionary_ = dict_learning.components_
-                    self.code_[
-                        permutation[:last_seen]] = dict_learning.transform(
-                            X_csr[permutation[:last_seen]])
+                    self.code_[permutation[:last_seen]] = dict_learning.\
+                        transform(X_csr[permutation[:last_seen]])
                     self.n_iter_ = dict_learning.n_iter_
                     self.dump_inter(debug_dict=dict_learning.debug_info_,
                                     **dump_kwargs)
-
-                    # for j in range(X_csr.shape[0]):
-                    #     indices = X_csr.indices[X_csr.indptr[j]:
-                    #     X_csr.indptr[j + 1]]
-                    #     interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
-                    #         self.code_[j].dot(self.dictionary_[:, indices])
-                    # self.dictionary_ -= self.dictionary_.mean(
-                    #         axis=0)[np.newaxis, :]
-                    # dict_learning.inner_stats_ = None
 
             self.dictionary_ = dict_learning.components_
             self.code_ = dict_learning.transform(X_csr)

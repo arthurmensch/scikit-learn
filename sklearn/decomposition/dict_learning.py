@@ -858,7 +858,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
         dictionary = np.r_[dictionary,
                            np.zeros((n_components - r, dictionary.shape[1]))]
     if fit_intercept:
-        dictionary = np.r_[np.ones(1, dictionary.shape[1]), dictionary]
+        dictionary = np.r_[np.ones((1, dictionary.shape[1])), dictionary]
         n_components += 1
     if verbose == 1:
         print('[dict_learning]', end=' ')
@@ -1007,7 +1007,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             check_input=False,
             missing_values=missing_values,
             random_state=random_state).T
-
+        # print(this_code)
         A *= 1 - len_batch / pow(n_seen_samples, learning_rate)
         A += np.dot(this_code, this_code.T) / pow(n_seen_samples,
                                                   learning_rate)
@@ -1686,6 +1686,8 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                     random_state=self.random_state_)
         if hasattr(self, 'components_'):
             dict_init = self.components_
+            if self.fit_intercept:
+                dict_init = dict_init[1:        ]
         else:
             dict_init = self.dict_init
         inner_stats = getattr(self, 'inner_stats_', None)
@@ -1708,6 +1710,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             feature_ratio=self.feature_ratio,
             mask_subsets=self.mask_subsets_,
             method=self.fit_algorithm,
+            fit_intercept=self.fit_intercept,
             n_jobs=self.n_jobs, dict_init=dict_init,
             learning_rate=self.learning_rate,
             batch_size=batch_size,
