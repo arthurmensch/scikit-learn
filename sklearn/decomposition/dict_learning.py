@@ -1073,7 +1073,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
         # XXX to remove
         if return_debug_info:
-            debug_info['values'].append((dictionary[:, 1][recorded_features]))
+            debug_info['values'].append((dictionary[:, 0][recorded_features]))
             debug_info['density'].append(
                 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary))
             debug_info['residuals'].append(current_cost)
