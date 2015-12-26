@@ -859,9 +859,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
         dictionary = np.r_[dictionary,
                            np.zeros((n_components - r, dictionary.shape[1]))]
     if fit_intercept:
-        intercept = np.ones((1, dictionary.shape[1]))
+        intercept = np.ones(dictionary.shape[1])
         enet_scale(intercept, inplace=True, radius=radius, l1_ratio=l1_ratio)
-        dictionary = np.r_[intercept, dictionary]
+        dictionary = np.r_[intercept[np.newaxis, :], dictionary]
         n_components += 1
     if verbose == 1:
         print('[dict_learning]', end=' ')
