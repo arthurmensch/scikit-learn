@@ -12,6 +12,10 @@ from sklearn.utils import check_array, check_X_y
 import numpy as np
 import scipy.sparse as sp
 
+def csr_mean_col(X):
+    n_m = X.getnnz(axis=0)
+    n_m[n_m == 0] = 1
+    return X.sum(axis=0).A[0] / n_m
 
 def csr_center_data(X, inplace=False):
     if not inplace:

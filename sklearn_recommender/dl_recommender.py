@@ -5,10 +5,10 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 from sklearn.decomposition import MiniBatchDictionaryLearning
-from sklearn.externals.joblib import Memory
 from sklearn.utils import check_random_state, gen_batches
+from sklearn.utils.sparsefuncs import mean_variance_axis
 
-from .base import csr_center_data, BaseRecommender
+from .base import csr_center_data, BaseRecommender, csr_mean_col
 
 
 def _find_decomposition(X_ref, dict_learning,
@@ -91,26 +91,28 @@ class DLRecommender(BaseRecommender):
         n_iter = X_ref.shape[0] * self.n_epochs // self.batch_size
 
         random_state = check_random_state(self.random_state)
-        dict_init = random_state.randn(self.n_components,
-                                       X_ref.shape[1])
-        self.dictionary_ = dict_init
-        self.code_ = np.zeros((X.shape[0], self.n_components))
+        dict_init = random_state.randn(self.n_components, X_ref.shape[1])
+
         dict_learning = MiniBatchDictionaryLearning(
                 n_components=self.n_components,
                 alpha=self.alpha,
                 transform_alpha=self.alpha,
                 fit_algorithm=self.algorithm,
                 transform_algorithm=self.algorithm,
-                dict_init=self.dictionary_,
+                dict_init=dict_init,
                 l1_ratio=self.l1_ratio,
                 batch_size=self.batch_size,
                 shuffle=True,
+                fit_intercept=True,
                 n_iter=n_iter,
                 missing_values=0,
                 learning_rate=self.learning_rate,
                 verbose=3,
                 debug_info=self.debug_folder is not None,
                 random_state=self.random_state)
+
+        self.dictionary_ = dict_init
+        self.code_ = np.zeros((X.shape[0], self.n_components))
 
         if self.debug_folder is None:
             (self.global_mean_, self.sample_mean_,
@@ -121,10 +123,9 @@ class DLRecommender(BaseRecommender):
             interaction = csr_matrix((np.zeros_like(X_csr.data),
                                       X_csr.indices, X_csr.indptr),
                                      shape=X_csr.shape)
-
             (X_csr, self.global_mean_,
              self.sample_mean_, self.feature_mean_) = csr_center_data(
-                X_ref)
+                    X_ref)
             self.dump_inter(**dump_kwargs)
 
             for i in range(self.n_epochs):
@@ -144,34 +145,35 @@ class DLRecommender(BaseRecommender):
                     dict_learning.partial_fit(X_csr[permutation[batch]],
                                               deprecated=False)
                     self.dictionary_ = dict_learning.components_
-                    self.code_[permutation[:last_seen]] = dict_learning.transform(
+                    self.code_[
+                        permutation[:last_seen]] = dict_learning.transform(
                             X_csr[permutation[:last_seen]])
                     self.n_iter_ = dict_learning.n_iter_
                     self.dump_inter(debug_dict=dict_learning.debug_info_,
                                     **dump_kwargs)
 
-                # for j in range(X_csr.shape[0]):
-                #     indices = X_csr.indices[X_csr.indptr[j]:
-                #     X_csr.indptr[j + 1]]
-                #     interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
-                #         self.code_[j].dot(self.dictionary_[:, indices])
-                # self.dictionary_ -= self.dictionary_.mean(
-                #         axis=0)[np.newaxis, :]
-                # dict_learning.inner_stats_ = None
+                    # for j in range(X_csr.shape[0]):
+                    #     indices = X_csr.indices[X_csr.indptr[j]:
+                    #     X_csr.indptr[j + 1]]
+                    #     interaction.data[X_csr.indptr[j]:X_csr.indptr[j + 1]] = \
+                    #         self.code_[j].dot(self.dictionary_[:, indices])
+                    # self.dictionary_ -= self.dictionary_.mean(
+                    #         axis=0)[np.newaxis, :]
+                    # dict_learning.inner_stats_ = None
 
             self.dictionary_ = dict_learning.components_
             self.code_ = dict_learning.transform(X_csr)
 
-                # A, B, residual_stat = dict_learning.inner_stats_
-                # last_cost, norm_cost, penalty_cost, n_seen_samples, \
-                # count_seen_features, A_ref, B_ref = residual_stat
-                # n_seen_samples = 0
-                # count_seen_features[:] = 0
-                # A *= X_csr.shape[0]
-                # B *= X_csr.shape[0]
-                # residual_stats = (last_cost, norm_cost, penalty_cost,
-                #                   n_seen_samples,
-                #                   count_seen_features, A_ref, B_ref)
+            # A, B, residual_stat = dict_learning.inner_stats_
+            # last_cost, norm_cost, penalty_cost, n_seen_samples, \
+            # count_seen_features, A_ref, B_ref = residual_stat
+            # n_seen_samples = 0
+            # count_seen_features[:] = 0
+            # A *= X_csr.shape[0]
+            # B *= X_csr.shape[0]
+            # residual_stats = (last_cost, norm_cost, penalty_cost,
+            #                   n_seen_samples,
+            #                   count_seen_features, A_ref, B_ref)
         return self
 
     def dump_init(self):

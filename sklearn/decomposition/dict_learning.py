@@ -12,6 +12,7 @@ import numpy as np
 from scipy import linalg
 import scipy.sparse as sp
 from numpy.lib.stride_tricks import as_strided
+
 from ..base import BaseEstimator, TransformerMixin
 from ..externals.joblib import Parallel, delayed, cpu_count
 from ..externals.six.moves import zip
@@ -358,6 +359,7 @@ def _update_dict(dictionary, Y, code,
                  return_r2=False,
                  l1_ratio=0., online=False, full_update=True,
                  shuffle=False,
+                 fit_intercept=False,
                  random_state=None):
     """Update the dense dictionary factor in place, constraining dictionary
     component to have a unit l2 norm.
@@ -416,9 +418,15 @@ def _update_dict(dictionary, Y, code,
     ger, = linalg.get_blas_funcs(('ger',), (dictionary, code))
 
     if shuffle:
-        component_range = random_state.permutation(n_components)
+        if fit_intercept:
+            component_range = random_state.permutation(n_components - 1) + 1
+        else:
+            component_range = random_state.permutation(n_components)
     else:
-        component_range = np.arange(n_components)
+        if fit_intercept:
+            component_range = np.arange(1, n_components)
+        else:
+            component_range = np.arange(n_components)
     for k in component_range:
         # R <- 1.0 * U_k * V_k^T + R
         R = ger(1.0, dictionary[:, k], code[k, :], a=R, overwrite_a=True)
@@ -689,6 +697,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
                          feature_ratio=1,
                          missing_values=None,
                          random_state=None,
+                         fit_intercept=False,
                          return_inner_stats=False, inner_stats=None,
                          return_n_iter=False,
                          return_debug_info=False):
@@ -848,7 +857,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
     else:
         dictionary = np.r_[dictionary,
                            np.zeros((n_components - r, dictionary.shape[1]))]
-
+    if fit_intercept:
+        dictionary = np.r_[np.ones(1, dictionary.shape[1]), dictionary]
+        n_components += 1
     if verbose == 1:
         print('[dict_learning]', end=' ')
 
@@ -1017,6 +1028,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             return_r2=False,
             online=True,
             full_update=full_update,
+            fit_intercept=fit_intercept,
             shuffle=shuffle)
         total_time += time.time() - t1
 
@@ -1556,6 +1568,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
                  batch_size=3, tol=0., shuffle=True, dict_init=None,
                  transform_algorithm='omp',
                  missing_values=None,
+                 fit_intercept=False,
                  transform_n_nonzero_coefs=None, transform_alpha=None,
                  verbose=False, split_sign=False,
                  random_state=None,
@@ -1573,6 +1586,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.dict_init = dict_init
         self.verbose = verbose
         self.shuffle = shuffle
+        self.fit_intercept = fit_intercept
         self.batch_size = batch_size
         self.split_sign = split_sign
         self.random_state = random_state
@@ -1614,6 +1628,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
             missing_values=self.missing_values,
+            fit_intercept=self.fit_intercept,
             n_jobs=self.n_jobs, dict_init=self.dict_init,
             batch_size=self.batch_size, shuffle=self.shuffle,
             verbose=self.verbose, random_state=self.random_state_,
