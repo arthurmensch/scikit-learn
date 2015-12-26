@@ -858,7 +858,9 @@ def dict_learning_online(X, n_components=2, alpha=1,
         dictionary = np.r_[dictionary,
                            np.zeros((n_components - r, dictionary.shape[1]))]
     if fit_intercept:
-        dictionary = np.r_[np.ones((1, dictionary.shape[1])), dictionary]
+        intercept = np.ones((1, dictionary.shape[1]))
+        enet_scale(intercept, inplace=True)
+        dictionary = np.r_[intercept, dictionary]
         n_components += 1
     if verbose == 1:
         print('[dict_learning]', end=' ')
@@ -1071,7 +1073,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
 
         # XXX to remove
         if return_debug_info:
-            debug_info['values'].append((dictionary[:, 0][recorded_features]))
+            debug_info['values'].append((dictionary[:, 1][recorded_features]))
             debug_info['density'].append(
                 1 - float(np.sum(dictionary == 0.)) / np.size(dictionary))
             debug_info['residuals'].append(current_cost)
@@ -1687,7 +1689,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         if hasattr(self, 'components_'):
             dict_init = self.components_
             if self.fit_intercept:
-                dict_init = dict_init[1:        ]
+                dict_init = dict_init[1:]
         else:
             dict_init = self.dict_init
         inner_stats = getattr(self, 'inner_stats_', None)
