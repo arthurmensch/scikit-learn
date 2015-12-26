@@ -76,7 +76,7 @@ dl_list = [DLRecommender(fm_decoder,
                          learning_rate=learning_rate,
                          l1_ratio=0.,
                          random_state=0)
-           for alpha in np.logspace(-4, 0, 5)
+           for alpha in np.logspace(-3, 0, 4)
            for learning_rate in np.linspace(0.5, 1, 6)]
 estimators = dl_list
 # estimators = [base_estimator]
