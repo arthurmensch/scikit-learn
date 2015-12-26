@@ -833,6 +833,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
         raise ValueError('Coding method not supported as a fit algorithm.')
     if method in ('lars', 'cd'):
         method = 'lasso_' + method
+    radius = 1  # sqrt(n_features)
 
     t0 = time.time()
     n_samples, n_features = X.shape
@@ -859,7 +860,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
                            np.zeros((n_components - r, dictionary.shape[1]))]
     if fit_intercept:
         intercept = np.ones((1, dictionary.shape[1]))
-        enet_scale(intercept, inplace=True)
+        enet_scale(intercept, inplace=True, radius=radius, l1_ratio=l1_ratio)
         dictionary = np.r_[intercept, dictionary]
         n_components += 1
     if verbose == 1:
@@ -886,7 +887,6 @@ def dict_learning_online(X, n_components=2, alpha=1,
                                            random=(feature_ratio > 1),
                                            random_state=random_state)
 
-    radius = 1  # sqrt(n_features)
     if n_iter != 0 and iter_offset == 0 and inner_stats is None:
         enet_scale(dictionary.T, l1_ratio=l1_ratio,
                    radius=radius,
