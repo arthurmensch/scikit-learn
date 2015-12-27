@@ -87,13 +87,13 @@ dl_list = [DLRecommender(fm_decoder,
                          l1_ratio=0.,
                          random_state=0) for alpha in np.logspace(-4, 0, 5)]
 
-dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-2, 2, 5),
+dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-3, 0, 4),
                                          'learning_rate':
-                                             np.linspace(.5, 1, 5)},
+                                             np.linspace(.5, 1, 2)},
                      cv=KFold(shuffle=False, n_folds=3),
                      error_score=-1000,
                      memory=mem,
-                     n_jobs=25,
+                     n_jobs=24,
                      refit='bagging',
                      verbose=10)
 estimators = [dl_cv]
