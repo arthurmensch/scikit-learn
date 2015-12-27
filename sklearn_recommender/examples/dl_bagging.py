@@ -61,7 +61,7 @@ X_csr = X_csr[permutation]
 
 X, y = array_to_fm_format(X_csr)
 
-uniform_split = ShuffleSplit(n_iter=1,
+uniform_split = ShuffleSplit(n_iter=4,
                              test_size=.25, random_state=random_state)
 
 fm_decoder = FMDecoder(n_samples=X_csr.shape[0], n_features=X_csr.shape[1])
@@ -72,8 +72,8 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
                      beta=1, verbose=100)
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
-                       batch_size=20,
-                       n_epochs=3,
+                       batch_size=32,
+                       n_epochs=4,
                        alpha=0.01,
                        learning_rate=1,
                        fit_intercept=True,
