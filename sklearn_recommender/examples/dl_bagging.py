@@ -61,7 +61,7 @@ X_csr = X_csr[permutation]
 
 X, y = array_to_fm_format(X_csr)
 
-uniform_split = ShuffleSplit(n_iter=4,
+uniform_split = ShuffleSplit(n_iter=1,
                              test_size=.25, random_state=random_state)
 
 fm_decoder = FMDecoder(n_samples=X_csr.shape[0], n_features=X_csr.shape[1])
@@ -76,16 +76,9 @@ dl_rec = DLRecommender(fm_decoder,
                        n_epochs=3,
                        alpha=0.01,
                        learning_rate=1,
+                       fit_intercept=True,
                        l1_ratio=0.,
                        random_state=0)
-dl_list = [DLRecommender(fm_decoder,
-                         n_components=50,
-                         batch_size=10,
-                         n_epochs=1,
-                         alpha=alpha,
-                         learning_rate=.75,
-                         l1_ratio=0.,
-                         random_state=0) for alpha in np.logspace(-4, 0, 5)]
 
 dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-3, 0, 4),
                                          'learning_rate':
@@ -96,14 +89,11 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-3, 0, 4),
                      n_jobs=24,
                      refit='bagging',
                      verbose=10)
-estimators = [dl_cv]
-# estimators = dl_list
 
 scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
-        delayed(single_run)(X, y, estimator, train, test,
-                            estimator_idx, split_idx,
+        delayed(single_run)(X, y, dl_cv, train, test,
+                            0, split_idx,
                             output_dir=output_dir
                             )
         for split_idx, (train, test) in enumerate(
-                uniform_split.split(X, y))
-        for estimator_idx, estimator in enumerate(estimators))
+                uniform_split.split(X, y)))
