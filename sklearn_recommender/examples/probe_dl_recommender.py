@@ -91,3 +91,5 @@ scores = Parallel(n_jobs=20, verbose=10, max_nbytes='100M')(
         for split_idx, (train, test) in enumerate(
                 uniform_split.split(X, y))
         for estimator_idx, estimator in enumerate(estimators))
+
+print(scores)
