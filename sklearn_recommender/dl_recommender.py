@@ -123,8 +123,7 @@ class DLRecommender(BaseRecommender):
             (X_csr, self.global_mean_,
              self.sample_mean_, self.feature_mean_) = csr_center_data(X_ref)
             for i in range(self.n_epochs):
-                permutation = random_state.permutation(X_csr.shape[0])
-                dict_learning.partial_fit(X_csr[permutation], deprecated=False)
+                dict_learning.partial_fit(X_csr, deprecated=False)
                 dict_learning.set_params(batch_size=
                                          dict_learning.batch_size // 2)
             self.n_iter_ = dict_learning.n_iter_
