@@ -70,8 +70,8 @@ base_estimator = BaseRecommender(fm_decoder)
 
 dl_list = [DLRecommender(fm_decoder,
                          n_components=50,
-                         batch_size=10,
-                         n_epochs=5,
+                         batch_size=20,
+                         n_epochs=3,
                          alpha=alpha,
                          learning_rate=learning_rate,
                          fit_intercept=True,

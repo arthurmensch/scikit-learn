@@ -145,7 +145,7 @@ class DLRecommender(BaseRecommender):
                     self.n_iter_ = dict_learning.n_iter_
                     self.dump_inter(debug_dict=dict_learning.debug_info_,
                                     **dump_kwargs)
-
+                    dict_learning.set_params(batch_size=dict_learning.batch_size // 2)
             self.dictionary_ = dict_learning.components_
             self.code_ = dict_learning.transform(X_csr)
 
