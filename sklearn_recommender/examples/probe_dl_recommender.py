@@ -82,7 +82,7 @@ dl_list = [DLRecommender(fm_decoder,
 estimators = dl_list
 # estimators = [base_estimator]
 
-scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
+scores = Parallel(n_jobs=20, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
                             estimator_idx, split_idx,
                             output_dir=output_dir
