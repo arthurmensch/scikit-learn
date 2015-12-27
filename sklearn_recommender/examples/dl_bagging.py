@@ -87,7 +87,7 @@ dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-3, 0, 4),
                      error_score=-1000,
                      memory=mem,
                      n_jobs=30,
-                     refit='bagging',
+                     refit=True,
                      verbose=10)
 
 scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
