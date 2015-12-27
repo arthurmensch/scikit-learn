@@ -120,13 +120,20 @@ class DLRecommender(BaseRecommender):
             self.code_ = np.zeros((X.shape[0], self.n_components))
 
         if self.debug_folder is None:
-            (self.global_mean_, self.sample_mean_,
-             self.feature_mean_, self.dictionary_, self.code_) = \
-                _find_decomposition(X_ref, dict_learning, self.n_epochs)
+            (X_csr, self.global_mean_,
+             self.sample_mean_, self.feature_mean_) = csr_center_data(X_ref)
+            for i in range(self.n_epochs):
+                permutation = random_state.permutation(X_csr.shape[0])
+                dict_learning.partial_fit(X_csr[permutation], deprecated=False)
+                dict_learning.set_params(batch_size=
+                                         dict_learning.batch_size // 2)
+            self.n_iter_ = dict_learning.n_iter_
+            self.dictionary_ = dict_learning.components_
+            self.code_ = dict_learning.transform(X_csr)
+
         if self.debug_folder is not None:
             (X_csr, self.global_mean_,
-             self.sample_mean_, self.feature_mean_) = csr_center_data(
-                    X_ref)
+             self.sample_mean_, self.feature_mean_) = csr_center_data(X_ref)
             self.dump_inter(**dump_kwargs)
 
             for i in range(self.n_epochs):
@@ -145,20 +152,10 @@ class DLRecommender(BaseRecommender):
                     self.n_iter_ = dict_learning.n_iter_
                     self.dump_inter(debug_dict=dict_learning.debug_info_,
                                     **dump_kwargs)
-                dict_learning.set_params(batch_size=dict_learning.batch_size // 2)
+                dict_learning.set_params(batch_size=
+                                         dict_learning.batch_size // 2)
             self.dictionary_ = dict_learning.components_
             self.code_ = dict_learning.transform(X_csr)
-
-            # A, B, residual_stat = dict_learning.inner_stats_
-            # last_cost, norm_cost, penalty_cost, n_seen_samples, \
-            # count_seen_features, A_ref, B_ref = residual_stat
-            # n_seen_samples = 0
-            # count_seen_features[:] = 0
-            # A *= X_csr.shape[0]
-            # B *= X_csr.shape[0]
-            # residual_stats = (last_cost, norm_cost, penalty_cost,
-            #                   n_seen_samples,
-            #                   count_seen_features, A_ref, B_ref)
         return self
 
     def dump_init(self):
