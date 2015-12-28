@@ -62,6 +62,7 @@ class DLRecommender(BaseRecommender):
                  alpha=1., l1_ratio=0., algorithm='ridge',
                  n_epochs=1, batch_size=10,
                  learning_rate=0.5,
+                 decreasing_batch_size=True,
                  fit_intercept=False,
                  debug_folder=None,
                  ):
@@ -76,6 +77,7 @@ class DLRecommender(BaseRecommender):
         self.n_epochs = n_epochs
         self.fit_intercept = fit_intercept
         self.debug_folder = debug_folder
+        self.decreasing_batch_size = decreasing_batch_size
 
     def _predict_quadratic(self, X_csr, samples, features):
         for i in range(X_csr.shape[0]):
@@ -124,8 +126,9 @@ class DLRecommender(BaseRecommender):
              self.sample_mean_, self.feature_mean_) = csr_center_data(X_ref)
             for i in range(self.n_epochs):
                 dict_learning.partial_fit(X_csr, deprecated=False)
-                dict_learning.set_params(batch_size=
-                                         dict_learning.batch_size // 2)
+                if self.decreasing_batch_size:
+                    dict_learning.set_params(batch_size=
+                                             dict_learning.batch_size // 2)
             self.n_iter_ = dict_learning.n_iter_
             self.dictionary_ = dict_learning.components_
             self.code_ = dict_learning.transform(X_csr)
@@ -151,8 +154,9 @@ class DLRecommender(BaseRecommender):
                     self.n_iter_ = dict_learning.n_iter_
                     self.dump_inter(debug_dict=dict_learning.debug_info_,
                                     **dump_kwargs)
-                dict_learning.set_params(batch_size=
-                                         dict_learning.batch_size // 2)
+                    if self.decreasing_batch_size:
+                        dict_learning.set_params(batch_size=
+                                                 dict_learning.batch_size // 2)
             self.dictionary_ = dict_learning.components_
             self.code_ = dict_learning.transform(X_csr)
         return self
