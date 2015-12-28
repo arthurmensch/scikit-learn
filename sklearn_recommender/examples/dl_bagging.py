@@ -61,7 +61,7 @@ X_csr = X_csr[permutation]
 
 X, y = array_to_fm_format(X_csr)
 
-uniform_split = ShuffleSplit(n_iter=2,
+uniform_split = ShuffleSplit(n_iter=1,
                              test_size=.25, random_state=random_state)
 
 fm_decoder = FMDecoder(n_samples=X_csr.shape[0], n_features=X_csr.shape[1])
@@ -80,14 +80,14 @@ dl_rec = DLRecommender(fm_decoder,
                        l1_ratio=0.,
                        random_state=0)
 
-dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-3, 0, 4),
+dl_cv = GridSearchCV(dl_rec, param_grid={'alpha': np.logspace(-4, 0, 5),
                                          'learning_rate':
-                                             np.linspace(.5, 1, 5)},
+                                             np.linspace(.5, 1, 3)},
                      cv=KFold(shuffle=False, n_folds=3),
                      error_score=-1000,
                      memory=mem,
                      n_jobs=30,
-                     refit='bagging',
+                     refit='refit',
                      verbose=10)
 
 scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
