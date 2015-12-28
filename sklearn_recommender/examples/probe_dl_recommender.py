@@ -70,7 +70,7 @@ fm_decoder = FMDecoder(n_samples=X_csr.shape[0], n_features=X_csr.shape[1])
 base_estimator = BaseRecommender(fm_decoder)
 
 dl_list = [DLRecommender(fm_decoder,
-                         n_components=20,
+                         n_components=n_components,
                          batch_size=batch_size,
                          n_epochs=4,
                          alpha=0.001,
@@ -80,6 +80,7 @@ dl_list = [DLRecommender(fm_decoder,
                          l1_ratio=0.,
                          random_state=0)
            for alpha in np.logspace(-5, 0, 6)
+           for n_components in [20, 35]
            for batch_size, decreasing_batch_size in [[32, True]]]
 estimators = dl_list
 
@@ -96,7 +97,7 @@ estimators = dl_list
 
 # estimators = [base_estimator]
 
-scores = Parallel(n_jobs=6, verbose=10, max_nbytes='100M')(
+scores = Parallel(n_jobs=12, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
                             estimator_idx, split_idx,
                             output_dir=output_dir
