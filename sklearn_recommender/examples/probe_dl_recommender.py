@@ -6,9 +6,9 @@ import numpy as np
 
 from sklearn.externals.joblib import Parallel, delayed, Memory, dump
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import ShuffleSplit, GridSearchCV, KFold
 from sklearn.utils import check_random_state
-from sklearn_recommender import DLRecommender
+from sklearn_recommender import DLRecommender, ConvexFM
 from sklearn_recommender.base import array_to_fm_format, FMDecoder, \
     BaseRecommender
 from sklearn_recommender.datasets import fetch_ml_10m
@@ -54,7 +54,7 @@ os.makedirs(output_dir)
 random_state = check_random_state(0)
 mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
 X_csr = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True)
+                                remove_empty=True, n_users=1000)
 
 permutation = random_state.permutation(X_csr.shape[0])
 
@@ -82,6 +82,18 @@ dl_list = [DLRecommender(fm_decoder,
            for learning_rate in np.linspace(.5, 1, 5)
            for batch_size, decreasing_batch_size in [[32, True], [4, False]]]
 estimators = dl_list
+
+convex_fm = ConvexFM(alpha=1e-9, beta=1, fit_linear=True, random_state=0,
+                     max_rank=20)
+dl_cv = GridSearchCV(convex_fm, param_grid={'beta': np.logspace(-4, 0, 5)},
+                     cv=KFold(shuffle=False, n_folds=3),
+                     error_score=-1000,
+                     memory=mem,
+                     n_jobs=1,
+                     refit=True,
+                     verbose=10)
+estimators = [convex_fm]
+
 # estimators = [base_estimator]
 
 scores = Parallel(n_jobs=10, verbose=10, max_nbytes='100M')(

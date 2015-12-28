@@ -19,6 +19,7 @@ http://www.mblondel.org/publications/mblondel-ecmlpkdd2015.pdf
 from math import sqrt
 
 import numpy as np
+import scipy.sparse as sp
 from scipy.sparse.linalg import LinearOperator, eigsh
 from sklearn.linear_model.cd_fast import enet_coordinate_descent
 
@@ -27,7 +28,6 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics.pairwise import polynomial_kernel
 from sklearn.utils import check_random_state
-
 
 def _find_basis(X, residual, **kwargs):
     def _create_mv(X, residual):
