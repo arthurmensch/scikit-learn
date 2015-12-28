@@ -6,9 +6,7 @@ from scipy.sparse import csr_matrix
 
 from sklearn.decomposition import MiniBatchDictionaryLearning
 from sklearn.utils import check_random_state, gen_batches
-from sklearn.utils.sparsefuncs import mean_variance_axis
-
-from .base import csr_center_data, BaseRecommender, csr_mean_col
+from .base import csr_center_data, BaseRecommender
 
 
 def _find_decomposition(X_ref, dict_learning,
