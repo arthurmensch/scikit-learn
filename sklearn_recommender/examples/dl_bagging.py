@@ -4,7 +4,7 @@ from os.path import join, expanduser
 
 import numpy as np
 
-from sklearn.externals.joblib import Parallel, delayed, Memory, dump, load
+from sklearn.externals.joblib import Parallel, delayed, Memory, dump
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import ShuffleSplit, KFold, GridSearchCV
 from sklearn.utils import check_random_state
@@ -72,11 +72,11 @@ convex_fm = ConvexFM(fit_linear=True, alpha=0, max_rank=20,
                      beta=1, verbose=100)
 dl_rec = DLRecommender(fm_decoder,
                        n_components=50,
-                       batch_size=32,
+                       batch_size=4,
                        n_epochs=4,
                        alpha=0.01,
                        learning_rate=1,
-                       decreasing_batch_size=True,
+                       decreasing_batch_size=False,
                        fit_intercept=True,
                        l1_ratio=0.,
                        random_state=0)
