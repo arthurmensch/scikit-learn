@@ -74,13 +74,14 @@ dl_list = [DLRecommender(fm_decoder,
                          batch_size=batch_size,
                          n_epochs=4,
                          alpha=alpha,
-                         learning_rate=1,
+                         learning_rate=learning_rate,
                          decreasing_batch_size=decreasing_batch_size,
                          fit_intercept=True,
                          l1_ratio=0.,
                          random_state=0)
            for alpha in np.logspace(-5, 0, 6)
-           for n_components in [20, 35]
+           for learning_rate in np.linspace(.5, 1., 5)
+           for n_components in [20]
            for batch_size, decreasing_batch_size in [[32, True]]]
 estimators = dl_list
 
