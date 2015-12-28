@@ -6,9 +6,9 @@ import numpy as np
 
 from sklearn.externals.joblib import Parallel, delayed, Memory, dump
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import ShuffleSplit, GridSearchCV, KFold
+from sklearn.model_selection import ShuffleSplit
 from sklearn.utils import check_random_state
-from sklearn_recommender import DLRecommender, ConvexFM
+from sklearn_recommender import DLRecommender
 from sklearn_recommender.base import array_to_fm_format, FMDecoder, \
     BaseRecommender
 from sklearn_recommender.datasets import fetch_ml_10m
@@ -70,33 +70,33 @@ fm_decoder = FMDecoder(n_samples=X_csr.shape[0], n_features=X_csr.shape[1])
 base_estimator = BaseRecommender(fm_decoder)
 
 dl_list = [DLRecommender(fm_decoder,
-                         n_components=50,
+                         n_components=20,
                          batch_size=batch_size,
                          n_epochs=4,
                          alpha=0.001,
-                         learning_rate=learning_rate,
+                         learning_rate=1,
                          decreasing_batch_size=decreasing_batch_size,
                          fit_intercept=True,
                          l1_ratio=0.,
                          random_state=0)
-           for learning_rate in np.linspace(.5, 1, 5)
-           for batch_size, decreasing_batch_size in [[32, True], [4, False]]]
+           for alpha in np.logspace(-5, 0, 6)
+           for batch_size, decreasing_batch_size in [[32, True]]]
 estimators = dl_list
 
-convex_fm = ConvexFM(alpha=1e-9, beta=1, fit_linear=True, random_state=0,
-                     max_rank=20)
-convex_fm_cv = GridSearchCV(convex_fm, param_grid={'beta': np.logspace(-4, 0, 5)},
-                     cv=KFold(shuffle=False, n_folds=3),
-                     error_score=-1000,
-                     memory=mem,
-                     n_jobs=15,
-                     refit=True,
-                     verbose=10)
-estimators = [convex_fm_cv]
+# convex_fm = ConvexFM(alpha=1e-9, beta=1, fit_linear=True, random_state=0,
+#                      max_rank=20)
+# convex_fm_cv = GridSearchCV(convex_fm, param_grid={'beta': np.logspace(-4, 0, 5)},
+#                      cv=KFold(shuffle=False, n_folds=3),
+#                      error_score=-1000,
+#                      memory=mem,
+#                      n_jobs=15,
+#                      refit=True,
+#                      verbose=10)
+# estimators = [convex_fm_cv]
 
 # estimators = [base_estimator]
 
-scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
+scores = Parallel(n_jobs=6, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
                             estimator_idx, split_idx,
                             output_dir=output_dir
