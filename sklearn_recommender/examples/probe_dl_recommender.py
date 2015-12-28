@@ -54,7 +54,7 @@ os.makedirs(output_dir)
 random_state = check_random_state(0)
 mem = Memory(cachedir=expanduser("~/cache"), verbose=10)
 X_csr = mem.cache(fetch_ml_10m)(expanduser('~/data/own/ml-10M100K'),
-                                remove_empty=True, n_users=10000)
+                                remove_empty=True)
 
 permutation = random_state.permutation(X_csr.shape[0])
 
