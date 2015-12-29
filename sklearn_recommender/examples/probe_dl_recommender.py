@@ -111,7 +111,7 @@ estimators = [dl]
 
 # estimators = [base_estimator]
 
-scores = Parallel(n_jobs=1, verbose=10, max_nbytes='100M')(
+scores = Parallel(n_jobs=15, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
                             estimator_idx, split_idx,
                             output_dir=output_dir
