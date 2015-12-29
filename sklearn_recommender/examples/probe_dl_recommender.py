@@ -72,7 +72,7 @@ base_estimator = BaseRecommender(fm_decoder)
 dl_list = [DLRecommender(fm_decoder,
                          n_components=n_components,
                          batch_size=batch_size,
-                         n_epochs=2,
+                         n_epochs=4,
                          alpha=alpha,
                          learning_rate=learning_rate,
                          learning_rate_offset=learning_rate_offset,
@@ -85,17 +85,17 @@ dl_list = [DLRecommender(fm_decoder,
            for learning_rate_offset in np.logspace(0, 3, 4)
            for n_components in [20]
            for batch_size, decreasing_batch_size in [[10, False]]]
-dl = DLRecommender(fm_decoder,
-                   n_components=50,
-                   batch_size=10,
-                   n_epochs=2,
-                   alpha=.1,
-                   learning_rate=1,
-                   learning_rate_offset=0,
-                   decreasing_batch_size=False,
-                   fit_intercept=True,
-                   l1_ratio=0.,
-                   random_state=0)
+# dl = DLRecommender(fm_decoder,
+#                    n_components=50,
+#                    batch_size=10,
+#                    n_epochs=2,
+#                    alpha=.1,
+#                    learning_rate=1,
+#                    learning_rate_offset=0,
+#                    decreasing_batch_size=False,
+#                    fit_intercept=True,
+#                    l1_ratio=0.,
+#                    random_state=0)
 estimators = [dl]
 
 # convex_fm = ConvexFM(alpha=1e-9, beta=1, fit_linear=True, random_state=0,

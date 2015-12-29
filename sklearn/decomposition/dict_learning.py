@@ -1017,7 +1017,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             count_seen_features[subset, np.newaxis] + learning_rate_offset),
                                      learning_rate)
         A *= 1 - len_batch * learning_weight
-        A += np.dot(this_code, this_code.T) / learning_weight
+        A += np.dot(this_code, this_code.T) * learning_weight
         B[subset] *= 1 - len_batch * learning_weight_vector
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
                                      this_code.T) * learning_weight_vector
