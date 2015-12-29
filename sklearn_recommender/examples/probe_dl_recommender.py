@@ -72,7 +72,7 @@ base_estimator = BaseRecommender(fm_decoder)
 dl_list = [DLRecommender(fm_decoder,
                          n_components=n_components,
                          batch_size=batch_size,
-                         n_epochs=4,
+                         n_epochs=5,
                          alpha=alpha,
                          learning_rate=learning_rate,
                          learning_rate_offset=learning_rate_offset,
@@ -80,11 +80,11 @@ dl_list = [DLRecommender(fm_decoder,
                          fit_intercept=True,
                          l1_ratio=0.,
                          random_state=0)
-           for alpha in np.logspace(-3, 0, 4)
+           for alpha in np.logspace(-5, 0, 6)
            for learning_rate in np.linspace(.75, .75, 1)
-           for learning_rate_offset in [0, 10, 100, 1000]
+           for learning_rate_offset in [0]
            for n_components in [20]
-           for batch_size, decreasing_batch_size in [[4, False]]]
+           for batch_size, decreasing_batch_size in [[64, True]]]
 # dl = DLRecommender(fm_decoder,
 #                    n_components=50,
 #                    batch_size=10,
@@ -111,7 +111,7 @@ estimators = dl_list
 
 # estimators = [base_estimator]
 
-scores = Parallel(n_jobs=15, verbose=10, max_nbytes='100M')(
+scores = Parallel(n_jobs=6, verbose=10, max_nbytes='100M')(
         delayed(single_run)(X, y, estimator, train, test,
                             estimator_idx, split_idx,
                             output_dir=output_dir
