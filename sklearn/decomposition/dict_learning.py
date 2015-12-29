@@ -7,7 +7,7 @@ from __future__ import print_function, division
 import time
 import sys
 import itertools
-from math import sqrt, ceil
+from math import ceil
 import numpy as np
 from scipy import linalg
 import scipy.sparse as sp
@@ -693,6 +693,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
                          method='lars',
                          iter_offset=0, tol=0.,
                          learning_rate=1,
+                         learning_rate_offset=0,
                          mask_subsets=None,
                          feature_ratio=1,
                          missing_values=None,
@@ -1009,16 +1010,16 @@ def dict_learning_online(X, n_components=2, alpha=1,
             check_input=False,
             missing_values=missing_values,
             random_state=random_state).T
-        # print(this_code)
-        A *= 1 - len_batch / pow(n_seen_samples, learning_rate)
-        A += np.dot(this_code, this_code.T) / pow(n_seen_samples,
-                                                  learning_rate)
-        B[subset] *= 1 - len_batch / np.power(count_seen_features[subset,
-                                                                  np.newaxis],
-                                              learning_rate)
+        learning_weight = pow((learning_rate_offset + 1) / (
+            learning_rate_offset + n_seen_samples), learning_rate)
+        learning_weight_vector = np.power((learning_rate_offset + 1) / (
+            count_seen_features[subset, np.newaxis] + learning_rate_offset),
+                                     learning_rate)
+        A *= 1 - len_batch * learning_weight
+        A += np.dot(this_code, this_code.T) / learning_weight
+        B[subset] *= 1 - len_batch * learning_weight_vector
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
-                                     this_code.T) / np.power(
-            count_seen_features[subset, np.newaxis], learning_rate)
+                                     this_code.T) * learning_weight_vector
 
         # Update dictionary
         dictionary[subset] = _update_dict(
@@ -1034,34 +1035,30 @@ def dict_learning_online(X, n_components=2, alpha=1,
             shuffle=shuffle)
         total_time += time.time() - t1
 
-        A_ref *= (1 - len_batch / pow(n_seen_samples, learning_rate))
-        A_ref += np.dot(this_code, this_code.T) / pow(n_seen_samples,
-                                                      learning_rate)
-        B_ref *= (1 - len_batch / pow(n_seen_samples, learning_rate))
-        B_ref += safe_sparse_dot(this_X.T, this_code.T) / pow(n_seen_samples,
-                                                              learning_rate)
+        A_ref *= 1 - len_batch * learning_weight
+        A_ref += np.dot(this_code, this_code.T) * learning_weight
+        B_ref *= 1 - len_batch * learning_weight
+        B_ref += safe_sparse_dot(this_X.T, this_code.T) * learning_weight
         total_time += time.time() - t0
         objective_cost = .5 * np.sum(dictionary.T.dot(dictionary) * A_ref)
         objective_cost -= np.sum(dictionary * B_ref)
         # Residual computation
-        norm_cost *= (1 - len_batch / pow(n_seen_samples, learning_rate))
+        norm_cost *= 1 - len_batch * learning_weight
         if not full_update:
             if missing_values is not None:
                 norm_cost += .5 * np.sum(this_X.data ** 2) * n_features / len(
-                    subset) / pow(n_seen_samples, learning_rate)
+                    subset) * learning_weight
             else:
-                norm_cost += .5 * np.sum(this_X ** 2)\
-                             / pow(n_seen_samples, learning_rate)
+                norm_cost += .5 * np.sum(this_X ** 2) * learning_weight
         else:
-            norm_cost += .5 * np.sum(this_X ** 2) / pow(n_seen_samples,
-                                                        learning_rate)
+            norm_cost += .5 * np.sum(this_X ** 2) * learning_weight
 
-        penalty_cost *= (1 - len_batch / pow(n_seen_samples, learning_rate))
+        penalty_cost *= 1 - len_batch * learning_weight
         if method in ('lasso_lars', 'lasso_cd'):
             penalty_cost += alpha * np.sum(
-                np.abs(this_code)) / pow(n_seen_samples, learning_rate)
+                np.abs(this_code)) * learning_weight
         else:
-            penalty_cost += alpha * np.sum(this_code ** 2) / pow(n_seen_samples, learning_rate)
+            penalty_cost += alpha * np.sum(this_code ** 2) * learning_weight
         current_cost = objective_cost + norm_cost + penalty_cost
 
         # Stopping criterion
@@ -1565,6 +1562,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
 
     def __init__(self, n_components=None, alpha=1,
                  learning_rate=1,
+                 learning_rate_offset=0,
                  l1_ratio=0.0,
                  n_iter=1000, fit_algorithm='lars', n_jobs=1,
                  batch_size=3, tol=0., shuffle=True, dict_init=None,
@@ -1595,6 +1593,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
         self.tol = tol
         self.debug_info = debug_info
         self.learning_rate = learning_rate
+        self.learning_rate_offset = learning_rate_offset
         self.feature_ratio = feature_ratio
 
     def fit(self, X, y=None):
@@ -1627,6 +1626,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             X, self.n_components, self.alpha,
             l1_ratio=self.l1_ratio,
             learning_rate=self.learning_rate,
+            learning_rate_offset=self.learning_rate_offset,
             n_iter=self.n_iter, return_code=False,
             method=self.fit_algorithm,
             missing_values=self.missing_values,
@@ -1715,6 +1715,7 @@ class MiniBatchDictionaryLearning(BaseEstimator, SparseCodingMixin):
             fit_intercept=self.fit_intercept,
             n_jobs=self.n_jobs, dict_init=dict_init,
             learning_rate=self.learning_rate,
+            learning_rate_offset=self.learning_rate_offset,
             batch_size=batch_size,
             shuffle=self.shuffle,
             verbose=self.verbose, return_code=False,
