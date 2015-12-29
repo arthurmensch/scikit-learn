@@ -81,10 +81,10 @@ dl_list = [DLRecommender(fm_decoder,
                          l1_ratio=0.,
                          random_state=0)
            for alpha in np.logspace(-3, 0, 4)
-           for learning_rate in np.linspace(.5, 1, 4)
+           for learning_rate in np.linspace(.5, .5, 1)
            for learning_rate_offset in np.logspace(0, 3, 4)
            for n_components in [20]
-           for batch_size, decreasing_batch_size in [[16, False]]]
+           for batch_size, decreasing_batch_size in [[4, False]]]
 # dl = DLRecommender(fm_decoder,
 #                    n_components=50,
 #                    batch_size=10,
