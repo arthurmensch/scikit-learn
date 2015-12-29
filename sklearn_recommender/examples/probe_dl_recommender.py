@@ -96,7 +96,7 @@ dl_list = [DLRecommender(fm_decoder,
 #                    fit_intercept=True,
 #                    l1_ratio=0.,
 #                    random_state=0)
-estimators = [dl]
+estimators = [dl_list]
 
 # convex_fm = ConvexFM(alpha=1e-9, beta=1, fit_linear=True, random_state=0,
 #                      max_rank=20)
