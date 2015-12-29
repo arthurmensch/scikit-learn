@@ -1012,6 +1012,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
             random_state=random_state).T
         learning_weight = pow((learning_rate_offset + 1) / (
             learning_rate_offset + n_seen_samples), learning_rate)
+        # print(learning_weight)
         learning_weight_vector = np.power((learning_rate_offset + 1) / (
             count_seen_features[subset, np.newaxis] + learning_rate_offset),
                                      learning_rate)
@@ -1020,6 +1021,7 @@ def dict_learning_online(X, n_components=2, alpha=1,
         B[subset] *= 1 - len_batch * learning_weight_vector
         B[subset] += safe_sparse_dot(this_X[:, subset].T,
                                      this_code.T) * learning_weight_vector
+        # print(learning_weight_vector)
 
         # Update dictionary
         dictionary[subset] = _update_dict(

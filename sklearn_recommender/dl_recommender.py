@@ -59,7 +59,8 @@ class DLRecommender(BaseRecommender):
                  random_state=None, n_components=10,
                  alpha=1., l1_ratio=0., algorithm='ridge',
                  n_epochs=1, batch_size=10,
-                 learning_rate=0.5,
+                 learning_rate=1,
+                 learning_rate_offset=0,
                  decreasing_batch_size=True,
                  fit_intercept=False,
                  debug_folder=None,
@@ -68,6 +69,7 @@ class DLRecommender(BaseRecommender):
         self.alpha = alpha
         self.l1_ratio = l1_ratio
         self.learning_rate = learning_rate
+        self.learning_rate_offset = learning_rate_offset
         self.algorithm = algorithm
         self.n_components = n_components
         self.batch_size = batch_size
@@ -107,6 +109,7 @@ class DLRecommender(BaseRecommender):
                 n_iter=n_iter,
                 missing_values=0,
                 learning_rate=self.learning_rate,
+                learning_rate_offset=self.learning_rate_offset,
                 verbose=3,
                 debug_info=self.debug_folder is not None,
                 random_state=self.random_state)
