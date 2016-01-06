@@ -1,5 +1,7 @@
+import tarfile
 from os.path import join
 
+import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 
@@ -30,3 +32,35 @@ def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
         rating_users = (X.getnnz(axis=1) > 0)
         X = X[rating_users, :]
     return X
+
+
+def fetch_nf(datadir='/volatile/arthur/nf_prize'):
+    df = []
+    with tarfile.open(join(datadir, 'training_set.tar')) as tar:
+        for i, member in enumerate(tar.getmembers()[1:400]):
+            if i % 100 == 0:
+                print('%i movies loaded' % i)
+            file = tar.extractfile(member)
+            movieId = int(file.readline()[:-2])
+            this_df = pd.read_csv(file,
+                                  header=None,
+                                  names=['userId', 'ratings', 'date'],
+                                  parse_dates=[2])
+            this_df['movieId'] = movieId
+            df.append(this_df)
+    df = pd.concat(df)
+    X = csr_matrix((df['ratings'], (df['userId'] - 1, df['movieId'] - 1)),
+                   shape=(df['userId'].max(), df['movieId'].max()))
+    return X
+
+def fetch_nf_probe(datadir='/volatile/arthur/nf_prize'):
+    movieId = []
+    userId = []
+    with open(join(datadir, 'probe.txt'), 'r') as f:
+        for line in f:
+            if line.strip().endswith(':'):
+                current = int(line[:-2])
+            else:
+                movieId.append(int(line))
+                userId.append(current)
+    return np.array(userId), np.array(movieId)
