@@ -52,4 +52,4 @@ benchmarks/bench_covertype_data/
 
 *.prefs
 .pydevproject
-.idea
+.idea/
