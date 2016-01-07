@@ -35,6 +35,7 @@ def fetch_ml_10m(datadir='/volatile/arthur/data/own/ml-10M100K',
 
 
 def fetch_nf(datadir='/volatile/arthur/nf_prize'):
+    probe_users, probe_movies = fetch_nf_probe(datadir)
     df = []
     with tarfile.open(join(datadir, 'training_set.tar')) as tar:
         for i, member in enumerate(tar.getmembers()[1:400]):
@@ -49,9 +50,17 @@ def fetch_nf(datadir='/volatile/arthur/nf_prize'):
             this_df['movieId'] = movieId
             df.append(this_df)
     df = pd.concat(df)
+    df.reset_index(drop=True, inplace=True)
+    df.set_index(['userId', 'movieId'], inplace=True)
+    df.sort_index(level=['userId', 'movieId'], inplace=True)
+
+    idx = np.r_([probe_users, probe_movies]).T
+    df_test = df.loc[idx]
+
     X = csr_matrix((df['ratings'], (df['userId'] - 1, df['movieId'] - 1)),
                    shape=(df['userId'].max(), df['movieId'].max()))
     return X
+
 
 def fetch_nf_probe(datadir='/volatile/arthur/nf_prize'):
     movieId = []
