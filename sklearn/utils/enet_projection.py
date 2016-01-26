@@ -11,7 +11,7 @@ from .enet_proj_fast import enet_norm as c_enet_norm
 from .enet_proj_fast import enet_projection_inplace
 
 
-def enet_projection(v, radius=1., l1_ratio=0.1, check_input=True):
+def enet_projection(v, radius=1., l1_ratio=1, check_input=True):
     if check_input:
         v = check_array(v, dtype=np.float64, order='C', copy=False,
                         ensure_2d=False)
@@ -24,7 +24,7 @@ def enet_projection(v, radius=1., l1_ratio=0.1, check_input=True):
     return b
 
 
-def enet_norm(v, l1_ratio=0.1):
+def enet_norm(v, l1_ratio=1):
     v = check_array(v, dtype=np.float64, order='C', copy=False,
                     ensure_2d=False)
     if v.ndim == 1:
@@ -37,7 +37,7 @@ def enet_norm(v, l1_ratio=0.1):
     return norms
 
 
-def enet_scale(v, radius=1, l1_ratio=0.1, inplace=False):
+def enet_scale(v, radius=1, l1_ratio=1, inplace=False):
     v = check_array(v, dtype=np.float64, order='C', copy=not inplace,
                     ensure_2d=False)
     if v.ndim == 1:
@@ -56,7 +56,7 @@ def enet_scale(v, radius=1, l1_ratio=0.1, inplace=False):
     return v.squeeze()
 
 
-def enet_threshold(v, l1_ratio=0.1, radius=1, inplace=False):
+def enet_threshold(v, l1_ratio=1, radius=1, inplace=False):
     if not inplace:
         v = v.copy()
     Sv = np.sqrt(np.sum(v ** 2, axis=1)) / radius
