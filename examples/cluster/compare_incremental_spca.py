@@ -58,7 +58,7 @@ def run():
     mem = Memory(cachedir=expanduser('~/sklearn_cache'), verbose=10)
     cached_single_run = mem.cache(single_run)
 
-    res = Parallel(n_jobs=7, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
+    res = Parallel(n_jobs=3, verbose=10)(delayed(cached_single_run)(estimator, data) for estimator in estimators)
     estimators, reconstructions, compute_times = zip(*res)
     dt = time.time() - t0
     print(compute_times)
