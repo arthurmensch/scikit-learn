@@ -6,15 +6,14 @@
 #          Tom Dupre la Tour <tom.dupre-la-tour@m4x.org>
 #
 # License: BSD 3 clause
-import numpy as np
 cimport numpy as np
-import scipy.sparse as sp
+import numpy as np
 from libc.math cimport fabs, exp, log
 from libc.time cimport time, time_t
 
-from ..utils.seq_dataset cimport SequentialDataset
 from .sgd_fast cimport LossFunction
 from .sgd_fast cimport Log, SquaredLoss
+from ..utils.seq_dataset cimport SequentialDataset
 
 
 cdef extern from "sgd_fast_helpers.h":
@@ -232,6 +231,7 @@ def sag(SequentialDataset dataset,
         bint fit_intercept,
         np.ndarray[double, ndim=1, mode='c'] intercept_sum_gradient_init,
         double intercept_decay,
+        bint saga,
         bint verbose):
     """Stochastic Average Gradient (SAG) solver.
 
@@ -320,6 +320,9 @@ def sag(SequentialDataset dataset,
         np.zeros(n_classes, dtype=np.double, order="c")
     cdef double* gradient = <double*> gradient_array.data
 
+    # Bias correction term in saga
+    cdef double gradient_correction
+
     # the scalar used for multiplying z
     cdef double wscale = 1.0
 
@@ -366,6 +369,7 @@ def sag(SequentialDataset dataset,
                 if sample_itr > 0:
                     for j in range(xnnz):
                         feature_ind = x_ind_ptr[j]
+                        val = x_data_ptr[j]
                         # cached index for sum_gradient and weights
                         f_idx = feature_ind * n_classes
 
@@ -376,7 +380,7 @@ def sag(SequentialDataset dataset,
 
                         for class_ind in range(n_classes):
                             weights[f_idx + class_ind] -= \
-                                cum_sum * sum_gradient[f_idx + class_ind]
+                            cum_sum * sum_gradient[f_idx + class_ind]
 
                             # check to see that the weight is not inf or NaN
                             if not skl_isfinite(weights[f_idx + class_ind]):
@@ -396,25 +400,39 @@ def sag(SequentialDataset dataset,
                 else:
                     gradient[0] = loss._dloss(prediction[0], y) * sample_weight
 
+                # L2 regularization by simply rescaling the weights
+                wscale *= wscale_update
+
                 # make the updates to the sum of gradients
                 for j in range(xnnz):
                     feature_ind = x_ind_ptr[j]
                     val = x_data_ptr[j]
                     f_idx = feature_ind * n_classes
                     for class_ind in range(n_classes):
-                        sum_gradient[f_idx + class_ind] += \
+                        gradient_correction = \
                             val * (gradient[class_ind] -
                                    gradient_memory[s_idx + class_ind])
+                        if saga:
+                            weights[f_idx + class_ind] -= \
+                                (gradient_correction * step_size
+                                 * (1 - 1. / num_seen) / wscale)
+                        sum_gradient[f_idx + class_ind] += gradient_correction
 
                 # fit the intercept
                 if fit_intercept:
                     for class_ind in range(n_classes):
-                        intercept_sum_gradient[class_ind] += \
-                            (gradient[class_ind] -
-                             gradient_memory[s_idx + class_ind])
-                        intercept[class_ind] -= \
-                            (step_size * intercept_sum_gradient[class_ind] /
-                             num_seen * intercept_decay)
+                        gradient_correction = (gradient[class_ind] -
+                                               gradient_memory[s_idx + class_ind])
+                        intercept_sum_gradient[class_ind] += gradient_correction
+                        gradient_correction *= step_size * (1. - 1. / num_seen)
+                        if saga:
+                            intercept[class_ind] -= \
+                                (step_size * intercept_sum_gradient[class_ind] /
+                                 num_seen * intercept_decay) + gradient_correction
+                        else:
+                            intercept[class_ind] -= \
+                                (step_size * intercept_sum_gradient[class_ind] /
+                                 num_seen * intercept_decay)
 
                         # check to see that the intercept is not inf or NaN
                         if not skl_isfinite(intercept[class_ind]):
@@ -425,9 +443,6 @@ def sag(SequentialDataset dataset,
                 for class_ind in range(n_classes):
                     gradient_memory[s_idx + class_ind] = gradient[class_ind]
 
-                # L2 regularization by simply rescaling the weights
-                wscale *= wscale_update
-
                 if sample_itr == 0:
                     cumulative_sums[0] = step_size / (wscale * num_seen)
                 else:
@@ -436,18 +451,19 @@ def sag(SequentialDataset dataset,
                          step_size / (wscale * num_seen))
 
                 # If wscale gets too small, we need to reset the scale.
-                if wscale < 1e-9:
-                    if verbose:
-                        with gil:
-                            print("rescaling...")
+                if wscale < 1:
+                    # if verbose:
+                    #     with gil:
+                    #         print("rescaling...")
                     wscale = scale_weights(
                         weights, wscale, n_features, n_samples, n_classes,
-                        sample_itr, cumulative_sums, feature_hist, sum_gradient)
+                        sample_itr, s_idx, cumulative_sums,
+                        feature_hist, sum_gradient)
 
             # we scale the weights every n_samples iterations and reset the
             # just-in-time update system for numerical stability.
             wscale = scale_weights(weights, wscale, n_features, n_samples,
-                                   n_classes, n_samples - 1, cumulative_sums,
+                                   n_classes, n_samples - 1, s_idx, cumulative_sums,
                                    feature_hist, sum_gradient)
 
             # check if the stopping criteria is reached
@@ -459,7 +475,6 @@ def sag(SequentialDataset dataset,
                                   fabs(weights[feature_ind] -
                                        previous_weights[feature_ind]))
                 previous_weights[feature_ind] = weights[feature_ind]
-
             if max_change / max_weight <= tol:
                 if verbose:
                     end_time = time(NULL)
@@ -467,6 +482,9 @@ def sag(SequentialDataset dataset,
                         print("convergence after %d epochs took %d seconds" %
                               (n_iter + 1, end_time - start_time))
                 break
+            elif verbose:
+                with gil:
+                    print('Change: %.8f' % (max_change / max_weight))
     n_iter += 1
 
     if verbose and n_iter >= max_iter:
@@ -486,7 +504,9 @@ cdef void raise_infinite_error(int n_iter):
 
 cdef double scale_weights(double* weights, double wscale, int n_features,
                           int n_samples, int n_classes, int sample_itr,
-                          double* cumulative_sums, int* feature_hist,
+                          int s_idx,
+                          double* cumulative_sums,
+                          int* feature_hist,
                           double* sum_gradient) nogil:
     """Scale the weights with wscale for numerical stability.
 

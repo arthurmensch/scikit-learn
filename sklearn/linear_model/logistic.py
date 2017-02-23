@@ -421,7 +421,7 @@ def _multinomial_grad_hess(w, X, Y, alpha, sample_weight):
 
 
 def _check_solver_option(solver, multi_class, penalty, dual):
-    if solver not in ['liblinear', 'newton-cg', 'lbfgs', 'sag']:
+    if solver not in ['liblinear', 'newton-cg', 'lbfgs', 'sag', 'saga']:
         raise ValueError("Logistic Regression supports only liblinear,"
                          " newton-cg, lbfgs and sag solvers, got %s" % solver)
 
@@ -631,7 +631,7 @@ def logistic_regression_path(X, y, pos_class=None, Cs=10, fit_intercept=True,
             sample_weight *= class_weight_[le.fit_transform(y_bin)]
 
     else:
-        if solver != 'sag':
+        if solver not in ['sag', 'saga']:
             lbin = LabelBinarizer()
             Y_multi = lbin.fit_transform(y)
             if Y_multi.shape[1] == 1:
@@ -726,7 +726,7 @@ def logistic_regression_path(X, y, pos_class=None, Cs=10, fit_intercept=True,
             else:
                 w0 = coef_.ravel()
 
-        elif solver == 'sag':
+        elif solver in ['sag', 'saga']:
             if multi_class == 'multinomial':
                 target = target.astype(np.float64)
                 loss = 'multinomial'
@@ -735,7 +735,8 @@ def logistic_regression_path(X, y, pos_class=None, Cs=10, fit_intercept=True,
 
             w0, n_iter_i, warm_start_sag = sag_solver(
                 X, target, sample_weight, loss, 1. / C, max_iter, tol,
-                verbose, random_state, False, max_squared_sum, warm_start_sag)
+                verbose, random_state, False, max_squared_sum, warm_start_sag,
+                is_saga=(solver == 'saga'))
 
         else:
             raise ValueError("solver must be one of {'liblinear', 'lbfgs', "
@@ -1188,7 +1189,7 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
             self.n_iter_ = np.array([n_iter_])
             return self
 
-        if self.solver == 'sag':
+        if self.solver in ['sag', 'saga']:
             max_squared_sum = row_norms(X, squared=True).max()
         else:
             max_squared_sum = None
@@ -1228,7 +1229,8 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
 
         # The SAG solver releases the GIL so it's more efficient to use
         # threads for this solver.
-        backend = 'threading' if self.solver == 'sag' else 'multiprocessing'
+        backend = 'threading' if self.solver in ['sag', 'saga']\
+            else 'multiprocessing'
         fold_coefs_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                                backend=backend)(
             path_func(X, y, pos_class=class_, Cs=[self.C],
@@ -1569,7 +1571,7 @@ class LogisticRegressionCV(LogisticRegression, BaseEstimator,
         classes = self.classes_ = label_encoder.classes_
         encoded_labels = label_encoder.transform(label_encoder.classes_)
 
-        if self.solver == 'sag':
+        if self.solver in ['sag', 'saga']:
             max_squared_sum = row_norms(X, squared=True).max()
         else:
             max_squared_sum = None
@@ -1612,7 +1614,8 @@ class LogisticRegressionCV(LogisticRegression, BaseEstimator,
 
         # The SAG solver releases the GIL so it's more efficient to use
         # threads for this solver.
-        backend = 'threading' if self.solver == 'sag' else 'multiprocessing'
+        backend = 'threading' if self.solver in ['sag', 'saga']\
+            else 'multiprocessing'
         fold_coefs_ = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                                backend=backend)(
             path_func(X, y, train, test, pos_class=label, Cs=self.Cs,
