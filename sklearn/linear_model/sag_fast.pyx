@@ -457,13 +457,13 @@ def sag(SequentialDataset dataset,
                             print("rescaling...")
                     wscale = scale_weights(
                         weights, wscale, n_features, n_samples, n_classes,
-                        sample_itr, s_idx, cumulative_sums,
+                        sample_itr, cumulative_sums,
                         feature_hist, sum_gradient)
 
             # we scale the weights every n_samples iterations and reset the
             # just-in-time update system for numerical stability.
             wscale = scale_weights(weights, wscale, n_features, n_samples,
-                                   n_classes, n_samples - 1, s_idx, cumulative_sums,
+                                   n_classes, n_samples - 1, cumulative_sums,
                                    feature_hist, sum_gradient)
 
             # check if the stopping criteria is reached
@@ -504,7 +504,6 @@ cdef void raise_infinite_error(int n_iter):
 
 cdef double scale_weights(double* weights, double wscale, int n_features,
                           int n_samples, int n_classes, int sample_itr,
-                          int s_idx,
                           double* cumulative_sums,
                           int* feature_hist,
                           double* sum_gradient) nogil:
