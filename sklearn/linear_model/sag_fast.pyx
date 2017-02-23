@@ -451,10 +451,10 @@ def sag(SequentialDataset dataset,
                          step_size / (wscale * num_seen))
 
                 # If wscale gets too small, we need to reset the scale.
-                if wscale < 1:
-                    # if verbose:
-                    #     with gil:
-                    #         print("rescaling...")
+                if wscale < 1e-9:
+                    if verbose:
+                        with gil:
+                            print("rescaling...")
                     wscale = scale_weights(
                         weights, wscale, n_features, n_samples, n_classes,
                         sample_itr, s_idx, cumulative_sums,
