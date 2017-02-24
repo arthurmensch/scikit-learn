@@ -1121,8 +1121,7 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
     def __init__(self, penalty='l2', dual=False, tol=1e-4, C=1.0,
                  fit_intercept=True, intercept_scaling=1, class_weight=None,
                  random_state=None, solver='liblinear', max_iter=100,
-                 multi_class='ovr', verbose=0, warm_start=False, n_jobs=1,
-                 callback=None):
+                 multi_class='ovr', verbose=0, warm_start=False, n_jobs=1):
 
         self.penalty = penalty
         self.dual = dual
@@ -1138,7 +1137,6 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
         self.verbose = verbose
         self.warm_start = warm_start
         self.n_jobs = n_jobs
-        self.callback = callback
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model according to the given training data.
@@ -1244,7 +1242,7 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
                       random_state=self.random_state, coef=warm_start_coef_,
                       max_squared_sum=max_squared_sum,
                       sample_weight=sample_weight,
-                      callback=self._callback)
+                      callback=self._wrapped_callback)
             for (class_, warm_start_coef_) in zip(classes_, warm_start_coef))
 
         fold_coefs_, _, n_iter_ = zip(*fold_coefs_)
@@ -1263,11 +1261,11 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
 
         return self
 
-    def _callback(self, coef, intercept):
-        if self.callback is not None:
+    def _wrapped_callback(self, coef, intercept):
+        if self._callback is not None:
             self.coef_ = coef
             self.intercept_ = intercept
-            self.callback(self)
+            self._callback(self)
 
     def predict_proba(self, X):
         """Probability estimates.

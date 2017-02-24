@@ -14,10 +14,8 @@ from ..exceptions import ConvergenceWarning
 from ..utils import check_array
 from ..utils.extmath import row_norms
 
-from math import sqrt
 
 def get_auto_step_size(max_squared_sum, alpha_scaled, loss, fit_intercept,
-                       n_classes=1,
                        n_samples=None,
                        is_saga=False):
     """Compute automatic step size for SAG solver
@@ -60,8 +58,6 @@ def get_auto_step_size(max_squared_sum, alpha_scaled, loss, fit_intercept,
     else:
         raise ValueError("Unknown loss function for SAG solver, got %s "
                          "instead of 'log' or 'squared'" % loss)
-    mun = min(2 * n_samples * alpha_scaled, L)
-
     if is_saga:
         mun = min(2 * n_samples * alpha_scaled, L)
         step = 1. / (2 * L + mun)
@@ -275,12 +271,13 @@ def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
         max_squared_sum = row_norms(X, squared=True).max()
     step_size = get_auto_step_size(max_squared_sum, alpha_scaled, loss,
                                    fit_intercept, n_samples=n_samples,
-                                   n_classes=n_classes, is_saga=is_saga)
+                                   is_saga=is_saga)
     if step_size * alpha_scaled == 1:
         raise ZeroDivisionError("Current sag implementation does not handle "
                                 "the case step_size * alpha_scaled == 1")
 
     if callback is not None:
+        has_callback = True
         def _callback():
             if loss == 'multinomial':
                 coef = coef_init.T
@@ -289,6 +286,7 @@ def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
             intercept = intercept_init
             callback(coef, intercept)
     else:
+        has_callback = False
         _callback = None
 
     num_seen, n_iter_ = sag(dataset, coef_init,
@@ -306,6 +304,7 @@ def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
                             intercept_decay,
                             is_saga,
                             verbose,
+                            has_callback,
                             _callback)
     if n_iter_ == max_iter:
         warnings.warn("The max_iter was reached which means "

@@ -15,6 +15,7 @@ from .sgd_fast cimport LossFunction
 from .sgd_fast cimport Log, SquaredLoss
 from ..utils.seq_dataset cimport SequentialDataset
 
+from libc.stdio cimport printf
 
 cdef extern from "sgd_fast_helpers.h":
     bint skl_isfinite(double) nogil
@@ -233,6 +234,7 @@ def sag(SequentialDataset dataset,
         double intercept_decay,
         bint saga,
         bint verbose,
+        bint has_callback,
         object callback=None):
     """Stochastic Average Gradient (SAG) solver.
 
@@ -352,6 +354,10 @@ def sag(SequentialDataset dataset,
     with nogil:
         start_time = time(NULL)
         for n_iter in range(max_iter):
+            if has_callback:
+                with gil:
+                    if callback is not None:
+                        callback()
             for sample_itr in range(n_samples):
 
                 # extract a random sample
@@ -484,10 +490,8 @@ def sag(SequentialDataset dataset,
                               (n_iter + 1, end_time - start_time))
                 break
             elif verbose:
-                with gil:
-                    if callback is not None:
-                        callback()
-                    print('Change: %.8f' % (max_change / max_weight))
+                printf('Epoch %d, change: %.8f\n',n_iter + 1,
+                                                  max_change / max_weight)
     n_iter += 1
 
     if verbose and n_iter >= max_iter:
