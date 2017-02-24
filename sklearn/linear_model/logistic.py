@@ -1264,9 +1264,10 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
         return self
 
     def _callback(self, coef, intercept):
-        self.coef_ = coef
-        self.intercept_ = intercept
-        self.callback(self)
+        if self.callback is not None:
+            self.coef_ = coef
+            self.intercept_ = intercept
+            self.callback(self)
 
     def predict_proba(self, X):
         """Probability estimates.

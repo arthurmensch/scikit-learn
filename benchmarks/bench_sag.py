@@ -23,7 +23,7 @@ class Callback:
     def __call__(self, lr):
         test_time = time.clock()
         y_pred = lr.predict_proba(self.X)
-        score = lr.C * log_loss(self.y, y_pred)
+        score = lr.C * log_loss(self.y, y_pred, normalize=False)
         score += 0.5 * np.sum(lr.coef_ ** 2)
         print('Score', score)
         self.score.append(score)
@@ -42,6 +42,8 @@ X = X
 y = rcv1.target
 y = y
 y = lbin.inverse_transform(y)
+X = X[::10000]
+y = y[::10000]
 
 X_train, X_test, y_train, y_test = train_test_split(X, y)
 

@@ -255,12 +255,10 @@ def test_consistency_path():
         coefs, Cs, _ = f(logistic_regression_path)(
             X, y, Cs=Cs, fit_intercept=False, tol=1e-5, solver=solver,
             max_iter=1000,
-            verbose=True,
             random_state=0)
         for i, C in enumerate(Cs):
             lr = LogisticRegression(C=C, fit_intercept=False, tol=1e-5,
                                     solver=solver,
-                                    verbose=True,
                                     random_state=0)
             lr.fit(X, y)
             lr_coef = lr.coef_.ravel()
@@ -789,12 +787,10 @@ def test_logistic_regression_multinomial():
     assert_array_equal(ref_w.coef_.shape, (n_classes, n_features))
     for solver in ['sag', 'saga', 'newton-cg']:
         clf_i = LogisticRegression(solver=solver, multi_class='multinomial',
-                                   random_state=42, max_iter=2000, tol=1e-6,
-                                   verbose=False,
+                                   random_state=42, max_iter=2000, tol=1e-7,
                                    )
         clf_w = LogisticRegression(solver=solver, multi_class='multinomial',
-                                   random_state=42, max_iter=2000, tol=1e-6,
-                                   verbose=(solver == 'saga'),
+                                   random_state=42, max_iter=2000, tol=1e-7,
                                    fit_intercept=False)
         clf_i.fit(X, y)
         clf_w.fit(X, y)

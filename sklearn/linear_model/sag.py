@@ -14,8 +14,12 @@ from ..exceptions import ConvergenceWarning
 from ..utils import check_array
 from ..utils.extmath import row_norms
 
+from math import sqrt
 
-def get_auto_step_size(max_squared_sum, alpha_scaled, loss, fit_intercept):
+def get_auto_step_size(max_squared_sum, alpha_scaled, loss, fit_intercept,
+                       n_classes=1,
+                       n_samples=None,
+                       is_saga=False):
     """Compute automatic step size for SAG solver
 
     The step size is set to 1 / (alpha_scaled + L + fit_intercept) where L is
@@ -49,15 +53,21 @@ def get_auto_step_size(max_squared_sum, alpha_scaled, loss, fit_intercept):
     https://hal.inria.fr/hal-00860051/document
     """
     if loss in ('log', 'multinomial'):
-        # inverse Lipschitz constant for log loss
-        return 4.0 / (max_squared_sum + int(fit_intercept)
-                      + 4.0 * alpha_scaled)
+        L = (0.25 * max_squared_sum + int(fit_intercept) + alpha_scaled)
     elif loss == 'squared':
         # inverse Lipschitz constant for squared loss
-        return 1.0 / (max_squared_sum + int(fit_intercept) + alpha_scaled)
+        L = max_squared_sum + int(fit_intercept) + alpha_scaled
     else:
         raise ValueError("Unknown loss function for SAG solver, got %s "
                          "instead of 'log' or 'squared'" % loss)
+    mun = min(2 * n_samples * alpha_scaled, L)
+
+    if is_saga:
+        mun = min(2 * n_samples * alpha_scaled, L)
+        step = 1. / (2 * L + mun)
+    else:
+        step = 1. / L
+    return step
 
 
 def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
@@ -264,11 +274,8 @@ def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
     if max_squared_sum is None:
         max_squared_sum = row_norms(X, squared=True).max()
     step_size = get_auto_step_size(max_squared_sum, alpha_scaled, loss,
-                                   fit_intercept)
-    if is_saga:
-        # Ref: SAGA paper
-        step_size /= 2
-
+                                   fit_intercept, n_samples=n_samples,
+                                   n_classes=n_classes, is_saga=is_saga)
     if step_size * alpha_scaled == 1:
         raise ZeroDivisionError("Current sag implementation does not handle "
                                 "the case step_size * alpha_scaled == 1")
