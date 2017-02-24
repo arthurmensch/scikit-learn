@@ -396,6 +396,10 @@ def sag(SequentialDataset dataset,
 
                         feature_hist[feature_ind] = sample_itr
 
+                if beta > 0:
+                    # l1 reg
+
+
                 # find the current prediction
                 predict_sample(x_data_ptr, x_ind_ptr, xnnz, weights, wscale,
                                intercept, prediction, n_classes)
