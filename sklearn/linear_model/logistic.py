@@ -448,7 +448,8 @@ def logistic_regression_path(X, y, pos_class=None, Cs=10, fit_intercept=True,
                              class_weight=None, dual=False, penalty='l2',
                              intercept_scaling=1., multi_class='ovr',
                              random_state=None, check_input=True,
-                             max_squared_sum=None, sample_weight=None):
+                             max_squared_sum=None, sample_weight=None,
+                             callback=None):
     """Compute a Logistic Regression model for a list of regularization
     parameters.
 
@@ -736,7 +737,7 @@ def logistic_regression_path(X, y, pos_class=None, Cs=10, fit_intercept=True,
             w0, n_iter_i, warm_start_sag = sag_solver(
                 X, target, sample_weight, loss, 1. / C, max_iter, tol,
                 verbose, random_state, False, max_squared_sum, warm_start_sag,
-                is_saga=(solver == 'saga'))
+                is_saga=(solver == 'saga'), callback=callback)
 
         else:
             raise ValueError("solver must be one of {'liblinear', 'lbfgs', "
@@ -1120,7 +1121,8 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
     def __init__(self, penalty='l2', dual=False, tol=1e-4, C=1.0,
                  fit_intercept=True, intercept_scaling=1, class_weight=None,
                  random_state=None, solver='liblinear', max_iter=100,
-                 multi_class='ovr', verbose=0, warm_start=False, n_jobs=1):
+                 multi_class='ovr', verbose=0, warm_start=False, n_jobs=1,
+                 callback=None):
 
         self.penalty = penalty
         self.dual = dual
@@ -1136,6 +1138,7 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
         self.verbose = verbose
         self.warm_start = warm_start
         self.n_jobs = n_jobs
+        self.callback = callback
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model according to the given training data.
@@ -1240,7 +1243,8 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
                       class_weight=self.class_weight, check_input=False,
                       random_state=self.random_state, coef=warm_start_coef_,
                       max_squared_sum=max_squared_sum,
-                      sample_weight=sample_weight)
+                      sample_weight=sample_weight,
+                      callback=self._callback)
             for (class_, warm_start_coef_) in zip(classes_, warm_start_coef))
 
         fold_coefs_, _, n_iter_ = zip(*fold_coefs_)
@@ -1258,6 +1262,11 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
             self.coef_ = self.coef_[:, :-1]
 
         return self
+
+    def _callback(self, coef, intercept):
+        self.coef_ = coef
+        self.intercept_ = intercept
+        self.callback(self)
 
     def predict_proba(self, X):
         """Probability estimates.

@@ -232,7 +232,8 @@ def sag(SequentialDataset dataset,
         np.ndarray[double, ndim=1, mode='c'] intercept_sum_gradient_init,
         double intercept_decay,
         bint saga,
-        bint verbose):
+        bint verbose,
+        object callback=None):
     """Stochastic Average Gradient (SAG) solver.
 
     Used in Ridge and LogisticRegression.
@@ -484,6 +485,8 @@ def sag(SequentialDataset dataset,
                 break
             elif verbose:
                 with gil:
+                    if callback is not None:
+                        callback()
                     print('Change: %.8f' % (max_change / max_weight))
     n_iter += 1
 

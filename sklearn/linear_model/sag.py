@@ -50,7 +50,7 @@ def get_auto_step_size(max_squared_sum, alpha_scaled, loss, fit_intercept):
     """
     if loss in ('log', 'multinomial'):
         # inverse Lipschitz constant for log loss
-        return 4.0 / (max_squared_sum + int(fit_intercept)
+        return 4.0 / (0.25 * max_squared_sum + int(fit_intercept)
                       + 4.0 * alpha_scaled)
     elif loss == 'squared':
         # inverse Lipschitz constant for squared loss
@@ -64,6 +64,7 @@ def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
                max_iter=1000, tol=0.001, verbose=0, random_state=None,
                check_input=True, max_squared_sum=None,
                warm_start_mem=None,
+               callback=None,
                is_saga=False):
     """SAG solver for Ridge and LogisticRegression
 
@@ -272,6 +273,17 @@ def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
         raise ZeroDivisionError("Current sag implementation does not handle "
                                 "the case step_size * alpha_scaled == 1")
 
+    if callback is not None:
+        def _callback():
+            if loss == 'multinomial':
+                coef = coef_init.T
+            else:
+                coef = coef_init[:, 0]
+            intercept = intercept_init
+            callback(coef, intercept)
+    else:
+        _callback = None
+
     num_seen, n_iter_ = sag(dataset, coef_init,
                             intercept_init, n_samples,
                             n_features, n_classes, tol,
@@ -286,7 +298,8 @@ def sag_solver(X, y, sample_weight=None, loss='log', alpha=1.,
                             intercept_sum_gradient,
                             intercept_decay,
                             is_saga,
-                            verbose)
+                            verbose,
+                            _callback)
     if n_iter_ == max_iter:
         warnings.warn("The max_iter was reached which means "
                       "the coef_ did not converge", ConvergenceWarning)
