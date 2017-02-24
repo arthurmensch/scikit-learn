@@ -50,7 +50,7 @@ def get_auto_step_size(max_squared_sum, alpha_scaled, loss, fit_intercept):
     """
     if loss in ('log', 'multinomial'):
         # inverse Lipschitz constant for log loss
-        return 4.0 / (0.25 * max_squared_sum + int(fit_intercept)
+        return 4.0 / (max_squared_sum + int(fit_intercept)
                       + 4.0 * alpha_scaled)
     elif loss == 'squared':
         # inverse Lipschitz constant for squared loss
