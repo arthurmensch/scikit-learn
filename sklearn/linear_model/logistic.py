@@ -1262,7 +1262,7 @@ class LogisticRegression(BaseEstimator, LinearClassifierMixin,
         return self
 
     def _wrapped_callback(self, coef, intercept):
-        if self._callback is not None:
+        if hasattr(self, '_callback') and self._callback is not None:
             self.coef_ = coef
             self.intercept_ = intercept
             self._callback(self)
